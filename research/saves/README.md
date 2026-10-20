@@ -237,6 +237,12 @@ a single copy, like the vanilla code does. Move to A + C only if the data outgro
 
 ## Proposed function names
 
+**Merged into `Quest64Syms/names.toml` on 2026-10-20** (commit 778bbb4). Where the four write-ups proposed different names for the same address, names.toml wins. Changes from this table:
+
+- `spell_type4_return` → `spell_type_return`, `spell_type6_exit` → `spell_type_exit`
+- `gLastRoomMap` (+2, +4) → `gRespawnMap`, `gRespawnSubmap`, `gRespawnEntrance` (the NPC write-up showed it's the inn respawn point)
+- `gBossFlags` → `gBossDefeatedFlags`
+
 | Address | Proposed name | Evidence |
 |---|---|---|
 | `0x8002E234` | `save_gather_slot_data` | Copies stats, day, map, settings into the slot's 100-byte summary and the 200-byte world buffer |

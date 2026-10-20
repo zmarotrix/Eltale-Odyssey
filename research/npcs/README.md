@@ -212,6 +212,13 @@ Nothing in the text engine needs changing.
 
 ## Proposed function names
 
+**Merged into `Quest64Syms/names.toml` on 2026-10-20** (commit 778bbb4). Where the four write-ups proposed different names for the same address, names.toml wins. Changes from this table:
+
+- `player_field_update` → `player_update` (the same function runs Brian in battle)
+- `boss_spawn_for_room` → `boss_field_spawn`; `sysmenu_open` → `save_menu_open` (both callers open the save menu)
+- `0x800268D4` is **not** `sfx_play`: it's a wrapper that scales the volume and then calls `sfx_play` (0x80025B8C). Named `sfx_play_scaled`
+- Data: `gInnMap` / `gInnSubmap` / `gInnEntrance` → `gRespawnMap` / `gRespawnSubmap` / `gRespawnEntrance`
+
 | Address | Proposed name | Evidence |
 |---|---|---|
 | `0x80001800` | `field_mode_loop` | Runs while `gGameMode == 1`; per-frame calls to player, NPC, time updates; map load/inn/fade handling |

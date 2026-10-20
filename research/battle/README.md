@@ -301,6 +301,15 @@ to the respawn point `0x8007BA60/62/64` (map/submap/entrance), which is updated 
 
 ## Proposed function names
 
+**Merged into `Quest64Syms/names.toml` on 2026-10-20** (commit 778bbb4). Where the four write-ups proposed different names for the same address, names.toml wins. Changes from this table:
+
+- Brian's functions use `player_*` instead of `brian_*` (`player_update`, `player_spawn`, `player_state_idle`, ...)
+- `battle_damage_enemy` → `enemy_take_damage`, `battle_damage_brian` → `player_take_damage`
+- `battle_hit_check_vs_enemy` / `_vs_brian` → `battle_hit_roll_vs_enemy` / `battle_hit_roll_vs_player`
+- `enemy_melee_damage` → `ai_melee_damage`; enemy states use `ai_state_*` (`enemy_state_move` → `ai_state_approach`)
+- `enemy_spawn_init` → `enemy_spawn`; `battle_turn_manager` → `battle_update` (it also runs the victory rewards)
+- Data: `gPlayerStats` kept as the existing `gPlayerMainData`; `gEnemiesAlive` → `gEnemyCount`; `gElementMasks` → `gElementWeakMasks`; `gBrianStateHandlers` → `gPlayerStateHandlers`. `gPlayer`, `gPlayerCombat` and `gSpellMpCost` were not added (no data symbol at those addresses; the MP cost is a field of each spell record)
+
 | Address | Name | Evidence |
 |---|---|---|
 | `0x80002F60` | `brian_update` | Per-frame Brian logic; calls `spell_menu_input`/`spell_cast_init`; pays victory rewards; dispatches state table `0x8004C230` |

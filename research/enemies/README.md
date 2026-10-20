@@ -451,6 +451,14 @@ Things to keep in mind when changing enemy spells:
 
 ## Proposed function names
 
+**Merged into `Quest64Syms/names.toml` on 2026-10-20** (commit 778bbb4). Where the four write-ups proposed different names for the same address, names.toml wins. Changes from this table:
+
+- `brian_take_damage` → `player_take_damage`
+- `enemy_give_turn` → `enemy_turn_begin`
+- `ai_melee_hit_roll` → `battle_hit_roll_vs_player` (spell_hit_check calls it too, not only melee)
+- `battle_start_random` → `battle_try_random_encounter`; `battle_end` → `battle_update` (per-frame flow, not only the end)
+- Data: `enemy_slots` → `gEnemies`, `enemy_count` → `gEnemyCount`, `enemy_set_table` → `gEnemySetTable`, `ai_state_handlers` → `gEnemyStateHandlers`, `element_weak_bits` → `gElementWeakMasks`, `boss_bonus_hp` → `gBossBonusHp`, `boss_spell_effect_lists` → `gBossSpellEffectLists`, `boss_defeated_flags` → `gBossDefeatedFlags`. The boss tables at 0x803A9xxx were not added (no data symbols there)
+
 For the main session to merge into `Quest64Syms/names.toml`. CONFIRMED = behaviour read from the code;
 PLAUSIBLE = consistent with the code but not fully traced.
 
