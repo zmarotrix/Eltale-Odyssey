@@ -187,6 +187,24 @@ the two lists are separate data that mostly match. One possible mismatch: for ma
 for "Dindom Dries Hut", but the spawn table has 0x14 (`0x8002CB6C`), so that save may show the wrong name in the list (not tested). For reference, a new game starts in map 0x0D, submap 0x11
 ("First Room (Grand Abbott)"), which is not a save point.
 
+### Save menu steps (checked 2026-10-20)
+
+`save_menu_update` runs one step per frame, picked by the low 3 bits of `gSaveMenuState` through the jump table at
+`0x80071764` (read from the ROM). **The order is not the order the calls appear in the code:**
+
+| Step | Calls | What it does |
+|---|---|---|
+| 0 | `save_menu_draw_slots(0)` | Slot list |
+| 1 | `func_8002DBE0` | (not traced) |
+| 2 | `save_load_slot` | **Load** the selected slot |
+| 3 | `save_write_slot` | **Write** the selected slot |
+| 4 | `save_delete_slot` | Delete the selected slot |
+| 5 | `func_8002BCA0` | (not traced) |
+| 6 | `func_8002D5D4` | (not traced) |
+
+Setting the step by hand to 3 thinking it was "load" overwrote a real save on 2026-10-20. To load without the menu,
+call `pak_scan_notes`, `save_read_slot_list` and `save_load_slot` directly (`Quest64-ModTemplate/examples/quick-load`).
+
 ## 4. Where can overhaul data go?
 
 What the overhaul needs, packed tightly (rough guess, to adjust when the design settles):
