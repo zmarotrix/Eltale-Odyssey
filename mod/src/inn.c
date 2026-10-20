@@ -60,7 +60,10 @@ static u32 nights_in_row(int inn) {
         return 0;
     }
     // The previous night itself adds a third of a day, so "in a row" means less than a day after it started.
-    if (eo_now() - gEo.last_rest_time >= DAY_LENGTH) {
+    // Saves keep the day but not the time of day, so after loading "now" can be earlier than the last night;
+    // count that as no time passed.
+    u32 now = eo_now();
+    if (now > gEo.last_rest_time && now - gEo.last_rest_time >= DAY_LENGTH) {
         return 0;
     }
     u32 extra = gEo.inn_nights_in_row + 1u;
