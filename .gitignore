@@ -1,0 +1,10 @@
+# Never commit ROMs or save files
+*.z64
+*.n64
+*.v64
+*.sav
+*.bin
+
+# Build output
+build/
+__pycache__/
