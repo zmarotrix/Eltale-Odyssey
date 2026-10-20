@@ -16,7 +16,13 @@ This repository is **local only** for now.
 | --- | --- |
 | `mod/` | The overhaul itself, built as a mod for Quest 64: Recompiled (empty until phase 1) |
 | `research/` | Reverse-engineering notes: spells, stats, time, menus, saves, battle, enemies, NPCs |
-| `tools/` | Analysis scripts (spell table dump, stat logger, spreadsheet converter) |
+| `tools/` | Shared scripts (`sheet2txt.py` turns the modding spreadsheet export into searchable text) |
+
+Scripts that belong to one topic live next to its notes (`research/spells/dump_spells.py`,
+`research/stats/stat_logger.py`).
+
+**Never publish ROM-derived files.** Some research files are extracted from the game (the sprite and font
+renders in `research/menus/`, `research/spells/spells_raw.csv`). They're fine locally but must not be shared.
 
 ## Related projects (separate folders next to this one)
 
