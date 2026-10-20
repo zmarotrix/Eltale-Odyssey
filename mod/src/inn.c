@@ -16,7 +16,7 @@
 #define NPC_SLOT_SIZE   0x84
 
 // The price window, centered near the top of the screen, clear of the dialogue box at the bottom.
-#define PRICE_WIN_W 150
+#define PRICE_WIN_W 180  // 20 characters of the 8 px dialogue font, plus margins
 #define PRICE_WIN_H 36
 #define PRICE_WIN_X ((320 - PRICE_WIN_W) / 2)
 #define PRICE_WIN_Y 16
@@ -119,6 +119,30 @@ RECOMP_HOOK("player_state_talking") void eo_inn_on_answer(void) {
     GOLD -= price;  // shown by the gold notice once the HUD is back
 }
 
+// "<label><amount right-aligned in 6 columns> gold", so amounts and "gold" line up (the font is fixed-width).
+static void price_line(char* out, const char* label, u32 amount) {
+    char number[12];
+    eo_format_u32(number, "", amount, "");
+    int len = 0;
+    while (number[len] != '\0') {
+        len++;
+    }
+    while (*label) {
+        *out++ = *label++;
+    }
+    for (int pad = 6 - len; pad > 0; pad--) {
+        *out++ = ' ';
+    }
+    for (int i = 0; i < len; i++) {
+        *out++ = number[i];
+    }
+    const char* unit = " gold";
+    while (*unit) {
+        *out++ = *unit++;
+    }
+    *out = '\0';
+}
+
 // While the inn's Yes/No box is open, show the price of tonight and what you have.
 // The dialogue frame doesn't run hud_draw_main, so this draws after the message windows instead.
 RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
@@ -129,8 +153,8 @@ RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
     u32 price = night_price(inn, nights_in_row(inn));
     char line1[24];
     char line2[24];
-    eo_format_u32(line1, "One night  ", price, " gold");
-    eo_format_u32(line2, "You have  ", GOLD, " gold");
+    price_line(line1, "One night", price);
+    price_line(line2, "You have ", GOLD);
     // A small window in the dialogue box's own style and font, drawn right after the game's windows.
     eo_ui_window(PRICE_WIN_X, PRICE_WIN_Y, PRICE_WIN_W, PRICE_WIN_H);
     eo_ui_text(PRICE_WIN_X + 10, PRICE_WIN_Y + 7, line1);
