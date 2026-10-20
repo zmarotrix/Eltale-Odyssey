@@ -1,0 +1,25 @@
+# Eltale Odyssey: the Quest 64 overhaul, built as a Quest 64: Recompiled mod.
+
+[manifest]
+
+id = "eltale_odyssey"
+version = "0.1.0"
+display_name = "Eltale Odyssey"
+description = """
+A mechanics overhaul of Quest 64. This early build adds gold (earned from battles, kept in your save) \
+and inns that charge for a night, more for each night in a row at the same inn."""
+short_description = "Quest 64 mechanics overhaul (early build: gold and paid inns)."
+authors = [ "zmarotrix" ]
+game_id = "qs64"
+minimum_recomp_version = "1.0.2"
+dependencies = [ ]
+optional_dependencies = [ ]
+native_libraries = [ ]
+
+[inputs]
+
+elf_path = "build/mod.elf"
+mod_filename = "eltale_odyssey"
+func_reference_syms_file = "../../Quest64-Recomp/Quest64Syms/dump.toml"
+data_reference_syms_files = [ "../../Quest64-Recomp/Quest64Syms/data_dump.toml" ]
+additional_files = [ ]
