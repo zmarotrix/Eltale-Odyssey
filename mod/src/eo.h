@@ -77,9 +77,13 @@ u32 eo_now(void);
 // ---- Native UI pieces (ui.c) ----
 void eo_ui_window(s32 x, s32 y, s32 w, s32 h);
 void eo_ui_text(s32 x, s32 y, const char* text);  // letters, digits and spaces
+// "<label><amount right-aligned so the two fill `columns` characters><unit>": amounts line up in the
+// fixed-width dialogue font.
+void eo_format_amount(char* out, const char* label, u32 amount, int columns, const char* unit);
 
 // ---- Gold display (gold.c) ----
 void eo_gold_resync(void);
+#define NOTICE_COLUMNS 12  // width of a gold notice line, in characters
 void eo_gold_notice(const char* line1, const char* line2);
 void eo_format_u32(char* out, const char* prefix, u32 value, const char* suffix);
 

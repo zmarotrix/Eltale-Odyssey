@@ -1,11 +1,13 @@
 #include "eo.h"
 
-// Shows gold on the field HUD for a few seconds whenever it changes (a won battle, a paid night),
-// in the game's own HUD font. There's no permanent counter: you see your purse when it matters.
+// Shows gold in a small window for a few seconds whenever it changes (a won battle, a paid night),
+// in the dialogue box's style. There's no permanent counter: you see your purse when it matters.
 
 #define NOTICE_FRAMES 150
-#define NOTICE_X 214
-#define NOTICE_Y 18
+#define NOTICE_W (NOTICE_COLUMNS * 8 + 20)  // 8 px characters plus margins
+#define NOTICE_H 36
+#define NOTICE_X (320 - 16 - 3 - NOTICE_W)  // top right, shadow inside the safe area
+#define NOTICE_Y 16
 
 static u32 shown_gold;
 static int synced = 0;
@@ -65,11 +67,11 @@ static void watch_gold(void) {
     }
     char line1[24];
     char line2[24];
-    eo_format_u32(line1, "GOLD ", gold, "");
+    eo_format_amount(line1, "Gold", gold, NOTICE_COLUMNS, "");
     if (gold > shown_gold) {
-        eo_format_u32(line2, "+", gold - shown_gold, "");
+        eo_format_amount(line2, "Won", gold - shown_gold, NOTICE_COLUMNS, "");
     } else {
-        eo_format_u32(line2, "-", shown_gold - gold, "");
+        eo_format_amount(line2, "Paid", shown_gold - gold, NOTICE_COLUMNS, "");
     }
     shown_gold = gold;
     eo_gold_notice(line1, line2);
@@ -82,6 +84,8 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_gold_draw(void) {
         return;
     }
     notice_timer--;
-    hud_draw_text(NOTICE_X, NOTICE_Y, 0, notice_line1);
-    hud_draw_text(NOTICE_X, NOTICE_Y + 10, 2, notice_line2);
+    // The same parchment window and font as the game's dialogue box (the font is loaded once at boot).
+    eo_ui_window(NOTICE_X, NOTICE_Y, NOTICE_W, NOTICE_H);
+    eo_ui_text(NOTICE_X + 10, NOTICE_Y + 7, notice_line1);
+    eo_ui_text(NOTICE_X + 10, NOTICE_Y + 21, notice_line2);
 }

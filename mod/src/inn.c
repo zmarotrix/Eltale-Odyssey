@@ -17,6 +17,7 @@
 
 // The price window, centered at the top or bottom of the screen, whichever the game's windows leave free
 // (the dialogue box moves between them depending on where Brian stands).
+#define PRICE_COLUMNS 15  // label + right-aligned amount; " gold" follows
 #define PRICE_WIN_W 180  // 20 characters of the 8 px dialogue font, plus margins
 #define PRICE_WIN_H 36
 #define PRICE_WIN_X ((320 - PRICE_WIN_W) / 2)
@@ -114,8 +115,8 @@ RECOMP_HOOK("player_state_talking") void eo_inn_on_answer(void) {
     if (GOLD < price) {
         gMsgChoiceResult = 1;  // the game now treats it as No: no rest, no heal, no save
         sfx_play(SFX_CANCEL, 0xFF, 0x40);
-        eo_format_u32(line1, "GOLD ", GOLD, "");
-        eo_format_u32(line2, "NEED ", price, "");
+        eo_format_amount(line1, "Gold", GOLD, NOTICE_COLUMNS, "");
+        eo_format_amount(line2, "Need", price, NOTICE_COLUMNS, "");
         eo_gold_notice(line1, line2);
         return;
     }
@@ -124,30 +125,6 @@ RECOMP_HOOK("player_state_talking") void eo_inn_on_answer(void) {
     gEo.inn_nights_in_row = (u8)extra;
     gEo.last_rest_time = eo_now();
     GOLD -= price;  // shown by the gold notice once the HUD is back
-}
-
-// "<label><amount right-aligned in 6 columns> gold", so amounts and "gold" line up (the font is fixed-width).
-static void price_line(char* out, const char* label, u32 amount) {
-    char number[12];
-    eo_format_u32(number, "", amount, "");
-    int len = 0;
-    while (number[len] != '\0') {
-        len++;
-    }
-    while (*label) {
-        *out++ = *label++;
-    }
-    for (int pad = 6 - len; pad > 0; pad--) {
-        *out++ = ' ';
-    }
-    for (int i = 0; i < len; i++) {
-        *out++ = number[i];
-    }
-    const char* unit = " gold";
-    while (*unit) {
-        *out++ = *unit++;
-    }
-    *out = '\0';
 }
 
 // True if a price window at height y would cover any open message window (shadows included).
@@ -178,8 +155,8 @@ RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
     u32 price = night_price(inn, nights_in_row(inn));
     char line1[24];
     char line2[24];
-    price_line(line1, "One night", price);
-    price_line(line2, "You have ", GOLD);
+    eo_format_amount(line1, "One night", price, PRICE_COLUMNS, " gold");
+    eo_format_amount(line2, "You have", GOLD, PRICE_COLUMNS, " gold");
     // A small window in the dialogue box's own style and font, drawn right after the game's windows.
     s32 y = overlaps_game_window(PRICE_WIN_TOP_Y) ? PRICE_WIN_BOTTOM_Y : PRICE_WIN_TOP_Y;
     eo_ui_window(PRICE_WIN_X, y, PRICE_WIN_W, PRICE_WIN_H);

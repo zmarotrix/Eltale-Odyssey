@@ -76,3 +76,26 @@ void eo_ui_text(s32 x, s32 y, const char* text) {
     encode(encoded, text);
     ui_draw_text(x, y, encoded);
 }
+
+void eo_format_amount(char* out, const char* label, u32 amount, int columns, const char* unit) {
+    char number[12];
+    eo_format_u32(number, "", amount, "");
+    int used = 0;
+    while (label[used] != '\0') {
+        *out++ = label[used++];
+    }
+    int len = 0;
+    while (number[len] != '\0') {
+        len++;
+    }
+    for (int pad = columns - used - len; pad > 0; pad--) {
+        *out++ = ' ';
+    }
+    for (int i = 0; i < len; i++) {
+        *out++ = number[i];
+    }
+    while (*unit != '\0') {
+        *out++ = *unit++;
+    }
+    *out = '\0';
+}
