@@ -15,6 +15,12 @@
 #define NPC_RECORD_PTRS 0x8007BDB0
 #define NPC_SLOT_SIZE   0x84
 
+// The price window, centered near the top of the screen, clear of the dialogue box at the bottom.
+#define PRICE_WIN_W 150
+#define PRICE_WIN_H 36
+#define PRICE_WIN_X ((320 - PRICE_WIN_W) / 2)
+#define PRICE_WIN_Y 16
+
 typedef struct {
     u8 map;
     u8 submap;
@@ -123,10 +129,10 @@ RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
     u32 price = night_price(inn, nights_in_row(inn));
     char line1[24];
     char line2[24];
-    eo_format_u32(line1, "A NIGHT ", price, " GOLD");
-    eo_format_u32(line2, "YOU HAVE ", GOLD, "");
-    // The dialogue box leaves its own color combine set, which turns HUD text dark; restore the HUD's setup.
-    gfx_call(HUD_SETUP_DL);
-    hud_draw_text(160 - 3 * 18, 18, 0, line1);
-    hud_draw_text(160 - 3 * 18, 28, GOLD < price ? 3 : 2, line2);
+    eo_format_u32(line1, "One night  ", price, " gold");
+    eo_format_u32(line2, "You have  ", GOLD, " gold");
+    // A small window in the dialogue box's own style and font, drawn right after the game's windows.
+    eo_ui_window(PRICE_WIN_X, PRICE_WIN_Y, PRICE_WIN_W, PRICE_WIN_H);
+    eo_ui_text(PRICE_WIN_X + 10, PRICE_WIN_Y + 7, line1);
+    eo_ui_text(PRICE_WIN_X + 10, PRICE_WIN_Y + 21, line2);
 }

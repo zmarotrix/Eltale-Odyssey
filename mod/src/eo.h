@@ -12,6 +12,8 @@
 s32 pak_read(s32 pak, s32 file, s32 offset, s32 size, void* buf);
 s32 pak_write(s32 pak, s32 file, s32 offset, s32 size, void* buf);
 void hud_draw_text(s32 x, s32 y, s32 palette, const char* text);
+void ui_draw_rect(s32 style, s32 x, s32 y, s32 w, s32 h);
+void ui_draw_text(s32 x, s32 y, const u8* text);  // text in the game's own encoding
 void sfx_play(s32 sound, s32 arg1, s32 volume);
 
 // ---- Game data ----
@@ -27,14 +29,11 @@ extern s32 gMsgChoiceResult;    // -1 pending, 0 = first option (Yes), 1 = No
 
 extern u32* gMasterGfxPos;      // next free command in the frame's display list
 
-// The HUD's render setup (copy mode, TLUT on, texture-only combine), called by hud_draw_main before its text.
-#define HUD_SETUP_DL 0x803A6FC0
-
-// Appends gSPDisplayList(dl) to the frame's display list.
-static inline void gfx_call(u32 dl) {
+// Appends one raw display-list command to the frame.
+static inline void eo_gfx(u32 w0, u32 w1) {
     u32* g = gMasterGfxPos;
-    g[0] = 0x06000000;
-    g[1] = dl;
+    g[0] = w0;
+    g[1] = w1;
     gMasterGfxPos = g + 2;
 }
 
@@ -74,6 +73,10 @@ extern EoSaveBlock gEo;
 
 void eo_reset(void);
 u32 eo_now(void);
+
+// ---- Native UI pieces (ui.c) ----
+void eo_ui_window(s32 x, s32 y, s32 w, s32 h);
+void eo_ui_text(s32 x, s32 y, const char* text);  // letters, digits and spaces
 
 // ---- Gold display (gold.c) ----
 void eo_gold_resync(void);
