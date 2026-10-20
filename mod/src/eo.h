@@ -25,6 +25,19 @@ extern s32 gTalkTargetNpc;      // NPC slot being talked to
 extern s32 gMsgWinOpenCount;
 extern s32 gMsgChoiceResult;    // -1 pending, 0 = first option (Yes), 1 = No
 
+extern u32* gMasterGfxPos;      // next free command in the frame's display list
+
+// The HUD's render setup (copy mode, TLUT on, texture-only combine), called by hud_draw_main before its text.
+#define HUD_SETUP_DL 0x803A6FC0
+
+// Appends gSPDisplayList(dl) to the frame's display list.
+static inline void gfx_call(u32 dl) {
+    u32* g = gMasterGfxPos;
+    g[0] = 0x06000000;
+    g[1] = dl;
+    gMasterGfxPos = g + 2;
+}
+
 #define GAME_STATE_CHOICE_PENDING 0x10
 #define GAME_STATE_RESTING        0x400
 

@@ -122,6 +122,8 @@ RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
     char line2[24];
     eo_format_u32(line1, "A NIGHT ", price, " GOLD");
     eo_format_u32(line2, "YOU HAVE ", GOLD, "");
+    // The dialogue box leaves its own color combine set, which turns HUD text dark; restore the HUD's setup.
+    gfx_call(HUD_SETUP_DL);
     hud_draw_text(160 - 3 * 18, 18, 0, line1);
     hud_draw_text(160 - 3 * 18, 28, GOLD < price ? 3 : 2, line2);
 }
