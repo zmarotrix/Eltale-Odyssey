@@ -18,6 +18,7 @@ void sfx_play(s32 sound, s32 arg1, s32 volume);
 
 // ---- Game data ----
 extern u32 gGameState;
+extern u16 gGameMode;           // 1 = field, 2 = system menu, 3 = title
 extern u32 gPlayerMainData[];   // Brian's stat block; see research/saves (summary offsets 0x00-0x37)
 extern s32 gNextMap;
 extern s32 gNextSubmap;
@@ -80,6 +81,9 @@ void eo_ui_text(s32 x, s32 y, const char* text);  // letters, digits and spaces
 // "<label><amount right-aligned so the two fill `columns` characters><unit>": amounts line up in the
 // fixed-width dialogue font.
 void eo_format_amount(char* out, const char* label, u32 amount, int columns, const char* unit);
+
+// ---- Status effects (status.c) ----
+void eo_status_cure_poison(void);
 
 // ---- Gold display (gold.c) ----
 void eo_gold_resync(void);

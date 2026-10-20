@@ -125,6 +125,7 @@ RECOMP_HOOK("player_state_talking") void eo_inn_on_answer(void) {
     gEo.inn_nights_in_row = (u8)extra;
     gEo.last_rest_time = eo_now();
     GOLD -= price;  // shown by the gold notice once the HUD is back
+    eo_status_cure_poison();  // a night's rest cures poison along with the heal
 }
 
 // True if a price window at height y would cover any open message window (shadows included).
