@@ -15,11 +15,18 @@
 #define NPC_RECORD_PTRS 0x8007BDB0
 #define NPC_SLOT_SIZE   0x84
 
-// The price window, centered near the top of the screen, clear of the dialogue box at the bottom.
+// The price window, centered at the top or bottom of the screen, whichever the game's windows leave free
+// (the dialogue box moves between them depending on where Brian stands).
 #define PRICE_WIN_W 180  // 20 characters of the 8 px dialogue font, plus margins
 #define PRICE_WIN_H 36
 #define PRICE_WIN_X ((320 - PRICE_WIN_W) / 2)
-#define PRICE_WIN_Y 16
+#define PRICE_WIN_TOP_Y    16
+#define PRICE_WIN_BOTTOM_Y (240 - 16 - PRICE_WIN_H - 3)
+
+// Message window slots (research/menus, ui_draw_window): flags at +0 (nonzero while in use), then s16 x, y, w, h.
+#define MSG_WINDOWS     0x800905E0
+#define MSG_WINDOW_SIZE 0x89C
+#define MSG_WINDOW_COUNT 4
 
 typedef struct {
     u8 map;
@@ -143,6 +150,24 @@ static void price_line(char* out, const char* label, u32 amount) {
     *out = '\0';
 }
 
+// True if a price window at height y would cover any open message window (shadows included).
+static int overlaps_game_window(s32 y) {
+    for (int i = 0; i < MSG_WINDOW_COUNT; i++) {
+        u8* slot = (u8*)(MSG_WINDOWS + i * MSG_WINDOW_SIZE);
+        if (*(u32*)slot == 0) {
+            continue;
+        }
+        s32 wx = *(s16*)(slot + 4);
+        s32 wy = *(s16*)(slot + 6);
+        s32 ww = *(s16*)(slot + 8) + 3;
+        s32 wh = *(s16*)(slot + 10) + 3;
+        if (PRICE_WIN_X < wx + ww && wx < PRICE_WIN_X + PRICE_WIN_W + 3 && y < wy + wh && wy < y + PRICE_WIN_H + 3) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 // While the inn's Yes/No box is open, show the price of tonight and what you have.
 // The dialogue frame doesn't run hud_draw_main, so this draws after the message windows instead.
 RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
@@ -156,7 +181,8 @@ RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
     price_line(line1, "One night", price);
     price_line(line2, "You have ", GOLD);
     // A small window in the dialogue box's own style and font, drawn right after the game's windows.
-    eo_ui_window(PRICE_WIN_X, PRICE_WIN_Y, PRICE_WIN_W, PRICE_WIN_H);
-    eo_ui_text(PRICE_WIN_X + 10, PRICE_WIN_Y + 7, line1);
-    eo_ui_text(PRICE_WIN_X + 10, PRICE_WIN_Y + 21, line2);
+    s32 y = overlaps_game_window(PRICE_WIN_TOP_Y) ? PRICE_WIN_BOTTOM_Y : PRICE_WIN_TOP_Y;
+    eo_ui_window(PRICE_WIN_X, y, PRICE_WIN_W, PRICE_WIN_H);
+    eo_ui_text(PRICE_WIN_X + 10, y + 7, line1);
+    eo_ui_text(PRICE_WIN_X + 10, y + 21, line2);
 }
