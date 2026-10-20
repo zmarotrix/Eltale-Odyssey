@@ -36,25 +36,25 @@ typedef struct {
 } InnPrice;
 
 // The 17 save points from the game's save spawn table (research/saves), in table order.
-// First-pass prices: about 1-2 normal fights of the game's own gold in that area; tune in playtests.
+// Prices: about 1-2 normal fights of the game's own gold in that area (pacing plan, "Gold and shops").
 static const InnPrice inn_prices[] = {
     { 0x0F, 0x05,  40 },  //  0 Melrode Inn
     { 0x10, 0x07,  40 },  //  1 Dondoran Inn
-    { 0x10, 0x0F,  80 },  //  2 Dondoran Flats Inn
-    { 0x12, 0x06,  80 },  //  3 West Carmagh Inn
-    { 0x11, 0x00, 100 },  //  4 Larapool Inn
-    { 0x12, 0x07,  80 },  //  5 Cull Hazard Cottage
-    { 0x14, 0x05, 100 },  //  6 Normoon Inn
-    { 0x16, 0x16, 200 },  //  7 Limelin Wharf
-    { 0x16, 0x0E, 200 },  //  8 Limelin Inn
-    { 0x17, 0x00, 250 },  //  9 Greenoch Inn
-    { 0x17, 0x14, 250 },  // 10 Dindom Dries Hut
-    { 0x17, 0x16, 400 },  // 11 Baragoon Moor House
-    { 0x17, 0x08, 400 },  // 12 Brannoch Inn
+    { 0x10, 0x0F, 100 },  //  2 Dondoran Flats Inn
+    { 0x12, 0x06, 160 },  //  3 West Carmagh Inn
+    { 0x11, 0x00, 120 },  //  4 Larapool Inn
+    { 0x12, 0x07, 240 },  //  5 Cull Hazard Cottage
+    { 0x14, 0x05, 280 },  //  6 Normoon Inn
+    { 0x16, 0x16, 260 },  //  7 Limelin Wharf
+    { 0x16, 0x0E, 260 },  //  8 Limelin Inn
+    { 0x17, 0x00, 400 },  //  9 Greenoch Inn
+    { 0x17, 0x14, 400 },  // 10 Dindom Dries Hut
+    { 0x17, 0x16, 480 },  // 11 Baragoon Moor House
+    { 0x17, 0x08, 500 },  // 12 Brannoch Inn
     { 0x1A, 0x03, 150 },  // 13 Epona's Cottage
     { 0x19, 0x03, 150 },  // 14 Seagoing Ship
-    { 0x1E, 0x0F, 500 },  // 15 Brannoch Castle
-    { 0x0F, 0x0D, 500 },  // 16 Floating Monastery
+    { 0x1E, 0x0F, 520 },  // 15 Brannoch Castle
+    { 0x0F, 0x0D, 800 },  // 16 Floating Monastery
 };
 #define INN_COUNT (sizeof(inn_prices) / sizeof(inn_prices[0]))
 #define UNKNOWN_INN_PRICE 100
