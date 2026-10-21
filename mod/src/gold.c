@@ -89,3 +89,22 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_gold_draw(void) {
     eo_ui_text(NOTICE_X + 10, NOTICE_Y + 7, notice_line1);
     eo_ui_text(NOTICE_X + 10, NOTICE_Y + 21, notice_line2);
 }
+
+// Boss gold (pacing plan, "Gold and shops"). Only Solvaring carries gold in the ROM (200, paid through the
+// normal battle reward); the others give none, so the overhaul adds theirs on top.
+static const u16 boss_gold[] = {
+    0,     // 0 Solvaring (pays its own 200)
+    2000,  // 1 Zelse
+    1500,  // 2 Nepty
+    3000,  // 3 Shilf
+    3000,  // 4 Fargo
+    4500,  // 5 Guilty
+    5000,  // 6 Beigis
+    0,     // 7 Mammon (the ending follows)
+};
+
+RECOMP_HOOK("boss_give_reward") void eo_gold_on_boss_reward(s32 boss) {
+    if (boss >= 0 && boss < (s32)(sizeof(boss_gold) / sizeof(boss_gold[0]))) {
+        GOLD += boss_gold[boss];
+    }
+}
