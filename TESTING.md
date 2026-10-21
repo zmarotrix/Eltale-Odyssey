@@ -31,20 +31,26 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
 ## Combat slice
 
 - [ ] **Enemy spells are separate** from Brian's (checked: monsters cast from their own copies).
-- [ ] **Element rebalance** (Brian only): Fire Ball 200, Rock 320, Water Pillar 285, Wind Cutter 2 shots of 143.
+- [ ] **Element rebalance** (Brian only): Fire Ball 200, Rock 247 (Earth now 0.85x vanilla across the board, it was
+      still the only right answer), Water Pillar 285, Wind Cutter 2 shots of 150.
       Enemies keep the vanilla numbers. How does each element feel in Holy Plains?
 - [ ] **Burn**: hit something with a Fire spell; from your next turn it takes extra damage numbers each turn for
       3 turns, stacking up to 3 hits. Burn can kill.
 - [ ] **Fire Bomb** on a burning enemy sets off all its remaining Burn at once.
-- [ ] **Poison**: Man Eaters and Bumbershoots can poison you (about 1 hit in 3). "Poisoned" window under the HP
+- [ ] **Poison**: Man Eaters and Bumbershoots can poison you (about 1 hit in 3). a purple drop icon right of the HP
       bar, 5% max HP per turn for 4 turns, also ticks outside battle, never below 1 HP. Water healing or an inn
       night cures it.
 
 ## Spirit Charge, shields and Break (new)
 
-In battle there are two new panels: **Charge / Boost** in the bottom right corner, and an **enemy list** (top right) with
-each enemy's shields and weakness ("?" until you hit it with the right element; for now the weakness is always the
-element opposite the monster's own).
+**Charge** shows as five diamonds right of the HP bar: purple = charge you have, gold = charge your Boost is about
+to spend, dark = empty. The enemy list is gone: icons float above each enemy instead (a white burst = Broken,
+a flame = burning, a coloured diamond = its weakness once you've revealed it). No durations are shown; track
+them yourself. For now the weakness is always the element opposite the monster's own.
+
+- [ ] While picking a spell, a one-line **description** of the selected spell shows under the spell name
+      ("UNKNOWN - CAST IT TO LEARN IT." for "???" spells). (Checked by Claude: diamonds, gold spend colour,
+      markers, description.)
 
 - [ ] Charge starts at 1 and goes up by 1 each of your turns (max 5), but not on the turn after you spend some.
       Your first weakness hit in a turn gives +1. (Checked by Claude.)
@@ -57,6 +63,11 @@ element opposite the monster's own).
 - [ ] Does Boost feel worth saving charge for? Are shield counts (2-4, bosses 6-10) right?
 
 Note: Holy Plains enemies die before they can be Broken; Break matters from tougher areas on.
+
+## Smaller windows
+
+- [ ] Shop, Spirits, Equipment, the inn's price window and the gold notice now use the HUD's small font, so they
+      take about a quarter less room. (Checked by Claude: inn price, Spirits, Equipment.) Too small to read?
 
 ## Spirits: points, tiers and discovering spells (new)
 
