@@ -58,7 +58,7 @@ static const u32 game_light[LIGHT_COUNT] = { 0x80085770, 0x80085780, 0x80085790,
 #define COLOR_YELLOW 6
 #define COLOR_ORANGE 15
 
-#define FLAME_FRAMES 24           // how long a burst lasts
+#define FLAME_FRAMES 16           // how long a burst lasts; one ember every other frame
 #define FLAME_SCALE 1.2f          // the game's sparkles are 1.3; it shrinks them to 1.0 near the end
 #define FLAME_HEIGHT 0.2f         // spawn this far up the body (0 = feet, 1 = top)
 
@@ -159,7 +159,7 @@ static void spawn_flame(int slot) {
     for (int k = 0; k < PARTICLE_SIZE; k++) {
         p[k] = SPARKLE_TEMPLATE[k];
     }
-    *(u16*)(p + P_LIFE) = (u16)(18 + get_rand(12));
+    *(u16*)(p + P_LIFE) = (u16)(12 + get_rand(8));
     *(u32**)(p + P_GFX) = flame_gfx();
     *(f32*)(p + P_POS + 0) = x + rand_unit() * width;
     *(f32*)(p + P_POS + 4) = y + rand_unit() * width * 0.2f;
@@ -167,7 +167,7 @@ static void spawn_flame(int slot) {
     *(f32*)(p + P_SCALE + 0) = FLAME_SCALE;
     *(f32*)(p + P_SCALE + 4) = FLAME_SCALE;
     *(f32*)(p + P_VEL + 0) = rand_unit() * 0.3f;
-    *(f32*)(p + P_VEL + 4) = 1.0f + (f32)get_rand(100) / 100.0f;
+    *(f32*)(p + P_VEL + 4) = 0.4f + (f32)get_rand(40) / 100.0f;
     *(f32*)(p + P_VEL + 8) = rand_unit() * 0.3f;
     int pick = get_rand(6);
     p[P_COLOR] = pick < 2 ? COLOR_RED : pick < 4 ? COLOR_SCARLET : pick < 5 ? COLOR_ORANGE : COLOR_YELLOW;
@@ -188,7 +188,6 @@ void eo_fx_update(void) {
             continue;
         }
         flame_frames[i]--;
-        spawn_flame(i);
         if (flame_frames[i] & 1) {
             spawn_flame(i);
         }
