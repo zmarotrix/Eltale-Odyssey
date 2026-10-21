@@ -279,8 +279,8 @@ RECOMP_HOOK_RETURN("frame_build") void eo_status_frame(void) {
 
 // ---- Display ----
 
-#define STATUS_WIN_X 16
-#define STATUS_WIN_Y 16
+#define STATUS_WIN_X 54   // under the HUD's HP/MP box
+#define STATUS_WIN_Y 56
 #define STATUS_WIN_W (8 * 8 + 20)
 #define STATUS_WIN_H 22
 

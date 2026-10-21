@@ -12,6 +12,7 @@
 s32 pak_read(s32 pak, s32 file, s32 offset, s32 size, void* buf);
 s32 pak_write(s32 pak, s32 file, s32 offset, s32 size, void* buf);
 void hud_draw_text(s32 x, s32 y, s32 palette, const char* text);
+void hud_draw_sprite(s32 image, s32 x, s32 y, s32 a3, s32 a4);  // one of the 55 menu images (1 = hand cursor)
 void ui_draw_rect(s32 style, s32 x, s32 y, s32 w, s32 h);
 void ui_draw_text(s32 x, s32 y, const u8* text);  // text in the game's own encoding
 void sfx_play(s32 sound, s32 arg1, s32 volume);
