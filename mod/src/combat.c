@@ -12,14 +12,14 @@
 //
 // Shields and Break: each enemy has shields (2-4 by toughness, bosses 6-10) and a weakness, the element
 // opposite its own (the game's own x1.25 rule), hidden until hit. Each weakness hit from Brian removes a
-// shield; at 0 the enemy is Broken: it loses its next turn (the game's own Restriction status) and takes 50%
+// shield; at 0 the enemy is Broken: it loses its next turn (the game's own Restriction status) and takes 100%
 // more damage until then. Then its shields come back; a boss's grow by one each Break.
 
 #define MAX_ENEMIES 6
 #define MAX_CHARGE 5
 #define MAX_BOOST 3
 #define START_CHARGE 0   // every battle starts empty (playtest, 2026-10-21); Bedrock adds
-#define BROKEN_BONUS_PERCENT 50
+#define BROKEN_BONUS_PERCENT 100   // double damage: worth spending the Break turn on, or on healing instead (playtest, 2026-10-21)
 // Talents (talents.c) bending these rules, per rank.
 #define SCHOOL_TALENT_PERCENT 4    // Kindling, Weight, Tidal Force, Gale Force
 #define SHATTER_PERCENT 15
@@ -358,7 +358,7 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     if (hit == 0) {
         return;
     }
-    // Extra damage on top of the hit: a Broken foe takes 50% more, the staff adds its flat bonus, and a staff
+    // Extra damage on top of the hit: a Broken foe takes double, the staff adds its flat bonus, and a staff
     // that favours the spell's element adds 10%.
     u32 extra = 0;
     u32 percent = 0;

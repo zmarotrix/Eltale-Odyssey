@@ -20,12 +20,12 @@ Spell power is `base x 0.02 x (1 + 0.2 x sum of 1.03^i over Brian's element leve
 `damage = power x A / (A + defense) + random(sqrt(damage))`. Opposite element x1.25, same element x0.5. So
 damage is **linear in the spell's base and in every percentage the mod adds**, which makes the model easy:
 multiply. All the mod's bonuses are added together as percentages first, then applied once (no stacking of
-multipliers on multipliers), except Break (+50%), stoking (70% / 140%), Tidal Echo and Boost, which multiply.
+multipliers on multipliers), except Break (+100%, double), stoking (70% / 140%), Tidal Echo and Boost, which multiply.
 
 ## What an optimised Brian deals per turn, against vanilla's best
 
 Rough figures for a player who commits to one style and owns that beat's gear. Averaged over a typical
-fight, including the turns spent building charge or Burn and the turns where the enemy is Broken (+50%).
+fight, including the turns spent building charge or Burn and the turns where the enemy is Broken (double damage; was +50% until a playtest asked for a harder choice between healing and attacking in the Break window: about +10% on the averages below, which the HP margins absorb).
 
 | Style | Beat 1 (Solvaring) | Beat 2 (Zelse) | Beat 4 (Shilf) | End (Mammon) | Where it comes from |
 |---|---|---|---|---|---|

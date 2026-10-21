@@ -76,7 +76,7 @@ them yourself. For now the weakness is always the element opposite the monster's
       Earth: +40% damage per charge. Wind: +2 shots per charge. Water: +30% healing, or Freezes the target for
       1 turn per charge. Fire: +1 Burn stack per charge; at 3 it also sets off the Burn already on the target.
 - [ ] Each weakness hit removes a shield and reveals the weakness. At 0 the enemy is **Broken**: it skips its next
-      turn and takes 50% more damage until then; then its shields come back (bosses get one more each time).
+      turn and takes double damage until then (was 50% more); then its shields come back (bosses get one more each time).
       (Checked by Claude: shields, reveal, charge bonus, Break and the skipped-turn status.)
 - [ ] Does Boost feel worth saving charge for? Are shield counts (2-4, bosses 6-10) right?
 
