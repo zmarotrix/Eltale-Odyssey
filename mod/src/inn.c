@@ -33,8 +33,9 @@ void msgwin_open(s32 position);
 // The price window, centered at the top or bottom of the screen, whichever the game's windows leave free
 // (the dialogue box moves between them depending on where Brian stands).
 #define PRICE_COLUMNS 15  // label + right-aligned amount; " gold" follows
-#define PRICE_WIN_W 180  // 20 characters of the 8 px dialogue font, plus margins
-#define PRICE_WIN_H 36
+#define HUD_SETUP_DL 0x803A6FC0  // hud_draw_main's render setup (copy mode, TLUT, texture-only combine)
+#define PRICE_WIN_W (20 * SMALL_W + 2 * SMALL_PAD)  // small font
+#define PRICE_WIN_H (2 * SMALL_LINE + 2 * SMALL_PAD - 2)
 #define PRICE_WIN_X ((320 - PRICE_WIN_W) / 2)
 #define PRICE_WIN_TOP_Y    16
 #define PRICE_WIN_BOTTOM_Y (240 - 16 - PRICE_WIN_H - 3)
@@ -222,8 +223,10 @@ RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
     // A small window in the dialogue box's own style and font, drawn right after the game's windows.
     s32 y = overlaps_game_window(PRICE_WIN_TOP_Y) ? PRICE_WIN_BOTTOM_Y : PRICE_WIN_TOP_Y;
     eo_ui_window(PRICE_WIN_X, y, PRICE_WIN_W, PRICE_WIN_H);
-    eo_ui_text(PRICE_WIN_X + 10, y + 7, line1);
-    eo_ui_text(PRICE_WIN_X + 10, y + 21, line2);
+    // The dialogue box leaves its own color combine set; restore the HUD's before its font (or it draws dark).
+    eo_gfx(0x06000000, HUD_SETUP_DL);
+    eo_ui_small(PRICE_WIN_X + SMALL_PAD, y + SMALL_PAD, TEXT_NORMAL, line1);
+    eo_ui_small(PRICE_WIN_X + SMALL_PAD, y + SMALL_PAD + SMALL_LINE, GOLD < price ? TEXT_WARN : TEXT_NORMAL, line2);
 }
 
 int eo_inn_here(void) {

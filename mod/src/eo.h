@@ -87,6 +87,13 @@ void eo_reset(void);
 u32 eo_now(void);
 
 // ---- Native UI pieces (ui.c) ----
+// Small text in the HUD's 6 x 8 font. Palettes on parchment: 0 dark grey (normal), 1 red (warning),
+// 2 light grey (unavailable), 3 green (selected, good news).
+#define SMALL_W 6        // character width
+#define SMALL_LINE 10    // line height
+#define SMALL_PAD 5      // window padding
+enum { TEXT_NORMAL, TEXT_WARN, TEXT_DIM, TEXT_GOOD };
+void eo_ui_small(s32 x, s32 y, int palette, const char* text);
 void eo_ui_window(s32 x, s32 y, s32 w, s32 h);
 void eo_ui_text(s32 x, s32 y, const char* text);  // letters, digits, spaces and . , ? '
 // Plain text to the game's encoding ('\n' line break, '\f' page break). _full adds the prefix and end byte.
@@ -119,6 +126,21 @@ int eo_combat_active_school(void);  // its element (0 Fire .. 3 Wind), -1 if non
 // ---- Spirits (spirits.c) ----
 void eo_spirits_mark_dirty(void);
 void eo_notice(const char* a, const char* b);  // bottom-of-screen notice, a and b joined  // the save block changed: rewrite the spell locks and names
+
+// ---- Icons (icons.c) ----
+enum {
+    ICON_CHARGE_EMPTY, ICON_CHARGE_FULL, ICON_CHARGE_SPEND,
+    ICON_FIRE, ICON_EARTH, ICON_WATER, ICON_WIND,   // element diamonds, in element order
+    ICON_BURN, ICON_BROKEN, ICON_POISON, ICON_POINTER,
+    ICON_COUNT
+};
+void eo_icons_init(void);
+void eo_icons_begin(void);                 // loads the icon palette; call before drawing icons
+void eo_icon_draw(int icon, s32 x, s32 y);  // 12 x 12
+int eo_screen_pos(f32 x, f32 y, f32 z, s32* sx, s32* sy);  // scene point to screen; 0 if off screen
+const char* eo_spell_description(int school, int index);
+int eo_spirits_known(int school, int index);
+s32 hud_strlen(const char* text);
 
 // ---- Equipment (equipment.c) ----
 enum {

@@ -4,8 +4,8 @@
 // in the dialogue box's style. There's no permanent counter: you see your purse when it matters.
 
 #define NOTICE_FRAMES 150
-#define NOTICE_W (NOTICE_COLUMNS * 8 + 20)  // 8 px characters plus margins
-#define NOTICE_H 36
+#define NOTICE_W (NOTICE_COLUMNS * SMALL_W + 2 * SMALL_PAD)  // small font
+#define NOTICE_H (2 * SMALL_LINE + 2 * SMALL_PAD - 2)
 #define NOTICE_X (320 - 16 - 3 - NOTICE_W)  // top right, shadow inside the safe area
 #define NOTICE_Y 16
 
@@ -84,10 +84,10 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_gold_draw(void) {
         return;
     }
     notice_timer--;
-    // The same parchment window and font as the game's dialogue box (the font is loaded once at boot).
+    // The game's parchment window, with the HUD's small font.
     eo_ui_window(NOTICE_X, NOTICE_Y, NOTICE_W, NOTICE_H);
-    eo_ui_text(NOTICE_X + 10, NOTICE_Y + 7, notice_line1);
-    eo_ui_text(NOTICE_X + 10, NOTICE_Y + 21, notice_line2);
+    eo_ui_small(NOTICE_X + SMALL_PAD, NOTICE_Y + SMALL_PAD, TEXT_NORMAL, notice_line1);
+    eo_ui_small(NOTICE_X + SMALL_PAD, NOTICE_Y + SMALL_PAD + SMALL_LINE, TEXT_GOOD, notice_line2);
 }
 
 // Boss gold (pacing plan, "Gold and shops"). Only Solvaring carries gold in the ROM (200, paid through the

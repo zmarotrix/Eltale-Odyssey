@@ -152,3 +152,29 @@ void eo_format_amount(char* out, const char* label, u32 amount, int columns, con
     }
     *out = '\0';
 }
+
+// ---- Small text: the HUD's own 6 x 8 font ----
+// Crisp at native size and about a quarter smaller than the dialogue font (playtest, 2026-10-20: windows can be
+// smaller on a modern screen). It has uppercase letters, digits and : ' - . ? = only, so other characters are
+// mapped: lowercase to uppercase, ! and , to ., & to -; anything else becomes a space.
+
+void eo_ui_small(s32 x, s32 y, int palette, const char* text) {
+    char buf[64];
+    int n = 0;
+    for (; *text != '\0' && n < 63; text++) {
+        char c = *text;
+        if (c >= 'a' && c <= 'z') {
+            c = (char)(c - 'a' + 'A');
+        } else if (c == '!' || c == ',') {
+            c = '.';
+        } else if (c == '&') {
+            c = '-';
+        } else if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ':' || c == '\'' || c == '-' ||
+                     c == '.' || c == '?' || c == '=' || c == ' ')) {
+            c = ' ';
+        }
+        buf[n++] = c;
+    }
+    buf[n] = '\0';
+    hud_draw_text(x, y, palette, buf);
+}

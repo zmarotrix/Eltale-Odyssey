@@ -8,4 +8,5 @@ RECOMP_HOOK_RETURN("boot_load_static_data") void eo_boot(void) {
     eo_balance_apply();
     eo_spirits_init_tables();
     eo_status_init();
+    eo_icons_init();
 }

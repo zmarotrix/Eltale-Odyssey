@@ -308,19 +308,17 @@ RECOMP_HOOK_RETURN("frame_build") void eo_status_frame(void) {
 
 // ---- Display ----
 
-#define STATUS_WIN_X 54   // under the HUD's HP/MP box
-#define STATUS_WIN_Y 56
-#define STATUS_WIN_Y_BATTLE 68  // below the selected-spell bar
-#define STATUS_WIN_W (8 * 8 + 20)
-#define STATUS_WIN_H 22
+// Brian's poison shows as a drop next to the HUD's HP box (under the charge diamonds in battle); no turn count.
+#define POISON_ICON_X 112
+#define POISON_ICON_Y 24
+#define POISON_ICON_Y_BATTLE 38
 
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_status_draw(void) {
     if (poison_turns == 0) {
         return;
     }
-    s32 y = (gBattleState & BATTLE_ACTIVE) ? STATUS_WIN_Y_BATTLE : STATUS_WIN_Y;
-    eo_ui_window(STATUS_WIN_X, y, STATUS_WIN_W, STATUS_WIN_H);
-    eo_ui_text(STATUS_WIN_X + 10, y + 7, "Poisoned");
+    eo_icons_begin();
+    eo_icon_draw(ICON_POISON, POISON_ICON_X, (gBattleState & BATTLE_ACTIVE) ? POISON_ICON_Y_BATTLE : POISON_ICON_Y);
 }
 
 // Set up the stand-in burn attacker once (from main.c).

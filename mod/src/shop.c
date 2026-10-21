@@ -210,15 +210,16 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_shop_on_greeting(void) {
 
 // ---- The shop window ----
 
-#define WIN_X 32
+// Small font layout: pointer, name (16), price (5), owned ("x 2"); the bottom line holds up to 31 characters.
+#define WIN_W (31 * SMALL_W + 2 * SMALL_PAD)
+#define WIN_X ((320 - WIN_W) / 2)
 #define WIN_Y 24
-#define WIN_W 256
-#define ROW_H 14
-#define TITLE_Y (WIN_Y + 8)
-#define LIST_Y (WIN_Y + 26)
-#define NAME_X (WIN_X + 26)
-#define PRICE_X (WIN_X + 160)
-#define OWNED_X (WIN_X + 214)
+#define ROW_H SMALL_LINE
+#define TITLE_Y (WIN_Y + SMALL_PAD)
+#define LIST_Y (TITLE_Y + SMALL_LINE + 3)
+#define NAME_X (WIN_X + SMALL_PAD + 2 * SMALL_W)
+#define PRICE_X (NAME_X + 17 * SMALL_W)
+#define OWNED_X (PRICE_X + 6 * SMALL_W)
 #define BTN_A 0x8000
 #define BTN_B 0x4000
 #define BTN_DUP 0x0800
@@ -265,8 +266,11 @@ RECOMP_HOOK_RETURN("pad_read") void eo_shop_read_input(void) {
     gPadStickY = 0;
 }
 
-static void say_message(const char* text) {
+static int message_palette = TEXT_WARN;
+
+static void say_message(const char* text, int palette) {
     message = text;
+    message_palette = palette;
     message_timer = MESSAGE_FRAMES;
 }
 
@@ -288,13 +292,13 @@ static void handle_input(void) {
         u8 good = stock[cursor];
         if (is_equipment(good) && eo_equipment_owned(good - EQ_BASE)) {
             sfx_play(SFX_CANCEL, 0xFF, 0x40);
-            say_message("You already have one.");
+            say_message("You already have one.", TEXT_WARN);
         } else if (GOLD < good_price(good)) {
             sfx_play(SFX_CANCEL, 0xFF, 0x40);
-            say_message("Not enough gold.");
+            say_message("Not enough gold.", TEXT_WARN);
         } else if (!is_equipment(good) && inventory_count_item(INVENTORY_EMPTY) == 0) {
             sfx_play(SFX_CANCEL, 0xFF, 0x40);
-            say_message("You can't carry any more.");
+            say_message("You can't carry any more.", TEXT_WARN);
         } else {
             GOLD -= good_price(good);
             if (is_equipment(good)) {
@@ -304,33 +308,37 @@ static void handle_input(void) {
             }
             eo_gold_resync();  // the shop shows the gold itself
             sfx_play(SFX_CONFIRM, 0xFF, 0x40);
-            say_message("Thank you.");
+            say_message("Thank you.", TEXT_GOOD);
         }
     }
 }
 
 static void draw_shop(void) {
-    s32 h = 26 + stock_count * ROW_H + 30;
+    s32 h = (LIST_Y - WIN_Y) + stock_count * ROW_H + 3 + SMALL_LINE + SMALL_PAD - 2;
     char line[32];
     eo_ui_window(WIN_X, WIN_Y, WIN_W, h);
-    eo_ui_text(WIN_X + 12, TITLE_Y, "Shop");
-    eo_format_amount(line, "Gold", GOLD, 11, "");
-    eo_ui_text(WIN_X + WIN_W - 12 - 11 * 8, TITLE_Y, line);
+    eo_ui_small(WIN_X + SMALL_PAD, TITLE_Y, TEXT_NORMAL, "SHOP");
+    eo_format_amount(line, "GOLD", GOLD, 12, "");
+    eo_ui_small(WIN_X + WIN_W - SMALL_PAD - 12 * SMALL_W, TITLE_Y, TEXT_NORMAL, line);
     for (int i = 0; i < stock_count; i++) {
         u8 good = stock[i];
         s32 y = LIST_Y + i * ROW_H;
-        eo_ui_text(NAME_X, y, good_name(good));
+        int palette = i == cursor ? TEXT_GOOD : TEXT_NORMAL;
+        eo_ui_small(NAME_X, y, palette, good_name(good));
         eo_format_amount(line, "", good_price(good), 5, "");
-        eo_ui_text(PRICE_X, y, line);
-        eo_format_amount(line, "x", good_owned(good), 3, "");
-        eo_ui_text(OWNED_X, y, line);
+        eo_ui_small(PRICE_X, y, palette, line);
+        eo_format_amount(line, "X", good_owned(good), 3, "");
+        eo_ui_small(OWNED_X, y, palette, line);
     }
-    s32 info_y = LIST_Y + stock_count * ROW_H + 6;
-    eo_ui_text(WIN_X + 12, info_y, message_timer > 0 ? message : good_effect(stock[cursor]));
+    s32 info_y = LIST_Y + stock_count * ROW_H + 3;
     if (message_timer > 0) {
+        eo_ui_small(WIN_X + SMALL_PAD, info_y, message_palette, message);
         message_timer--;
+    } else {
+        eo_ui_small(WIN_X + SMALL_PAD, info_y, TEXT_NORMAL, good_effect(stock[cursor]));
     }
-    hud_draw_sprite(1, WIN_X + 6, LIST_Y + cursor * ROW_H - 1, 16, 13);  // the game's pointing-hand cursor (16 x 13)
+    eo_icons_begin();
+    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, LIST_Y + cursor * ROW_H - 2);
 }
 
 // The shop window draws over the field HUD; the greeting closes first, then the window opens.

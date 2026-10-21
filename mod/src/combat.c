@@ -384,77 +384,110 @@ RECOMP_HOOK_RETURN("pad_read") void eo_combat_read_input(void) {
     }
 }
 
-// ---- Battle panels ----
+// ---- Battle display ----
+// No lists or counters (playtest, 2026-10-20): Brian's charge is a row of diamonds next to the HUD, statuses sit
+// on the enemies themselves without turn counts, and the selected spell gets a one-line description.
 
-// Bottom right: clear of the HUD (HP/MP, the selected-spell bar, element gems) and of the spell wheel.
-#define CHARGE_WIN_W (8 * 8 + 20)
-#define CHARGE_WIN_H 36
-#define CHARGE_WIN_X (320 - 16 - 3 - CHARGE_WIN_W)
-#define CHARGE_WIN_Y (240 - 16 - 3 - CHARGE_WIN_H)
+#define CHARGE_X 112      // right of the HUD's HP/MP box
+#define CHARGE_Y 24
+#define CHARGE_STEP 11
+#define MARKER_STEP 13
+#define MARKER_RISE 16    // above the top of the enemy
+#define DESC_X 52         // under the game's selected-spell bar
+#define DESC_Y 77
 
-// One row per enemy: name, shields (or "Broken"), weakness ("?" until revealed), Burn stacks ("B3").
-// 21 columns keep the panel clear of the HUD's HP box.
-#define NAME_CHARS 9
-#define SHIELD_COL 10
-#define WEAKNESS_COL 13
-#define BURN_COL 19
-#define FOE_COLS 21
-#define FOES_WIN_W (FOE_COLS * 8 + 20)
-#define FOES_WIN_X (320 - 16 - 3 - FOES_WIN_W)
-#define FOES_WIN_Y 16
-#define FOE_ROW_H 14
+#define BATTLE_DATA_POS_X 0x00
+#define BATTLE_DATA_POS_Y 0x04
+#define BATTLE_DATA_POS_Z 0x08
+#define BATTLE_DATA_SCALE 0x24
+#define BATTLE_DATA_RECORD 0x64
+#define RECORD_TYPE 0x00        // 0 ground, 1 flying, 2 Mammon
+#define RECORD_HEIGHT 0x1C
 
-static const char* const element_names[4] = { "Fire", "Earth", "Water", "Wind" };
+#define BRIAN_SPELL_PRESSES ((u8*)0x8007BBD1)   // element of each press so far
+#define BRIAN_SPELL_COUNT (*(u16*)0x8007BBD4)   // presses so far
+s32 spell_find_by_inputs(u16 count, u8* inputs);
 
-static void draw_panels(void) {
-    char line[32];
-    eo_ui_window(CHARGE_WIN_X, CHARGE_WIN_Y, CHARGE_WIN_W, CHARGE_WIN_H);
-    eo_format_amount(line, "Charge", charge, 8, "");
-    eo_ui_text(CHARGE_WIN_X + 10, CHARGE_WIN_Y + 7, line);
-    eo_format_amount(line, "Boost", boost, 8, "");
-    eo_ui_text(CHARGE_WIN_X + 10, CHARGE_WIN_Y + 21, line);
-
-    int rows = 0;
-    for (int i = 0; i < MAX_ENEMIES; i++) {
-        if (ENEMY_RECORD(i) != 0 && ENEMY_HP(i) > 0) {
-            rows++;
-        }
-    }
-    if (rows == 0) {
-        return;
-    }
-    eo_ui_window(FOES_WIN_X, FOES_WIN_Y, FOES_WIN_W, 12 + rows * FOE_ROW_H);
-    s32 y = FOES_WIN_Y + 7;
-    char** names = NAME_TABLE;
-    for (int i = 0; i < MAX_ENEMIES; i++) {
-        u8* record = ENEMY_RECORD(i);
-        if (record == 0 || ENEMY_HP(i) == 0) {
-            continue;
-        }
-        Guard* g = &guards[i];
-        char name[NAME_CHARS + 1];
-        eo_title_case(name, names != 0 ? names[*(u16*)(record + RECORD_MODEL_INDEX)] : "Foe", NAME_CHARS);
-        eo_ui_text(FOES_WIN_X + 10, y, name);
-        if (g->broken) {
-            eo_ui_text(FOES_WIN_X + 10 + SHIELD_COL * 8, y, "Broken");
-        } else {
-            eo_format_amount(line, "", g->shields, 2, "");
-            eo_ui_text(FOES_WIN_X + 10 + SHIELD_COL * 8, y, line);
-        }
-        if (g->weakness != NO_WEAKNESS && !g->broken) {
-            eo_ui_text(FOES_WIN_X + 10 + WEAKNESS_COL * 8, y, g->revealed ? element_names[g->weakness] : "?");
-        }
-        int stacks = eo_status_burn_stacks(i);
-        if (stacks > 0) {
-            eo_format_amount(line, "B", (u32)stacks, 2, "");
-            eo_ui_text(FOES_WIN_X + 10 + BURN_COL * 8, y, line);
-        }
-        y += FOE_ROW_H;
+static void draw_charge(void) {
+    for (int i = 0; i < MAX_CHARGE; i++) {
+        int icon = i < charge - boost ? ICON_CHARGE_FULL : i < charge ? ICON_CHARGE_SPEND : ICON_CHARGE_EMPTY;
+        eo_icon_draw(icon, CHARGE_X + i * CHARGE_STEP, CHARGE_Y);
     }
 }
 
-RECOMP_HOOK_RETURN("hud_draw_main") void eo_combat_draw(void) {
-    if (in_battle()) {
-        draw_panels();
+// Where to draw markers over an enemy: the top of its body, the way the game places damage numbers.
+static int marker_origin(int i, s32* sx, s32* sy) {
+    u8* bd = ENEMY_BATTLE_DATA(i);
+    u8* record = *(u8**)(bd + BATTLE_DATA_RECORD);
+    f32 x = *(f32*)(bd + BATTLE_DATA_POS_X);
+    f32 y = *(f32*)(bd + BATTLE_DATA_POS_Y);
+    f32 z = *(f32*)(bd + BATTLE_DATA_POS_Z);
+    if (record != 0 && *(u16*)(record + RECORD_TYPE) == 0) {
+        y += *(f32*)(record + RECORD_HEIGHT) * *(f32*)(bd + BATTLE_DATA_SCALE);
+    } else if (record != 0 && *(u16*)(record + RECORD_TYPE) == 1) {
+        y = *(f32*)(*(u8**)(bd + 0x68) + 0x94);
     }
+    return eo_screen_pos(x, y, z, sx, sy);
+}
+
+static void draw_enemy_markers(void) {
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (ENEMY_RECORD(i) == 0 || ENEMY_HP(i) == 0) {
+            continue;
+        }
+        Guard* g = &guards[i];
+        int icons[3];
+        int n = 0;
+        if (g->broken) {
+            icons[n++] = ICON_BROKEN;
+        }
+        if (eo_status_burn_stacks(i) > 0) {
+            icons[n++] = ICON_BURN;
+        }
+        if (g->revealed && g->weakness != NO_WEAKNESS) {
+            icons[n++] = ICON_FIRE + g->weakness;
+        }
+        s32 sx, sy;
+        if (n == 0 || !marker_origin(i, &sx, &sy)) {
+            continue;
+        }
+        s32 x = sx - (n * MARKER_STEP) / 2;
+        for (int k = 0; k < n; k++) {
+            eo_icon_draw(icons[k], x + k * MARKER_STEP, sy - MARKER_RISE);
+        }
+    }
+}
+
+// The spell Brian has selected so far (on his turn, while choosing), as the game's spell wheel finds it.
+static void draw_spell_description(void) {
+    if (!brians_turn() || active_spell != 0 || BRIAN_SPELL_COUNT == 0 || BRIAN_SPELL_COUNT > 3) {
+        return;
+    }
+    s32 spell = spell_find_by_inputs(BRIAN_SPELL_COUNT, BRIAN_SPELL_PRESSES);
+    int school = (spell >> 8) & 0xF;
+    int index = spell & 0xFF;
+    const char* text;
+    if (spell < 0 || school > WIND || index >= 15) {
+        text = "NO SPELL";
+    } else if (!eo_spirits_known(school, index)) {
+        text = "UNKNOWN - CAST IT TO LEARN IT.";
+    } else {
+        text = eo_spell_description(school, index);
+    }
+    if (text == 0) {
+        return;
+    }
+    s32 w = hud_strlen(text) * 6 + 10;
+    eo_ui_window(DESC_X, DESC_Y, w, 13);
+    hud_draw_text(DESC_X + 5, DESC_Y + 3, 0, text);
+}
+
+RECOMP_HOOK_RETURN("hud_draw_main") void eo_combat_draw(void) {
+    if (!in_battle()) {
+        return;
+    }
+    draw_spell_description();
+    eo_icons_begin();
+    draw_charge();
+    draw_enemy_markers();
 }

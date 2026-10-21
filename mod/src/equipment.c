@@ -121,10 +121,11 @@ extern u16 gBattleState;
 #define BTN_DDOWN 0x0400
 #define STICK_THRESHOLD 40
 
-#define WIN_W 272
+// Small font layout, 32 characters wide (the longest effect line is 31).
+#define WIN_W (32 * SMALL_W + 2 * SMALL_PAD)
 #define WIN_X ((320 - WIN_W) / 2)
 #define WIN_Y 32
-#define ROW_H 14
+#define ROW_H SMALL_LINE
 
 static const char* const slot_names[SLOT_COUNT] = { "Staff", "Robe", "Charm", "Sigil" };
 
@@ -232,32 +233,37 @@ static void handle_input(void) {
 
 static void draw_window(void) {
     int rows = choosing ? choice_count : SLOT_COUNT;
-    s32 h = 26 + rows * ROW_H + 22;
-    eo_ui_window(WIN_X, WIN_Y, WIN_W, h);
-    s32 list_y = WIN_Y + 26;
+    s32 list_y = WIN_Y + SMALL_PAD + SMALL_LINE + 3;
+    s32 info_y = list_y + rows * ROW_H + 3;
+    eo_ui_window(WIN_X, WIN_Y, WIN_W, info_y + SMALL_LINE + SMALL_PAD - 2 - WIN_Y);
+    s32 x = WIN_X + SMALL_PAD + 2 * SMALL_W;
     if (!choosing) {
-        eo_ui_text(WIN_X + 12, WIN_Y + 8, "Equipment");
+        eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, TEXT_NORMAL, "EQUIPMENT");
         for (int s = 0; s < SLOT_COUNT; s++) {
             s32 y = list_y + s * ROW_H;
-            eo_ui_text(WIN_X + 26, y, slot_names[s]);
+            int open = slot_open(s);
+            int palette = !open ? TEXT_DIM : s == cursor ? TEXT_GOOD : TEXT_NORMAL;
             int worn = worn_in(s);
-            eo_ui_text(WIN_X + 26 + 7 * 8, y, !slot_open(s) ? "Locked" : worn >= 0 ? catalog[worn].name : "Nothing");
+            eo_ui_small(x, y, palette, slot_names[s]);
+            eo_ui_small(x + 7 * SMALL_W, y, palette, !open ? "LOCKED" : worn >= 0 ? catalog[worn].name : "NOTHING");
         }
     } else {
-        eo_ui_text(WIN_X + 12, WIN_Y + 8, slot_names[slot_cursor]);
+        eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, TEXT_NORMAL, slot_names[slot_cursor]);
         for (int i = 0; i < choice_count; i++) {
-            eo_ui_text(WIN_X + 26, list_y + i * ROW_H, choices[i] < 0 ? "Nothing" : catalog[choices[i]].name);
+            int palette = i == cursor ? TEXT_GOOD : TEXT_NORMAL;
+            eo_ui_small(x, list_y + i * ROW_H, palette, choices[i] < 0 ? "NOTHING" : catalog[choices[i]].name);
         }
     }
-    hud_draw_sprite(1, WIN_X + 6, list_y + cursor * ROW_H - 1, 16, 13);
 
     // Bottom line: a message, or what the highlighted piece does.
-    const char* info = message;
-    if (info == 0) {
+    if (message != 0) {
+        eo_ui_small(WIN_X + SMALL_PAD, info_y, TEXT_WARN, message);
+    } else {
         int piece = choosing ? choices[cursor] : worn_in(cursor);
-        info = piece >= 0 ? catalog[piece].effect : "";
+        eo_ui_small(WIN_X + SMALL_PAD, info_y, TEXT_NORMAL, piece >= 0 ? catalog[piece].effect : "");
     }
-    eo_ui_text(WIN_X + 12, list_y + rows * ROW_H + 6, info);
+    eo_icons_begin();
+    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, list_y + cursor * ROW_H - 2);
 }
 
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_equipment_draw(void) {

@@ -50,6 +50,10 @@ static int is_discovered(int school, int index) {
     return (gEo.discovered[bit / 8] >> (bit % 8)) & 1;
 }
 
+int eo_spirits_known(int school, int index) {
+    return is_discovered(school, index);
+}
+
 static void set_discovered(int school, int index) {
     int bit = school * SPELLS + index;
     gEo.discovered[bit / 8] |= (u8)(1 << (bit % 8));
@@ -171,12 +175,14 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
 
 // ---- The Spirits window ----
 
-#define WIN_W 256
+// Small font layout, 30 characters wide.
+#define WIN_W (30 * SMALL_W + 2 * SMALL_PAD)
 #define WIN_X ((320 - WIN_W) / 2)
 #define WIN_Y 40
-#define ROW_H 14
-#define LIST_Y (WIN_Y + 26)
-#define WIN_H (26 + SCHOOLS * ROW_H + 36)
+#define ROW_H SMALL_LINE
+#define LIST_Y (WIN_Y + SMALL_PAD + SMALL_LINE + 3)
+#define INFO_Y (LIST_Y + SCHOOLS * ROW_H + 3)
+#define WIN_H (INFO_Y + SMALL_LINE + SMALL_PAD - 2 - WIN_Y)
 #define BTN_A 0x8000
 #define BTN_B 0x4000
 #define BTN_DUP 0x0800
@@ -259,45 +265,44 @@ static void handle_input(void) {
 static void draw_window(void) {
     char line[40];
     eo_ui_window(WIN_X, WIN_Y, WIN_W, WIN_H);
-    eo_ui_text(WIN_X + 12, WIN_Y + 8, "Spirits");
-    eo_format_amount(line, "Points", gEo.spirit_points, 10, "");
-    eo_ui_text(WIN_X + WIN_W - 12 - 10 * 8, WIN_Y + 8, line);
+    eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, TEXT_NORMAL, "SPIRITS");
+    eo_format_amount(line, "POINTS", gEo.spirit_points, 10, "");
+    eo_ui_small(WIN_X + WIN_W - SMALL_PAD - 10 * SMALL_W, WIN_Y + SMALL_PAD, TEXT_NORMAL, line);
+    s32 x = WIN_X + SMALL_PAD + 2 * SMALL_W;
     for (int s = 0; s < SCHOOLS; s++) {
         s32 y = LIST_Y + s * ROW_H;
-        eo_ui_text(WIN_X + 26, y, element_names[s]);
-        eo_format_amount(line, "Lv", ELEMENT_LEVELS[s], 5, "");
-        eo_ui_text(WIN_X + 26 + 7 * 8, y, line);
-        eo_format_amount(line, "Tier", gEo.tiers[s], 6, "");
-        eo_ui_text(WIN_X + 26 + 14 * 8, y, line);
+        int palette = s == cursor ? TEXT_GOOD : TEXT_NORMAL;
+        eo_ui_small(x, y, palette, element_names[s]);
+        eo_format_amount(line, "LV", ELEMENT_LEVELS[s], 5, "");
+        eo_ui_small(x + 7 * SMALL_W, y, palette, line);
+        eo_format_amount(line, "TIER", gEo.tiers[s], 6, "");
+        eo_ui_small(x + 14 * SMALL_W, y, palette, line);
     }
-    hud_draw_sprite(1, WIN_X + 6, LIST_Y + cursor * ROW_H - 1, 16, 13);
 
     // What the next tier of the selected element needs.
     int next = gEo.tiers[cursor] + 1;
-    s32 info_y = LIST_Y + SCHOOLS * ROW_H + 6;
     if (next > TIERS) {
-        eo_ui_text(WIN_X + 12, info_y, "Fully attuned.");
+        eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, TEXT_DIM, "FULLY ATTUNED.");
     } else {
-        char* out = line;
-        out = eo_append(out, "Tier ");
         char num[8];
+        char* out = eo_append(line, "TIER ");
         eo_format_u32(num, "", (u32)next, "");
         out = eo_append(out, num);
-        out = eo_append(out, " needs Lv ");
+        out = eo_append(out, ": LV ");
         eo_format_u32(num, "", tier_min_level[next], "");
         out = eo_append(out, num);
-        out = eo_append(out, ", ");
+        out = eo_append(out, " AND ");
         eo_format_u32(num, "", tier_cost[next], "");
         out = eo_append(out, num);
-        eo_append(out, " points.");
-        eo_ui_text(WIN_X + 12, info_y, line);
+        eo_append(out, " POINTS");
+        int ready = ELEMENT_LEVELS[cursor] >= tier_min_level[next] && gEo.spirit_points >= tier_cost[next];
+        eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, ready ? TEXT_GOOD : TEXT_NORMAL, line);
     }
-    eo_ui_text(WIN_X + 12, info_y + 14, "A Attune   B Close");
+    eo_icons_begin();
+    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, LIST_Y + cursor * ROW_H - 2);
 }
 
-#define NOTICE_W 216
-#define NOTICE_X ((320 - NOTICE_W) / 2)
-#define NOTICE_Y 176
+#define NOTICE_Y 182
 
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_spirits_draw(void) {
     if (window_open) {
@@ -308,7 +313,9 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_spirits_draw(void) {
     }
     if (notice_timer > 0) {
         notice_timer--;
-        eo_ui_window(NOTICE_X, NOTICE_Y, NOTICE_W, 22);
-        eo_ui_text(NOTICE_X + 10, NOTICE_Y + 7, notice);
+        s32 w = hud_strlen(notice) * SMALL_W + 2 * SMALL_PAD;
+        s32 x = (320 - w) / 2;
+        eo_ui_window(x, NOTICE_Y, w, SMALL_LINE + 2 * SMALL_PAD - 2);
+        eo_ui_small(x + SMALL_PAD, NOTICE_Y + SMALL_PAD, TEXT_GOOD, notice);
     }
 }
