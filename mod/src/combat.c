@@ -199,6 +199,10 @@ static void break_enemy(int i) {
     }
 }
 
+// Sound for a shield knocked off without a Break (playtest pick, 2026-10-21). It plays alongside the game's own hit
+// sound (0x18, from enemy_take_damage, which this runs inside).
+#define SFX_SHIELD_HIT 0x27
+
 // Knocks shields off a foe (a weakness hit, Cyclone, Glacier); at 0 it Breaks.
 static void crack_shields(int i, int count) {
     Guard* g = &guards[i];
@@ -208,6 +212,8 @@ static void crack_shields(int i, int count) {
     g->shields = (u8)(g->shields > count ? g->shields - count : 0);
     if (g->shields == 0) {
         break_enemy(i);
+    } else if (SFX_SHIELD_HIT != 0) {
+        sfx_play(SFX_SHIELD_HIT, 0xFF, 0x40);
     }
     eo_fx_shield_hit(i, g->broken);
 }
