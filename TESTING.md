@@ -24,6 +24,8 @@ The six Wings shops and Greenoch's item shop sell things now instead of giving o
 Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Limelin), Bronze (Greenoch), Tom (Brannoch).
 
 - [ ] Talk to Ingram in Melrode's Wings shop: a greeting, then a shop window (checked by Claude with a test NPC).
+- [ ] Each shop lists its own town's Wings first, always, and never another town's (Greenoch sells none: the game
+      has no Greenoch Wings). Each shop also has staples plus 3 rotating items that change each in-game day.
 - [ ] D-pad or stick moves the hand cursor; A buys; B leaves. Gold, owned count and the effect line update.
 - [ ] Three of the items rotate each day: rest at the inn and visit again.
 - [ ] At night (after evening turns dark) the shopkeeper says they're closed.

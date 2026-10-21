@@ -82,26 +82,27 @@ typedef struct {
     u8 pool[MAX_POOL];
 } Shop;
 
+// Each shop sells its own town's Wings, first and always, and never another town's (playtest, 2026-10-21).
+// Greenoch has no Wings item in the game, so it sells none.
 static const Shop shops[] = {
-    { 0x1BB0, { FRESH_BREAD, DEW_DROP, WHITE_WINGS, EQ(EQ_TRAVELERS_ROBE) },                      // Ingram, Melrode
-              { HONEY_BREAD, MINT_LEAVES, REPLICA, SILVER_AMULET, YELLOW_WINGS, END } },
-    { 0x36B8, { FRESH_BREAD, HONEY_BREAD, YELLOW_WINGS, EQ(EQ_HEAVY_STAFF) },                    // Thom, Dondoran
-              { DEW_DROP, MINT_LEAVES, HEALING_POTION, REPLICA, SILVER_AMULET, CELINES_BELL, WHITE_WINGS,
-                EQ(EQ_EMBER_STAFF), END } },
-    { 0x5880, { HONEY_BREAD, MINT_LEAVES, BLUE_WINGS, END },                                      // Jiryo, Larapool
-              { HEALING_POTION, HEROES_DRINK, SILENT_FLUTE, CELINES_BELL, GIANTS_SHOES, SILVER_AMULET, YELLOW_WINGS,
+    { 0x1BB0, { WHITE_WINGS, FRESH_BREAD, DEW_DROP, EQ(EQ_TRAVELERS_ROBE) },                      // Ingram, Melrode
+              { HONEY_BREAD, MINT_LEAVES, REPLICA, SILVER_AMULET, END } },
+    { 0x36B8, { YELLOW_WINGS, FRESH_BREAD, HONEY_BREAD, EQ(EQ_HEAVY_STAFF) },                    // Thom, Dondoran
+              { DEW_DROP, MINT_LEAVES, HEALING_POTION, REPLICA, SILVER_AMULET, CELINES_BELL, EQ(EQ_EMBER_STAFF),
+                END } },
+    { 0x5880, { BLUE_WINGS, HONEY_BREAD, MINT_LEAVES, END },                                      // Jiryo, Larapool
+              { HEALING_POTION, HEROES_DRINK, SILENT_FLUTE, CELINES_BELL, GIANTS_SHOES, SILVER_AMULET,
                 EQ(EQ_STONE_STAFF), EQ(EQ_TRAVELERS_ROBE), END } },
-    { 0x6928, { HONEY_BREAD, MINT_LEAVES, GREEN_WINGS, END },                                     // Anette, Normoon
+    { 0x6928, { GREEN_WINGS, HONEY_BREAD, MINT_LEAVES, END },                                     // Anette, Normoon
               { HEALING_POTION, HEROES_DRINK, SILENT_FLUTE, CELINES_BELL, GIANTS_SHOES, GOLDEN_AMULET, SPIRIT_LIGHT,
-                BLUE_WINGS, EQ(EQ_TIDE_STAFF), EQ(EQ_PILGRIMS_SOUL) } },
-    { 0x7900, { HEALING_POTION, HEROES_DRINK, RED_WINGS, END },                                   // Ring, Limelin
-              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL, GREEN_WINGS,
+                EQ(EQ_TIDE_STAFF), EQ(EQ_PILGRIMS_SOUL), END } },
+    { 0x7900, { RED_WINGS, HEALING_POTION, HEROES_DRINK, END },                                   // Ring, Limelin
+              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL,
                 EQ(EQ_GALE_STAFF), EQ(EQ_TIDECLOTH_ROBE), END } },
     { 0xB3B0, { HEALING_POTION, HEROES_DRINK, END },                                              // Bronze, Greenoch
-              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, REPLICA, RED_WINGS, EQ(EQ_TIDECLOTH_ROBE),
-                EQ(EQ_EMBER_STAFF), END } },
-    { 0x87B8, { HEALING_POTION, HEROES_DRINK, BLACK_WINGS, END },                                 // Tom, Brannoch
-              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL, RED_WINGS,
+              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, REPLICA, EQ(EQ_TIDECLOTH_ROBE), EQ(EQ_EMBER_STAFF), END } },
+    { 0x87B8, { BLACK_WINGS, HEALING_POTION, HEROES_DRINK, END },                                 // Tom, Brannoch
+              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL,
                 EQ(EQ_HEAVY_STAFF), EQ(EQ_TIDECLOTH_ROBE), END } },
 };
 #define SHOP_COUNT (sizeof(shops) / sizeof(shops[0]))
