@@ -144,6 +144,7 @@ static void burn_ignite(int slot) {
     total *= b->turns_left;
     *b = (Burn){ 0 };
     if (total > 0 && ENEMY_HP(slot) > 0) {
+        eo_fx_burn_hit(slot);
         enemy_take_damage(slot, (u16)(total > 0xFFFF ? 0xFFFF : total), ELEMENT_FIRE, DAMAGE_NO_ELEMENT, burn_attacker);
     }
 }
@@ -233,7 +234,6 @@ void eo_status_add_burn(int slot, u16 amount) {
 // Damage that ignores element and defense (the stand-in attacker), through the game's own damage routine.
 void eo_status_fixed_damage(int slot, u16 amount) {
     if (slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0 && amount > 0) {
-        eo_fx_burn_hit(slot);
         enemy_take_damage(slot, amount, ELEMENT_FIRE, DAMAGE_NO_ELEMENT, burn_attacker);
     }
 }
