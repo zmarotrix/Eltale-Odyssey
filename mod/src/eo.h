@@ -82,6 +82,11 @@ void eo_ui_text(s32 x, s32 y, const char* text);  // letters, digits and spaces
 // fixed-width dialogue font.
 void eo_format_amount(char* out, const char* label, u32 amount, int columns, const char* unit);
 
+// ---- Boot steps, run in order by main.c ----
+void eo_enemy_spells_init(void);
+void eo_balance_apply(void);
+void eo_status_init(void);
+
 // ---- Status effects (status.c) ----
 void eo_status_cure_poison(void);
 

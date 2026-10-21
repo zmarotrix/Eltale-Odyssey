@@ -16,7 +16,7 @@
 
 #define MAX_ENEMIES 6
 #define BURN_STACKS 3
-#define BURN_PERCENT 35
+#define BURN_PERCENT 30
 #define BURN_TURNS 3
 #define POISON_TURNS 4
 #define POISON_PERCENT 5
@@ -261,8 +261,8 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_status_draw(void) {
     eo_ui_text(STATUS_WIN_X + 10, STATUS_WIN_Y + 7, "Poisoned");
 }
 
-// Set up the stand-in burn attacker once.
-RECOMP_HOOK_RETURN("boot_load_static_data") void eo_status_init(void) {
+// Set up the stand-in burn attacker once (from main.c).
+void eo_status_init(void) {
     *(u8**)(burn_attacker + 0x68) = burn_attacker_stats;
     *(u16*)(burn_attacker_stats + 0x84) = 0xFFFF;
 }

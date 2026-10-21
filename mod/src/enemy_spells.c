@@ -87,8 +87,8 @@ static void rewrite_actions(u8* monster) {
     }
 }
 
-// Runs once the game has copied its spell tables into RAM, before any battle.
-RECOMP_HOOK_RETURN("boot_load_static_data") void eo_enemy_spells_init(void) {
+// Runs once the game has copied its spell tables into RAM (from main.c), before Brian's spells are rebalanced.
+void eo_enemy_spells_init(void) {
     for (int i = 0; i < BOSS_SPELLS; i++) {
         copy_spell(i, ENEMY_SCHOOL, i);
     }
