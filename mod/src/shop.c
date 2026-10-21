@@ -170,7 +170,7 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_shop_on_greeting(void) {
     if (shop < 0) {
         return;
     }
-    eo_text_encode_full(gMessageBuffer, "Welcome! Have a look at\nwhat I have today.");
+    eo_text_encode_full(gMessageBuffer, "Welcome, traveler. Have a\nlook at what I have today.");
     shop_pending = shop;
 }
 
