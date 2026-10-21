@@ -142,6 +142,10 @@ const char* eo_spell_description(int school, int index);
 int eo_spirits_known(int school, int index);
 s32 hud_strlen(const char* text);
 
+// ---- Burn visuals (fx.c) ----
+void eo_fx_burn_hit(int enemy_slot);  // flames rise from the enemy for a moment
+void eo_fx_update(void);              // every frame in battle
+
 // ---- Equipment (equipment.c) ----
 enum {
     EQ_EMBER_STAFF, EQ_HEAVY_STAFF, EQ_STONE_STAFF, EQ_TIDE_STAFF, EQ_GALE_STAFF,

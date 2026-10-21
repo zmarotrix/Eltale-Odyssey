@@ -486,6 +486,7 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_combat_draw(void) {
     if (!in_battle()) {
         return;
     }
+    eo_fx_update();
     draw_spell_description();
     eo_icons_begin();
     draw_charge();
