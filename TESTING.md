@@ -83,6 +83,7 @@ No floating icons or plates over enemies, and no explanation of what Boost does:
 
 - [ ] **Spell window**: element gem and description, then the MP cost (red if you can't pay). (Checked by Claude.)
 - [ ] **Shield hit**: a weakness hit throws white glints off the enemy; nothing says how many shields are left.
+- [ ] **Break sound**: sound 0x35 three times in quick succession (4 frames apart) when an enemy breaks.
 - [ ] **Breaking**: the enemy's model flickers dark for a moment (a white flash isn't possible with the game's
       lighting). Not checked by Claude yet.
 - [ ] **Broken**: a bigger burst of white and pale gold glints; while Broken the enemy is a little darker, glints

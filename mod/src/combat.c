@@ -165,13 +165,29 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
 
 // ---- Break ----
 
+// The Break sound (playtest, 2026-10-21): sound 0x35 three times in quick succession.
+#define SFX_BREAK 0x35
+#define BREAK_SOUNDS 3
+#define BREAK_SOUND_GAP 4   // frames between them
+static int break_sounds_left = 0;
+static int break_sound_timer = 0;
+
+static void play_break_sounds(void) {
+    if (break_sounds_left > 0 && --break_sound_timer <= 0) {
+        sfx_play(SFX_BREAK, 0xFF, 0x40);
+        break_sounds_left--;
+        break_sound_timer = BREAK_SOUND_GAP;
+    }
+}
+
 static void break_enemy(int i) {
     Guard* g = &guards[i];
     g->broken = 1;
     u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
     *(u16*)status |= STATUS_RESTRICTION_BIT;   // its next turn is skipped by the game itself
     status[STATUS_RESTRICTION_DURATION] = (u8)(1 + eo_talent(TALENT_EPICENTRE));
-    sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+    break_sounds_left = BREAK_SOUNDS;   // played by eo_combat_draw, a few frames apart
+    break_sound_timer = 0;
     // Landslide: the Break cracks a shield off every other foe (never their last).
     if (eo_talent(TALENT_LANDSLIDE)) {
         for (int k = 0; k < MAX_ENEMIES; k++) {
@@ -568,6 +584,7 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_combat_draw(void) {
         return;
     }
     eo_fx_update();
+    play_break_sounds();
     draw_spell_description();
     eo_icons_begin();
     draw_charge();
