@@ -107,6 +107,16 @@ static const Shop shops[] = {
 };
 #define SHOP_COUNT (sizeof(shops) / sizeof(shops[0]))
 
+// How many of each good a shop has each day (playtest, 2026-10-21: "items should be limited per day, especially
+// mana and HP recovery"). Equipment: one.
+static const u8 daily_stock[ITEM_COUNT] = {
+    [SPIRIT_LIGHT] = 1, [FRESH_BREAD] = 3, [HONEY_BREAD] = 2, [HEALING_POTION] = 2, [DRAGONS_POTION] = 1,
+    [DEW_DROP] = 3, [MINT_LEAVES] = 2, [HEROES_DRINK] = 1,
+    [SILENT_FLUTE] = 1, [CELINES_BELL] = 1, [REPLICA] = 2, [GIANTS_SHOES] = 1, [SILVER_AMULET] = 1,
+    [GOLDEN_AMULET] = 1,
+    [WHITE_WINGS] = 5, [YELLOW_WINGS] = 5, [BLUE_WINGS] = 5, [GREEN_WINGS] = 5, [RED_WINGS] = 5, [BLACK_WINGS] = 5,
+};
+
 static int is_equipment(u8 good) {
     return good >= EQ_BASE && good != END;
 }
@@ -121,10 +131,6 @@ static u32 good_price(u8 good) {
 
 static const char* good_effect(u8 good) {
     return is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->effect : items[good].effect;
-}
-
-static u32 good_owned(u8 good) {
-    return is_equipment(good) ? (u32)eo_equipment_owned(good - EQ_BASE) : (u32)inventory_count_item(good);
 }
 
 static int shop_for_text(u16 text_id) {
@@ -244,8 +250,8 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_shop_on_greeting(void) {
 
 // ---- The shop window ----
 
-// Small font layout: pointer, name (16), price (5) and a coin, owned ("x 2"); the bottom line holds up to 31
-// characters.
+// Small font layout: pointer, name (16), price (5) and a coin, the shop's stock left today ("x 2", or SOLD); the
+// bottom line holds up to 31 characters.
 #define WIN_W (31 * SMALL_W + 2 * SMALL_PAD)
 #define WIN_X ((320 - WIN_W) / 2)
 #define WIN_Y 24
@@ -274,8 +280,26 @@ int eo_shop_is_open(void) {
     return shop_open >= 0;
 }
 
+// Today's counts for the open shop, kept in the save so a sold-out shelf stays sold out after saving. A new day
+// restocks.
+static u8* stock_left(void) {
+    return gEo.shop_left[shop_open];
+}
+
+static void restock_if_new_day(int shop) {
+    if (gEo.shop_day[shop] == (u16)(gCurrentDay + 1)) {
+        return;
+    }
+    gEo.shop_day[shop] = (u16)(gCurrentDay + 1);
+    for (int i = 0; i < stock_count && i < 7; i++) {
+        u8 good = stock[i];
+        gEo.shop_left[shop][i] = is_equipment(good) ? 1 : daily_stock[good];
+    }
+}
+
 static void open_shop(int shop) {
     build_stock(shop);
+    restock_if_new_day(shop);
     shop_open = shop;
     cursor = 0;
     message_timer = 0;
@@ -344,7 +368,10 @@ static void handle_input(void) {
         message_timer = 0;
     } else if (pressed & BTN_A) {
         u8 good = stock[cursor];
-        if (is_equipment(good) && eo_equipment_owned(good - EQ_BASE)) {
+        if (stock_left()[cursor] == 0) {
+            eo_sfx(SFX_CANCEL);
+            say_message("SOLD OUT FOR TODAY.", TEXT_WARN);
+        } else if (is_equipment(good) && eo_equipment_owned(good - EQ_BASE)) {
             eo_sfx(SFX_CANCEL);
             say_message("YOU ALREADY HAVE ONE OF THOSE.", TEXT_WARN);
         } else if (GOLD < good_price(good)) {
@@ -356,6 +383,7 @@ static void handle_input(void) {
             say_message("YOUR BAG'S FULL.", TEXT_WARN);
         } else {
             GOLD -= good_price(good);
+            stock_left()[cursor]--;
             if (is_equipment(good)) {
                 eo_equipment_give(good - EQ_BASE);
             } else {
@@ -383,8 +411,16 @@ static void draw_shop(void) {
         eo_ui_small(NAME_X, y, palette, good_name(good));
         eo_format_amount(line, "", good_price(good), 5, "");
         eo_ui_small(PRICE_X, y, palette, line);
-        eo_format_amount(line, "X", good_owned(good), 3, "");
-        eo_ui_small(OWNED_X, y, palette, line);
+        // How many the shop has left today.
+        u8 left = stock_left()[i];
+        if (is_equipment(good) && eo_equipment_owned(good - EQ_BASE)) {
+            eo_ui_small(OWNED_X, y, TEXT_DIM, "OWNED");
+        } else if (left == 0) {
+            eo_ui_small(OWNED_X, y, TEXT_DIM, "SOLD");
+        } else {
+            eo_format_amount(line, "X", left, 3, "");
+            eo_ui_small(OWNED_X, y, palette, line);
+        }
     }
     s32 info_y = LIST_Y + stock_count * ROW_H + 3;
     if (message_timer > 0) {

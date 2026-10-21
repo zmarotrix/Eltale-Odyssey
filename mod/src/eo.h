@@ -119,7 +119,10 @@ typedef struct {
     u32 owned_equipment;   // one bit per piece
     u8 equipped[4];        // staff, robe, charm, sigil: piece + 1, 0 = none
     u8 talent_ranks[40];   // ranks learned per talent (talents.c)
-    u8 reserved[80];
+    // Shop stock left today (shop.c): the day it belongs to (+1, 0 = never stocked) and one count per row.
+    u16 shop_day[7];
+    u8 shop_left[7][7];
+    u8 reserved[17];
 } EoSaveBlock;
 
 _Static_assert(sizeof(EoSaveBlock) == 160, "the save block must fill the 160 free bytes exactly");

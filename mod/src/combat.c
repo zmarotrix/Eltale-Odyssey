@@ -605,3 +605,18 @@ static void eo_combat_draw_body(void) {
     eo_icons_begin();
     draw_charge();
 }
+
+// ---- Item drops ----
+// Enemies drop items half as often (playtest, 2026-10-21): 1 battle in 8 instead of 1 in 4. Bosses still always do.
+// Same as the game's battle_roll_item_drop otherwise: a random enemy's item (monster record +0x34), 0xFF for none.
+#define DROP_ODDS 8
+#define ENEMY_COUNT (*(u16*)0x8008C59A)
+#define RECORD_DROP_ITEM 0x34
+
+RECOMP_PATCH s32 battle_roll_item_drop(void) {
+    if (!(gBattleState & BATTLE_BOSS) && get_rand(DROP_ODDS) != 0) {
+        return 0xFF;
+    }
+    u8* record = ENEMY_RECORD(get_rand(ENEMY_COUNT));
+    return record != 0 ? record[RECORD_DROP_ITEM] : 0xFF;
+}

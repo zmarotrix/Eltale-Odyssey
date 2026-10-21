@@ -26,7 +26,12 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
 - [ ] Talk to Ingram in Melrode's Wings shop: a greeting, then a shop window (checked by Claude with a test NPC).
 - [ ] Each shop lists its own town's Wings first, always, and never another town's (Greenoch sells none: the game
       has no Greenoch Wings). Each shop also has staples plus 3 rotating items that change each in-game day.
-- [ ] D-pad or stick moves the hand cursor; A buys; B leaves. Gold, owned count and the effect line update.
+- [ ] D-pad or stick moves the hand cursor; A buys; B leaves. Gold and the effect line update.
+- [ ] **Daily stock**: the number on each row is how many the SHOP has left today (SOLD when out, OWNED for gear
+      you have). Restocks each in-game day; saving keeps today's counts. Per day: own Wings 5, Fresh Bread and Dew
+      Drop 3, Honey Bread, Mint Leaves, Healing Potion and Replica 2, the rest 1 (Spirit Light, Dragon's Potion,
+      Heroes Drink, amulets, tools, equipment). (Checked by Claude: counts, SOLD, "Sold out for today".)
+- [ ] **Item drops**: enemies drop an item after 1 battle in 8 (was 1 in 4); bosses always.
 - [ ] Three of the items rotate each day: rest at the inn and visit again.
 - [ ] At night (after evening turns dark) the shopkeeper says they're closed.
 - [ ] Each shopkeeper has their own greetings (alternating by day) and closed line; buying gives varied
