@@ -16,7 +16,8 @@ Findings from the burn and Break visuals (2026-10-20/21). Function names are in 
   originals after it tints just that model. The lights already add up past full brightness, so tints must cut
   channels (pulling toward a color barely shows) and nothing can go brighter than the texture (no white flash).
 - Display lists, textures and lights the renderer reads must be in the console's 8 MB; mod memory is above it
-  (the mod uses `0x807F0000`-`0x807F12FF`, unused by the game).
+  (the mod uses `0x807F0000`-`0x807FFFFF`, unused by the game: icons, tint lights, the dev sound mailbox at
+  `0x807F1F00`, and its own UI display lists from `0x807F4000`).
 
 ## Brian's model (field and battle, loaded around `0x8020xxxx` on the test save)
 
