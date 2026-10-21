@@ -140,7 +140,7 @@ every tree, on top of 92 for full attunement, out of 98 in the game.
 | Fire | Earth | Water | Wind |
 |---|---|---|---|
 | Smoulder 2: Burn +1 turn | Bedrock 2: +1 starting charge | Deep Freeze 2: Freeze +1 turn | Crosswind 2: Wind Boost +1 shot per charge |
-| Fanned Flames 3: Burn +5% of the hit | Weight 3: Earth +4% | Wellspring 3: Water healing +10% | Gale Force 3: Wind +4% |
+| Fanned Flames 3: Burn +5% of the hit | Weight 3: Earth +4% | Wellspring 3: Water healing +10% | Lock-On 1: hold Z to lock on (see below) |
 | Kindling 3: Fire +4% | Stoneskin 3: Defense +2 | Tidal Force 3: Water +4% | Tailwind 2: weakness charge twice a turn, then every hit |
 | Conflagration 2: ignition +25% | Shatter 2: Broken +15% | Still Waters 2: +1 MP every other turn / every turn | Shifting Winds 1: your statuses ignore the limit |
 | Firebrand 1: any staff hit burns | Fault Line 1: Earth weak hits take 2 shields | Undertow 1: Water healing ends your status | Eye of the Storm 2: your statuses +1 turn |
@@ -150,6 +150,11 @@ every tree, on top of 92 for full attunement, out of 98 in the game.
 | Inferno (cap): Burn stacks to 4 | Epicentre (cap): Broken one more turn | Glacier (cap): freezing cracks a shield | Maelstrom (cap): 2 charge a turn |
 
 (Numbers are per rank.)
+
+**Lock-On** (Wind, Lv 3): in battle, hold **Z** and Brian locks onto an enemy (the one most straight ahead) and
+keeps facing it while you move, which aims your spells. Tap Z again to switch to the next enemy. A pale-gold
+sparkle floats over the target. Z doesn't swing or cast while the talent is learned (A and R still do).
+- [ ] Facing and the marker checked by Claude; moving while locked and switching targets not checked yet.
 
 - [ ] Pages draw (checked by Claude). Learning ranks and every effect: not checked yet (needs points and levels;
       the dev panel's Brian tab can raise element levels, and Spirit Points can be set from the Memory tab).

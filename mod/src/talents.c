@@ -46,7 +46,7 @@ static const TalentInfo talents[TALENT_COUNT] = {
     [TALENT_GLACIER]        = { "Glacier",        2, 30, 1, CAPSTONE_COST, "FREEZING A FOE CRACKS A SHIELD." },
     // Wind: many hits, charge and statuses
     [TALENT_CROSSWIND]      = { "Crosswind",      3, 1,  2, RANK_COST, "WIND BOOST: 1 MORE SHOT A RANK." },
-    [TALENT_GALE_FORCE]     = { "Gale Force",     3, 3,  3, RANK_COST, "WIND SPELLS 4 PCT MORE A RANK." },
+    [TALENT_LOCK_ON]        = { "Lock-On",        3, 3,  1, RANK_COST, "HOLD Z TO LOCK ON. TAP TO SWITCH." },
     [TALENT_TAILWIND]       = { "Tailwind",       3, 6,  2, RANK_COST, "MORE CHARGE FROM WEAK HITS." },
     [TALENT_SHIFTING_WINDS] = { "Shifting Winds", 3, 10, 1, RANK_COST, "YOUR STATUSES IGNORE THE LIMIT." },
     [TALENT_EYE_OF_THE_STORM] = { "Eye of Storm", 3, 12, 2, RANK_COST, "YOUR STATUSES LAST 1 MORE A RANK." },

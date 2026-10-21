@@ -374,6 +374,23 @@ void eo_fx_flare(int slot) {
     }
 }
 
+// Lock-On's marker: a pale-gold sparkle bobbing just over the target's head.
+void eo_fx_lockon_marker(int slot) {
+    if (slot < 0 || slot >= MAX_ENEMIES) {
+        return;
+    }
+    f32 pos[3];
+    f32 ox;
+    f32 oz;
+    body_point(slot, 1.0f, pos, &ox, &oz);
+    u8* bd = ENEMY_BATTLE_DATA(slot);
+    pos[0] = *(f32*)(bd + 0x0);   // centered, not on the body's ring
+    pos[2] = *(f32*)(bd + 0x8);
+    pos[1] += 6.0f;
+    f32 vel[3] = { 0.0f, 0.15f, 0.0f };
+    spawn(pos, vel, 3.0f, COLOR_PALE_GOLD, 16, 0);   // the game shrinks sparkles to 1.0 below 10 frames left
+}
+
 // A slow glint drifting around a Broken enemy's head.
 static void spawn_head_glint(int slot) {
     f32 pos[3];

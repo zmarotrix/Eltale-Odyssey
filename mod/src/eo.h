@@ -172,7 +172,7 @@ enum {
     TALENT_DEEP_FREEZE, TALENT_WELLSPRING, TALENT_TIDAL_FORCE, TALENT_STILL_WATERS, TALENT_UNDERTOW,
     TALENT_FROSTBITE, TALENT_RIPTIDE, TALENT_UNDERCURRENT, TALENT_GLACIER,
     // Wind
-    TALENT_CROSSWIND, TALENT_GALE_FORCE, TALENT_TAILWIND, TALENT_SHIFTING_WINDS, TALENT_EYE_OF_THE_STORM,
+    TALENT_CROSSWIND, TALENT_LOCK_ON, TALENT_TAILWIND, TALENT_SHIFTING_WINDS, TALENT_EYE_OF_THE_STORM,
     TALENT_CYCLONE, TALENT_SECOND_WIND, TALENT_UPDRAFT, TALENT_MAELSTROM,
     TALENT_COUNT
 };
@@ -188,6 +188,10 @@ typedef struct {
 const TalentInfo* eo_talent_info(int talent);
 int eo_talent(int talent);         // ranks learned, 0 = none
 int eo_talent_learn(int talent);   // 1 if a rank was learned now (level and points checked)
+
+// ---- Lock-On (lockon.c): Wind's Z-targeting talent ----
+int eo_lockon_target(void);   // enemy slot Brian is locked onto, -1 if none
+void eo_fx_lockon_marker(int enemy_slot);   // fx.c: the sparkle over the target's head
 
 // ---- One status at a time (status.c) ----
 // 1 if `fighter` (battle data) has a status that keeps a new one off. `by_brian`: the new status is Brian's

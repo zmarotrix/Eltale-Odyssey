@@ -90,7 +90,8 @@ static u8* active_spell = 0;
 static u16 saved_base;
 static u16 saved_shots;
 
-static const u8 school_talent[4] = { TALENT_KINDLING, TALENT_WEIGHT, TALENT_TIDAL_FORCE, TALENT_GALE_FORCE };
+// Each school's +damage talent (Wind's tree has Lock-On instead).
+static const u8 school_talent[4] = { TALENT_KINDLING, TALENT_WEIGHT, TALENT_TIDAL_FORCE, TALENT_COUNT };
 
 // Most charge Brian can hold: 5, more with Updraft.
 static u8 max_charge(void) {
