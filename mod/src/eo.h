@@ -148,7 +148,7 @@ void eo_icon_draw(int icon, s32 x, s32 y);  // 12 x 12
 int eo_screen_pos(f32 x, f32 y, f32 z, s32* sx, s32* sy);  // scene point to screen; 0 if off screen
 const char* eo_spell_description(int school, int index);
 int eo_spirits_known(int school, int index);
-s32 eo_strlen(const char* text);  // characters (the game's hud_strlen gave short counts for some strings)
+s32 eo_strlen(const char* text);  // characters in a zero-terminated string
 
 // ---- Burn visuals (fx.c) ----
 void eo_fx_burn_hit(int enemy_slot);  // flames rise from the enemy for a moment
