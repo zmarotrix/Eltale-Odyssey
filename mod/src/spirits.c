@@ -161,6 +161,54 @@ RECOMP_HOOK("projectile_init") void eo_spirits_on_projectile(void* caster, u16 s
     eo_sfx(SFX_CONFIRM);
 }
 
+// ---- Hint scrolls (shop.c; pacing plan: the Elementalist's starter, sold by every shop from beat 1) ----
+
+#define SPELL_INPUT_COUNT 0x04   // u16, 1-3 presses
+#define SPELL_PRESSES 0x06       // u8 x 3: 0 Fire, 1 Earth, 2 Water, 3 Wind
+
+// Teaches one spell Brian can already cast (its tier is attuned) but hasn't discovered, picked at random, lowest
+// tier first so scrolls lead the way through a new tier. Writes how to cast it into out ("CAST IT: ...", 31
+// characters at most) and shows "Learned <name>". Returns 0, writing nothing, when there's nothing left to teach.
+int eo_spirits_hint(char* out, u32 seed) {
+    static const char* const press_names[SCHOOLS] = { "FIRE", "EARTH", "WATER", "WIND" };
+    for (int tier = 1; tier <= TIERS; tier++) {
+        int candidates = 0;
+        for (int s = 0; s < SCHOOLS; s++) {
+            for (int i = 0; i < SPELLS; i++) {
+                if (spell_tier[s][i] == tier && tier <= gEo.tiers[s] && !is_discovered(s, i)) {
+                    candidates++;
+                }
+            }
+        }
+        if (candidates == 0) {
+            continue;
+        }
+        int pick = (int)(seed % (u32)candidates);
+        for (int s = 0; s < SCHOOLS; s++) {
+            for (int i = 0; i < SPELLS; i++) {
+                if (spell_tier[s][i] != tier || tier > gEo.tiers[s] || is_discovered(s, i) || pick-- != 0) {
+                    continue;
+                }
+                u8* stats = SPELL_STAT_TABLES[s] + i * SPELL_STAT_SIZE;
+                u16 count = *(u16*)(stats + SPELL_INPUT_COUNT);
+                out[0] = '\0';
+                char* end = eo_append(out, "CAST IT:");
+                for (u16 k = 0; k < count && k < 3; k++) {
+                    u8 press = stats[SPELL_PRESSES + k];
+                    end = eo_append(eo_append(end, " "), press < SCHOOLS ? press_names[press] : "?");
+                }
+                set_discovered(s, i);
+                SPELL_NAME_TABLES[s][i] = spell_names[s][i];
+                char name[24];
+                eo_title_case(name, spell_names[s][i], 20);
+                eo_notice("Learned ", name);
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 // ---- Every frame: set up saves, count new spirits ----
 
 RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {

@@ -11,7 +11,7 @@
 #define SHOP_TEXT_CONDITION 7
 #define ROTATING_SLOTS 3
 #define MAX_STAPLES 4
-#define MAX_POOL 10
+#define MAX_POOL 11
 #define MAX_ROWS (MAX_STAPLES + ROTATING_SLOTS)
 
 // Live NPC slots: 16 x 0x84 bytes; +0x80 points at the NPC's map record (+0x02 text condition, +0x08 text ID).
@@ -72,6 +72,10 @@ static const ItemInfo items[ITEM_COUNT] = {
 };
 
 #define END 0xFF
+// A hint scroll isn't an item either: it teaches a spell on the spot (spirits.c). Pacing plan: the Elementalist's
+// starter, on every shop's shelf from the first beat, one a day.
+#define HINT_SCROLL 0x3F
+static const ItemInfo hint_scroll = { "Hint Scroll", 150, "Teaches a spell you can cast." };
 // Goods at EQ_BASE and up are the overhaul's equipment (equipment.c), not game items.
 #define EQ_BASE 0x40
 #define EQ(piece) (EQ_BASE + (piece))
@@ -86,24 +90,25 @@ typedef struct {
 // Greenoch has no Wings item in the game, so it sells none.
 static const Shop shops[] = {
     { 0x1BB0, { WHITE_WINGS, FRESH_BREAD, DEW_DROP, EQ(EQ_TRAVELERS_ROBE) },                      // Ingram, Melrode
-              { HONEY_BREAD, MINT_LEAVES, REPLICA, SILVER_AMULET, END } },
+              { HONEY_BREAD, MINT_LEAVES, REPLICA, SILVER_AMULET, HINT_SCROLL, END } },
     { 0x36B8, { YELLOW_WINGS, FRESH_BREAD, HONEY_BREAD, EQ(EQ_HEAVY_STAFF) },                    // Thom, Dondoran
               { DEW_DROP, MINT_LEAVES, HEALING_POTION, REPLICA, SILVER_AMULET, CELINES_BELL, EQ(EQ_EMBER_STAFF),
-                END } },
+                HINT_SCROLL, END } },
     { 0x5880, { BLUE_WINGS, HONEY_BREAD, MINT_LEAVES, END },                                      // Jiryo, Larapool
               { HEALING_POTION, HEROES_DRINK, SILENT_FLUTE, CELINES_BELL, GIANTS_SHOES, SILVER_AMULET,
-                EQ(EQ_STONE_STAFF), EQ(EQ_TRAVELERS_ROBE), END } },
+                EQ(EQ_STONE_STAFF), EQ(EQ_TRAVELERS_ROBE), HINT_SCROLL, END } },
     { 0x6928, { GREEN_WINGS, HONEY_BREAD, MINT_LEAVES, END },                                     // Anette, Normoon
               { HEALING_POTION, HEROES_DRINK, SILENT_FLUTE, CELINES_BELL, GIANTS_SHOES, GOLDEN_AMULET, SPIRIT_LIGHT,
-                EQ(EQ_TIDE_STAFF), EQ(EQ_PILGRIMS_SOUL), END } },
+                EQ(EQ_TIDE_STAFF), EQ(EQ_PILGRIMS_SOUL), HINT_SCROLL, END } },
     { 0x7900, { RED_WINGS, HEALING_POTION, HEROES_DRINK, END },                                   // Ring, Limelin
               { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL,
-                EQ(EQ_GALE_STAFF), EQ(EQ_TIDECLOTH_ROBE), END } },
+                EQ(EQ_GALE_STAFF), EQ(EQ_TIDECLOTH_ROBE), HINT_SCROLL, END } },
     { 0xB3B0, { HEALING_POTION, HEROES_DRINK, END },                                              // Bronze, Greenoch
-              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, REPLICA, EQ(EQ_TIDECLOTH_ROBE), EQ(EQ_EMBER_STAFF), END } },
+              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, REPLICA, EQ(EQ_TIDECLOTH_ROBE), EQ(EQ_EMBER_STAFF),
+                HINT_SCROLL, END } },
     { 0x87B8, { BLACK_WINGS, HEALING_POTION, HEROES_DRINK, END },                                 // Tom, Brannoch
               { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL,
-                EQ(EQ_HEAVY_STAFF), EQ(EQ_TIDECLOTH_ROBE), END } },
+                EQ(EQ_HEAVY_STAFF), EQ(EQ_TIDECLOTH_ROBE), HINT_SCROLL, END } },
 };
 #define SHOP_COUNT (sizeof(shops) / sizeof(shops[0]))
 
@@ -122,15 +127,18 @@ static int is_equipment(u8 good) {
 }
 
 static const char* good_name(u8 good) {
-    return is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->name : items[good].name;
+    return good == HINT_SCROLL ? hint_scroll.name : is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->name :
+           items[good].name;
 }
 
 static u32 good_price(u8 good) {
-    return is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->price : items[good].price;
+    return good == HINT_SCROLL ? hint_scroll.price : is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->price :
+           items[good].price;
 }
 
 static const char* good_effect(u8 good) {
-    return is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->effect : items[good].effect;
+    return good == HINT_SCROLL ? hint_scroll.effect :
+           is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->effect : items[good].effect;
 }
 
 static int shop_for_text(u16 text_id) {
@@ -293,7 +301,7 @@ static void restock_if_new_day(int shop) {
     gEo.shop_day[shop] = (u16)(gCurrentDay + 1);
     for (int i = 0; i < stock_count && i < 7; i++) {
         u8 good = stock[i];
-        gEo.shop_left[shop][i] = is_equipment(good) ? 1 : daily_stock[good];
+        gEo.shop_left[shop][i] = is_equipment(good) || good == HINT_SCROLL ? 1 : daily_stock[good];
     }
 }
 
@@ -378,6 +386,20 @@ static void handle_input(void) {
             eo_sfx(SFX_CANCEL);
             char line[40];
             say_message(eo_text_fill(line, "YOU'RE %a GOLD SHORT.", 0, good_price(good) - GOLD, 0), TEXT_WARN);
+        } else if (good == HINT_SCROLL) {
+            char how[40];
+            if (!eo_spirits_hint(how, (u32)gCurrentDay * 31u + sales)) {
+                eo_sfx(SFX_CANCEL);
+                say_message("NOTHING IN IT YOU DON'T KNOW.", TEXT_WARN);
+                return;
+            }
+            GOLD -= good_price(good);
+            stock_left()[cursor]--;
+            eo_spirits_mark_dirty();
+            eo_gold_resync();
+            eo_sfx(SFX_CONFIRM);
+            sales++;
+            say_message(how, TEXT_GOOD);
         } else if (!is_equipment(good) && inventory_count_item(INVENTORY_EMPTY) == 0) {
             eo_sfx(SFX_CANCEL);
             say_message("YOUR BAG'S FULL.", TEXT_WARN);

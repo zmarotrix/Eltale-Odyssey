@@ -239,6 +239,20 @@ Mirror Shard. Chest pieces are given on load to saves that already opened those 
 - Checked by Claude: the Equipment window opens and shows the slots (charm and sigil locked on your save).
 - [ ] Not checked yet: equipping, each effect in battle, buying pieces in shops, boss rewards ("Found ...").
 
+## Hint Scrolls (new)
+
+Every shop can roll a **Hint Scroll** (150 gold, one a day) into its rotating slots. Buying one teaches a spell
+you can already cast but haven't discovered (lowest tier first): the shopkeeper shows how to cast it ("CAST IT:
+EARTH EARTH") and the notice says "Learned ...". With nothing left to teach, the shop refuses the sale.
+- Checked by Claude: Melrode, bought with 1000 gold set in RAM; it taught Boulder (game closed, not saved).
+
+## Attunement tiers (changed)
+
+Tier gates now match the level vanilla needed for each tier's first spell: Lv 7 / 16 / 25 / 36, costing
+3 / 6 / 10 / 15 Spirit Points (was Lv 6 / 14 / 22 / 30 for 2 / 4 / 7 / 10). One element to tier 5 is 34 points;
+the game has 98 and talents share them. Tiers you already attuned stay attuned.
+Epicentre no longer makes a Broken boss lose two turns (bosses lose one, like Freeze).
+
 ## Balance pass (new, 2026-10-21)
 
 Full reasoning in `research/balance/README.md`. In short: the new systems make a focused Brian deal about
