@@ -234,3 +234,44 @@ void eo_sfx(s32 sound) {
     sfx_last_frame = sfx_frame;
     sfx_play_scaled(0, sound, 0xFF);
 }
+
+// ---- The mod's own display list ----
+
+static u32* ui_pos = 0;     // next free command in this frame's UI list
+static u32* ui_end = 0;
+static u32* game_pos = 0;   // where the game's list resumes while drawing into ours
+static int ui_depth = 0;
+
+RECOMP_HOOK("frame_build") void eo_ui_frame_start(u8* context) {
+    int n = (u32)context >= GFX_CONTEXT_BASE + GFX_CONTEXT_SIZE ? 1 : 0;
+    ui_pos = (u32*)(UI_LIST_BASE + n * UI_LIST_SIZE);
+    ui_end = ui_pos + UI_LIST_SIZE / 4;
+    ui_depth = 0;
+    game_pos = 0;
+}
+
+void eo_ui_begin(void) {
+    if (ui_depth++ > 0) {
+        return;
+    }
+    if (ui_pos == 0 || ui_end - ui_pos < 0x100 / 4 || eo_gfx_room() < 0x40) {
+        return;   // draw into the game's list as before (still room-checked)
+    }
+    u32* g = gMasterGfxPos;
+    g[0] = 0x06000000;          // gSPDisplayList: call ours, come back
+    g[1] = (u32)ui_pos;
+    game_pos = g + 2;
+    gMasterGfxPos = ui_pos;
+}
+
+void eo_ui_end(void) {
+    if (ui_depth == 0 || --ui_depth > 0 || game_pos == 0) {
+        return;
+    }
+    u32* g = gMasterGfxPos;
+    g[0] = 0xB8000000;          // gSPEndDisplayList
+    g[1] = 0;
+    ui_pos = g + 2;
+    gMasterGfxPos = game_pos;
+    game_pos = 0;
+}

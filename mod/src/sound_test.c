@@ -54,7 +54,16 @@ RECOMP_HOOK_RETURN("frame_build") void eo_sound_test_mailbox(void) {
     }
 }
 
+static void eo_sound_test_draw_body(void);
+
+// Drawn into the mod's own display list (ui.c).
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_sound_test_draw(void) {
+    eo_ui_begin();
+    eo_sound_test_draw_body();
+    eo_ui_end();
+}
+
+static void eo_sound_test_draw_body(void) {
     if (!showing) {
         return;
     }

@@ -417,7 +417,16 @@ static void draw_window(void) {
 
 #define NOTICE_Y 182
 
+static void eo_spirits_draw_body(void);
+
+// Drawn into the mod's own display list (ui.c).
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_spirits_draw(void) {
+    eo_ui_begin();
+    eo_spirits_draw_body();
+    eo_ui_end();
+}
+
+static void eo_spirits_draw_body(void) {
     if (window_open) {
         handle_input();
         if (window_open) {

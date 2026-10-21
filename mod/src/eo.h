@@ -42,16 +42,28 @@ extern u32* gMasterGfxPos;      // next free command in the frame's display list
 #define GFX_CONTEXT_BASE 0x80301000
 #define GFX_CONTEXT_SIZE 0xD150
 #define GFX_RESERVE 0x400   // left for the rest of the game's frame
+// The mod's windows and text go into a list of its own (ui.c, eo_ui_begin/end), one per frame context, in the spare
+// 4 MB the game never uses (see icons.c): the game's list only gets a call to it.
+#define UI_LIST_BASE 0x807F4000
+#define UI_LIST_SIZE 0x6000   // two lists end at 0x80800000, the top of the 8 MB
 
-// Bytes left in the frame's display list (a large number when it isn't one of the two known lists).
+// Bytes left in the list being written (a large number when it isn't one we know).
 static inline s32 eo_gfx_room(void) {
     u32 pos = (u32)gMasterGfxPos;
+    if (pos >= UI_LIST_BASE && pos < UI_LIST_BASE + 2 * UI_LIST_SIZE) {
+        u32 end = UI_LIST_BASE + ((pos - UI_LIST_BASE) / UI_LIST_SIZE + 1) * UI_LIST_SIZE;
+        return (s32)(end - pos) - 8 + GFX_RESERVE;   // only the closing command needs keeping back
+    }
     u32 n = (pos - GFX_CONTEXT_BASE) / GFX_CONTEXT_SIZE;
     if (pos < GFX_CONTEXT_BASE || n > 1) {
         return 0x7FFFFFFF;
     }
     return (s32)(GFX_CONTEXT_BASE + (n + 1) * GFX_CONTEXT_SIZE - pos);
 }
+
+// Mod drawing between these goes into the mod's own list (they nest; with no room there it falls back to the game's).
+void eo_ui_begin(void);
+void eo_ui_end(void);
 
 // 1 if `bytes` more commands fit with the reserve to spare.
 static inline int eo_gfx_fits(s32 bytes) {

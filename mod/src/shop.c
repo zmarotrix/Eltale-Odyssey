@@ -401,7 +401,16 @@ static void draw_shop(void) {
 }
 
 // The shop window draws over the field HUD; the greeting closes first, then the window opens.
+static void eo_shop_draw_body(void);
+
+// Drawn into the mod's own display list (ui.c).
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_shop_draw(void) {
+    eo_ui_begin();
+    eo_shop_draw_body();
+    eo_ui_end();
+}
+
+static void eo_shop_draw_body(void) {
     if (shop_open < 0 && shop_pending >= 0 && !(gGameState & 0x2) && gMsgWinOpenCount == 0) {
         open_shop(shop_pending);
         shop_pending = -1;

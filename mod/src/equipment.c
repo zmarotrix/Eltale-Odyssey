@@ -274,7 +274,16 @@ static void draw_window(void) {
     eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, list_y + cursor * ROW_H + 2 + ICON_TEXT_DY);
 }
 
+static void eo_equipment_draw_body(void);
+
+// Drawn into the mod's own display list (ui.c).
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_equipment_draw(void) {
+    eo_ui_begin();
+    eo_equipment_draw_body();
+    eo_ui_end();
+}
+
+static void eo_equipment_draw_body(void) {
     if (!window_open) {
         return;
     }

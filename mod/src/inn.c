@@ -224,7 +224,16 @@ static int overlaps_game_window(s32 y) {
 
 // While the inn's Yes/No box is open, show the price of tonight and what you have.
 // The dialogue frame doesn't run hud_draw_main, so this draws after the message windows instead.
+static void eo_inn_draw_price_body(void);
+
+// Drawn into the mod's own display list (ui.c).
 RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
+    eo_ui_begin();
+    eo_inn_draw_price_body();
+    eo_ui_end();
+}
+
+static void eo_inn_draw_price_body(void) {
     if (!inn_choice_active() || gMsgWinOpenCount == 0) {
         return;
     }

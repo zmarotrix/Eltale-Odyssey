@@ -586,7 +586,16 @@ static void draw_spell_description(void) {
     }
 }
 
+static void eo_combat_draw_body(void);
+
+// Drawn into the mod's own display list (ui.c).
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_combat_draw(void) {
+    eo_ui_begin();
+    eo_combat_draw_body();
+    eo_ui_end();
+}
+
+static void eo_combat_draw_body(void) {
     if (!in_battle()) {
         return;
     }

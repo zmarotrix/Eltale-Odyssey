@@ -80,7 +80,16 @@ static void watch_gold(void) {
 }
 
 // hud_draw_main draws the field and battle HUD when no menu or dialogue is open.
+static void eo_gold_draw_body(void);
+
+// Drawn into the mod's own display list (ui.c).
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_gold_draw(void) {
+    eo_ui_begin();
+    eo_gold_draw_body();
+    eo_ui_end();
+}
+
+static void eo_gold_draw_body(void) {
     watch_gold();
     if (notice_timer <= 0) {
         return;
