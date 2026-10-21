@@ -181,6 +181,7 @@ enum {
     ICON_COIN, ICON_PIP_EMPTY, ICON_PIP_FULL, ICON_LOCK,
     ICON_STAFF, ICON_ROBE, ICON_CHARM, ICON_SIGIL,   // equipment slots, in slot order
     ICON_PIP_STEEL,                                  // an enemy's shield
+    ICON_PLUS,                                       // the HUD font has no +
     ICON_COUNT
 };
 #define ICON_TEXT_DY (-2)   // draw an icon at a small-text line's y + ICON_TEXT_DY to line them up

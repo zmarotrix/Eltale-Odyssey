@@ -6,8 +6,9 @@
 #define NOTICE_FRAMES 150
 #define NOTICE_W (NOTICE_COLUMNS * SMALL_W + 2 * SMALL_PAD)  // small font
 #define NOTICE_H (2 * SMALL_LINE + 2 * SMALL_PAD - 2)
-#define NOTICE_X (320 - 16 - 3 - NOTICE_W)  // top right, shadow inside the safe area
-#define NOTICE_Y 16
+#define NOTICE_X (320 - 16 - 3 - NOTICE_W)  // bottom right (playtest, 2026-10-21), shadow inside the safe area
+#define NOTICE_Y (240 - 16 - 3 - NOTICE_H)
+#define PLUS_W 9   // the plus icon's art and a gap
 
 static u32 shown_gold;
 static int synced = 0;
@@ -96,21 +97,26 @@ static void eo_gold_draw_body(void) {
     }
     notice_timer--;
     // The game's parchment window, with the HUD's small font; a gold notice is just wide enough for its
-    // numbers and coin. Both lines right-aligned, against the screen's top right.
+    // numbers, its coin and the plus before gold gained. Both lines right-aligned, against the screen's bottom right.
+    int plus = notice_coins && !notice_spent;
     s32 w = NOTICE_W;
     if (notice_coins) {
-        s32 len = eo_strlen(notice_line1) > eo_strlen(notice_line2) ? eo_strlen(notice_line1) : eo_strlen(notice_line2);
-        w = len * SMALL_W + ICON_W + 2 * SMALL_PAD;
+        s32 w1 = eo_strlen(notice_line1) * SMALL_W + ICON_W;
+        s32 w2 = eo_strlen(notice_line2) * SMALL_W + (plus ? PLUS_W : 0);
+        w = (w1 > w2 ? w1 : w2) + 2 * SMALL_PAD;
     }
     s32 right = NOTICE_X + NOTICE_W - SMALL_PAD;
     eo_ui_window(right + SMALL_PAD - w, NOTICE_Y, w, NOTICE_H);
     s32 x1 = right - eo_strlen(notice_line1) * SMALL_W;
     eo_ui_small(x1, NOTICE_Y + SMALL_PAD, TEXT_NORMAL, notice_line1);
-    eo_ui_small(right - eo_strlen(notice_line2) * SMALL_W, NOTICE_Y + SMALL_PAD + SMALL_LINE,
-                notice_coins && notice_spent ? TEXT_WARN : TEXT_GOOD, notice_line2);
+    s32 x2 = right - eo_strlen(notice_line2) * SMALL_W;
+    eo_ui_small(x2, NOTICE_Y + SMALL_PAD + SMALL_LINE, notice_coins && notice_spent ? TEXT_WARN : TEXT_GOOD, notice_line2);
     if (notice_coins) {
         eo_icons_begin();
         eo_icon_draw(ICON_COIN, x1 - ICON_W, NOTICE_Y + SMALL_PAD + ICON_TEXT_DY);
+        if (plus) {
+            eo_icon_draw(ICON_PLUS, x2 - PLUS_W - 2, NOTICE_Y + SMALL_PAD + SMALL_LINE + ICON_TEXT_DY);
+        }
     }
 }
 

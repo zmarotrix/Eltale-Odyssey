@@ -270,6 +270,21 @@ static void make_charm(int icon) {
     paint(icon, art, 9, 2, 1, "#g*", colors);
 }
 
+// A green plus (art 7 x 7, columns 2-8 of the cell) for gold gained.
+static void make_plus(int icon) {
+    static const char* const art[] = {
+        "  ###  ",
+        "  #g#  ",
+        "###g###",
+        "#ggggg#",
+        "###g###",
+        "  #g#  ",
+        "  ###  ",
+    };
+    static const u8 colors[] = { C_OUTLINE, C_GREEN };
+    paint(icon, art, 7, 2, 3, "#g", colors);
+}
+
 static void make_sigil(int icon) {
     static const char* const art[] = {
         "  ####  ",
@@ -326,6 +341,7 @@ void eo_icons_init(void) {
     make_pip(ICON_PIP_EMPTY, C_EMPTY);
     make_pip(ICON_PIP_FULL, C_PURPLE);
     make_pip(ICON_PIP_STEEL, C_STEEL);
+    make_plus(ICON_PLUS);
     make_lock(ICON_LOCK);
     make_staff(ICON_STAFF);
     make_robe(ICON_ROBE);
