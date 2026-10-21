@@ -252,8 +252,6 @@ After Zelse, Melrode and Dondoran can roll Healing Potions, Heroes Drinks and Gi
 Dondoran, Larapool and Normoon can roll Spirit Light, Dragon's Potion and Golden Amulets. They join the rotating
 pool, so they still compete for the three daily slots.
 - Checked by Claude: shelves unchanged on a save before Zelse. Not yet seen after a boss.
-- Rough edge: on the day you beat the boss, a shop you already visited that day may show counts for the old
-  shelf until the next morning.
 
 ## Attunement tiers (changed)
 

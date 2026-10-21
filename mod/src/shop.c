@@ -328,10 +328,15 @@ static u8* stock_left(void) {
 }
 
 static void restock_if_new_day(int shop) {
-    if (gEo.shop_day[shop] == (u16)(gCurrentDay + 1)) {
+    // The saved key is the day (+1) and, in the top two bits, how many restocks the shop has had, so a boss beaten
+    // mid-day refills the new shelf at once.
+    int level = (shop < 2 && boss_is_defeated(BOSS_ZELSE) ? 1 : 0) +
+                (shop < RESTOCK_SHOPS && boss_is_defeated(BOSS_SHILF) ? 1 : 0);
+    u16 key = (u16)(((gCurrentDay + 1) & 0x3FFF) | (level << 14));
+    if (gEo.shop_day[shop] == key) {
         return;
     }
-    gEo.shop_day[shop] = (u16)(gCurrentDay + 1);
+    gEo.shop_day[shop] = key;
     for (int i = 0; i < stock_count && i < 7; i++) {
         u8 good = stock[i];
         gEo.shop_left[shop][i] = is_equipment(good) || good == HINT_SCROLL ? 1 : daily_stock[good];
