@@ -203,6 +203,10 @@ static int stick_held = 0;
 static int message_timer = 0;
 static const char* message = "";
 
+int eo_shop_is_open(void) {
+    return shop_open >= 0;
+}
+
 static void open_shop(int shop) {
     build_stock(shop);
     shop_open = shop;

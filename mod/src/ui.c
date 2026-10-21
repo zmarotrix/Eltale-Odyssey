@@ -101,6 +101,19 @@ void eo_ui_text(s32 x, s32 y, const char* text) {
     ui_draw_text(x, y, encoded);
 }
 
+void eo_title_case(char* out, const char* name, int max_chars) {
+    int start = 1;
+    for (int n = 0; name != 0 && *name != '\0' && n < max_chars; name++, n++) {
+        char c = *name;
+        if (c >= 'A' && c <= 'Z' && !start) {
+            c = (char)(c - 'A' + 'a');
+        }
+        start = c == ' ' || c == '-';
+        *out++ = c;
+    }
+    *out = '\0';
+}
+
 char* eo_append(char* out, const char* text) {
     while (*text != '\0') {
         *out++ = *text++;

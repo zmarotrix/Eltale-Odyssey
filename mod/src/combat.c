@@ -298,10 +298,11 @@ RECOMP_HOOK_RETURN("pad_read") void eo_combat_read_input(void) {
 
 // ---- Battle panels ----
 
-#define CHARGE_WIN_X 54   // under the HUD's HP/MP box and its element-sequence bar
-#define CHARGE_WIN_Y 62
-#define CHARGE_WIN_W (9 * 8 + 20)
+// Bottom right: clear of the HUD (HP/MP, the selected-spell bar, element gems) and of the spell wheel.
+#define CHARGE_WIN_W (8 * 8 + 20)
 #define CHARGE_WIN_H 36
+#define CHARGE_WIN_X (320 - 16 - 3 - CHARGE_WIN_W)
+#define CHARGE_WIN_Y (240 - 16 - 3 - CHARGE_WIN_H)
 
 // One row per enemy: name, shields (or "Broken"), weakness ("?" until revealed), Burn stacks ("B3").
 // 21 columns keep the panel clear of the HUD's HP box.
@@ -316,21 +317,6 @@ RECOMP_HOOK_RETURN("pad_read") void eo_combat_read_input(void) {
 #define FOE_ROW_H 14
 
 static const char* const element_names[4] = { "Fire", "Earth", "Water", "Wind" };
-
-// "WERE HARE" -> "Were Hare", cut to NAME_CHARS.
-static void title_case(char* out, const char* name) {
-    int start = 1;
-    int n = 0;
-    for (; name != 0 && *name != '\0' && n < NAME_CHARS; name++, n++) {
-        char c = *name;
-        if (c >= 'A' && c <= 'Z' && !start) {
-            c = (char)(c - 'A' + 'a');
-        }
-        start = c == ' ' || c == '-';
-        *out++ = c;
-    }
-    *out = '\0';
-}
 
 static void draw_panels(void) {
     char line[32];
@@ -359,7 +345,7 @@ static void draw_panels(void) {
         }
         Guard* g = &guards[i];
         char name[NAME_CHARS + 1];
-        title_case(name, names != 0 ? names[*(u16*)(record + RECORD_MODEL_INDEX)] : "Foe");
+        eo_title_case(name, names != 0 ? names[*(u16*)(record + RECORD_MODEL_INDEX)] : "Foe", NAME_CHARS);
         eo_ui_text(FOES_WIN_X + 10, y, name);
         if (g->broken) {
             eo_ui_text(FOES_WIN_X + 10 + SHIELD_COL * 8, y, "Broken");

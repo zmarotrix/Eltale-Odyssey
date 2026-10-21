@@ -66,7 +66,14 @@ typedef struct {
     u8 inn_nights_in_row;  // extra nights in a row at last_inn (0 = first night)
     u16 pad;
     u32 last_rest_time;    // day * DAY_LENGTH + time when that night started
-    u8 reserved[144];
+    // Spirits (spirits.c). Zero in saves from before them: spirits_ready = 0 sets them up on load.
+    u8 spirits_ready;
+    u8 spirit_points;      // unspent
+    u8 spirits_counted;    // spirits already turned into points
+    u8 pad2;
+    u8 tiers[4];           // attuned tier per element, 1-5
+    u8 discovered[8];      // 60 bits: school * 15 + index
+    u8 reserved[128];
 } EoSaveBlock;
 
 _Static_assert(sizeof(EoSaveBlock) == 160, "the save block must fill the 160 free bytes exactly");
@@ -88,6 +95,8 @@ void eo_format_amount(char* out, const char* label, u32 amount, int columns, con
 
 // Copies text to out and returns the new end (out stays zero-terminated).
 char* eo_append(char* out, const char* text);
+// "WERE HARE" -> "Were Hare" (the game's names are uppercase ASCII), cut to max_chars.
+void eo_title_case(char* out, const char* name, int max_chars);
 
 // ---- Calendar (calendar.c) ----
 const char* eo_weekday_name(u32 day);
@@ -97,11 +106,18 @@ void eo_calendar_on_rest(void);  // a paid night: wake at dawn
 // ---- Boot steps, run in order by main.c ----
 void eo_enemy_spells_init(void);
 void eo_balance_apply(void);
+void eo_spirits_init_tables(void);
 void eo_status_init(void);
 
 // ---- Combat (combat.c) ----
 int eo_combat_active_boost(void);   // Spirit Charge spent on the spell being cast, 0 if none
 int eo_combat_active_school(void);  // its element (0 Fire .. 3 Wind), -1 if none
+
+// ---- Spirits (spirits.c) ----
+void eo_spirits_mark_dirty(void);  // the save block changed: rewrite the spell locks and names
+
+// ---- Shops (shop.c) ----
+int eo_shop_is_open(void);
 
 // ---- Status effects (status.c) ----
 void eo_status_cure_poison(void);

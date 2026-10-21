@@ -42,7 +42,7 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
 
 ## Spirit Charge, shields and Break (new)
 
-In battle there are two new panels: **Charge / Boost** under your HP bar, and an **enemy list** (top right) with
+In battle there are two new panels: **Charge / Boost** in the bottom right corner, and an **enemy list** (top right) with
 each enemy's shields and weakness ("?" until you hit it with the right element; for now the weakness is always the
 element opposite the monster's own).
 
@@ -57,6 +57,21 @@ element opposite the monster's own).
 - [ ] Does Boost feel worth saving charge for? Are shield counts (2-4, bosses 6-10) right?
 
 Note: Holy Plains enemies die before they can be Broken; Break matters from tougher areas on.
+
+## Spirits: points, tiers and discovering spells (new)
+
+- **D-pad up** in the field opens the **Spirits** window: each element's level and attuned tier, and your
+  Spirit Points. Each spirit you collect now also gives 1 Spirit Point.
+- Each element's 15 spells are in 5 tiers (by their old level requirement). Tier 1 is open. **A** attunes the next
+  tier: tier 2 needs element Lv 6 and 2 points, tier 3 Lv 14 and 4, tier 4 Lv 22 and 7, tier 5 Lv 30 and 10.
+  All four elements fully attuned cost 92 points; the game has 98 spirits.
+- Spells in attuned tiers show as **"???"** in the spell wheel until you cast their combination once, which teaches
+  the spell ("Learned Fire Ball Lv2"). Spells in tiers you haven't attuned stay EMPTY.
+- Checked by Claude: the window, attuning (points spent, spells unlocked), "???" in the wheel, learning on cast.
+- [ ] Collect a spirit: "Spirit Point gained".
+- [ ] Do the tier costs and level gates feel right? Decisions for you: should Brian be able to master everything
+      by the end (current numbers allow it only near the end), and can points be refunded?
+- [ ] Existing saves get points for spirits already found and keep the spells their levels already allowed.
 
 ## Known rough edges
 

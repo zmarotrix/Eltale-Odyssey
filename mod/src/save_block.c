@@ -66,6 +66,7 @@ RECOMP_HOOK("pak_read") void eo_save_on_pak_read(s32 pak, s32 file, s32 offset, 
 // The loaded save's values (gold included) are copied into place here; don't announce them as new gold.
 RECOMP_HOOK_RETURN("save_apply_slot_data") void eo_save_on_apply(void) {
     eo_gold_resync();
+    eo_spirits_mark_dirty();
 }
 
 RECOMP_HOOK_RETURN("new_game_init") void eo_save_on_new_game(void) {
