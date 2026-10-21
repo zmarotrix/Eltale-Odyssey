@@ -7,8 +7,9 @@
 // - Each element's 15 spells sit in 5 tiers by their vanilla level requirement. Tier 1 is open; attuning the
 //   next tier costs Spirit Points and needs a minimum element level. All four elements to tier 5 cost 92 points
 //   and the game has 98 spirits: specialise through the mid-game, master everything only at the very end.
-// - Spells in attuned tiers can be cast, but undiscovered ones show as "???" in the spell wheel until their
-//   combination is cast once.
+// - Tier 1 spells are known as soon as Brian's element level reaches their vanilla requirement (playtest,
+//   2026-10-21: "only new tiers need discovering"). Spells in tiers attuned later can be cast, but show as "???"
+//   in the spell wheel until their combination is cast once.
 //
 // How it hooks in: the spell wheel and casting ask spell_check_castable, which refuses a spell whose level
 // requirement is above Brian's element level; spells of unattuned tiers get an unreachable requirement. The
@@ -47,6 +48,9 @@ static u8 tier_for_level(u16 level) {
 
 static int is_discovered(int school, int index) {
     int bit = school * SPELLS + index;
+    if (spell_tier[school][index] == 1 && ELEMENT_LEVELS[school] >= spell_vanilla_level[school][index]) {
+        return 1;   // a tier 1 spell Brian's level allows
+    }
     return (gEo.discovered[bit / 8] >> (bit % 8)) & 1;
 }
 
@@ -169,6 +173,14 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
         gEo.spirit_points = (u8)(gEo.spirit_points + (spirits - gEo.spirits_counted));
         gEo.spirits_counted = (u8)spirits;
         eo_notice("Spirit Point gained", "");
+    }
+    // A level-up can make tier 1 spells known: refresh the names when any element level changes.
+    static u8 seen_levels[SCHOOLS];
+    for (int s = 0; s < SCHOOLS; s++) {
+        if (ELEMENT_LEVELS[s] != seen_levels[s]) {
+            seen_levels[s] = ELEMENT_LEVELS[s];
+            dirty = 1;
+        }
     }
     if (dirty) {
         apply();

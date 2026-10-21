@@ -112,7 +112,8 @@ No floating icons or plates over enemies, and no explanation of what Boost does:
 - Each element's 15 spells are in 5 tiers (by their old level requirement). Tier 1 is open. **A** attunes the next
   tier: tier 2 needs element Lv 6 and 2 points, tier 3 Lv 14 and 4, tier 4 Lv 22 and 7, tier 5 Lv 30 and 10.
   All four elements fully attuned cost 92 points; the game has 98 spirits.
-- Spells in attuned tiers show as **"???"** in the spell wheel until you cast their combination once, which teaches
+- Tier 1 spells are known as soon as your element level reaches their old level requirement. Spells in tiers
+  you attune later show as **"???"** in the spell wheel until you cast their combination once, which teaches
   the spell ("Learned Fire Ball Lv2"). Spells in tiers you haven't attuned stay EMPTY.
 - Checked by Claude: the window, attuning (points spent, spells unlocked), "???" in the wheel, learning on cast.
 - [ ] Collect a spirit: "Spirit Point gained".
