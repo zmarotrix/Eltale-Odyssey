@@ -312,7 +312,8 @@ RECOMP_HOOK_RETURN("spell_cast_init") void eo_equipment_after_cast(void) {
     }
 }
 
-// Pilgrim's Soul: MP comes back only from walking, so a staff hit's +1 MP is taken back.
+// A staff hit's +1 MP comes only from Brian's starting staff (playtest, 2026-10-21): any other staff, or
+// Pilgrim's Soul (MP comes back only from walking), takes it back.
 static u16 mp_before_staff;
 
 RECOMP_HOOK("player_state_staff_hit") void eo_equipment_before_staff(void) {
@@ -320,7 +321,8 @@ RECOMP_HOOK("player_state_staff_hit") void eo_equipment_before_staff(void) {
 }
 
 RECOMP_HOOK_RETURN("player_state_staff_hit") void eo_equipment_after_staff(void) {
-    if (worn_in(SLOT_CHARM) == EQ_PILGRIMS_SOUL && BRIAN_MP > mp_before_staff) {
+    int no_mp = worn_in(SLOT_STAFF) >= 0 || worn_in(SLOT_CHARM) == EQ_PILGRIMS_SOUL;
+    if (no_mp && BRIAN_MP > mp_before_staff) {
         BRIAN_MP = mp_before_staff;
     }
 }

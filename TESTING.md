@@ -83,6 +83,8 @@ No floating icons or plates over enemies, and no explanation of what Boost does:
 
 - [ ] **Spell window**: element gem and description, then the MP cost (red if you can't pay). (Checked by Claude.)
 - [ ] **Shield hit**: a weakness hit throws white glints off the enemy; nothing says how many shields are left.
+- [ ] **Breaking**: the enemy's model flickers dark for a moment (a white flash isn't possible with the game's
+      lighting). Not checked by Claude yet.
 - [ ] **Broken**: a bigger burst of white and pale gold glints; while Broken the enemy is a little darker, glints
       drift around its head, and its idle animation crawls at about 1/8 speed. (Checked by Claude, forced.)
 - [ ] **Poisoned** (you): Brian pulses purple, in battle and in the field; no icon. (Checked by Claude, forced;
@@ -90,6 +92,12 @@ No floating icons or plates over enemies, and no explanation of what Boost does:
 - [ ] **Ember Staff flare**: a staff hit sets the enemy burning; a staff hit on an enemy that's already burning
       flares: embers burst out and its strongest Burn spreads to every enemy within reach (about a pack's
       width). (Spread checked by Claude with a test trigger; you saw the flare in play.)
+
+## Dev tools
+
+- **Sound browser**: hold L to see a sound ID at the left of the screen; while holding L, D-pad right / left
+  plays the next / previous sound, D-pad up replays it. Use it to pick sounds (e.g. a weak-point hit).
+  Starts at 18, the game's normal hit sound.
 
 ## Smaller windows
 
@@ -112,6 +120,8 @@ No floating icons or plates over enemies, and no explanation of what Boost does:
 - [ ] Existing saves get points for spirits already found and keep the spells their levels already allowed.
 
 ## Equipment (new, only partly checked)
+
+Only Brian's starting staff (no staff equipped) gives MP back on staff hits; every other staff doesn't.
 
 **D-pad down** in the field opens the **Equipment** window: staff, robe, charm and sigil slots. You can look
 anywhere but change equipment only at an inn. The charm slot opens after Solvaring, the sigil slot after Zelse.

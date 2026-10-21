@@ -15,7 +15,9 @@
 //   Burn damage  small embers rising around the enemy, in reds and orange. The sparkle's own draw commands mix
 //                its color toward white ("texture + (1 - texture) x color"), so embers use a copy that draws
 //                "texture x color" instead.
-//   Shield hit   white glints flying off the enemy; a Break throws more, bigger, and pale gold.
+//   Shield hit   white glints flying off the enemy; a Break throws more, bigger, and pale gold, and the
+//                enemy's model flickers dark for a moment (lights can't take a model past its own texture
+//                colors, so a white flash isn't possible this way).
 
 #define MAX_ENEMIES 6
 #define ENEMY_SLOTS 0x8007C998
@@ -48,6 +50,8 @@ static const u32 game_light[LIGHT_COUNT] = { 0x80085770, 0x80085780, 0x80085790,
                                   // so a gentle cut barely shows)
 #define BROKEN_ANIM_STEP 8        // a Broken enemy's animation advances one frame in this many
 #define BATTLE_DATA_ANIM_FRAME 0x54  // u16 frames into the current animation (model_draw reads it)
+#define BREAK_FLASH_FRAMES 12     // the enemy's model flickers when it breaks
+#define FLICKER_LIGHT 20          // percent of the light on the dark frames
 #define HEAD_GLINT_EVERY 6        // frames between glints around a Broken enemy's head
 // Poison scales each channel down at the peak (pulling toward a color wouldn't show: the lights add up past
 // full brightness), keeping most red and blue: purple.
@@ -89,6 +93,7 @@ static int tinting = 0;
 static u32 frame = 0;             // counts Brian's draws: one per frame wherever he is
 static u8 flame_frames[MAX_ENEMIES];
 static u8 was_broken[MAX_ENEMIES];
+static u8 flash_frames[MAX_ENEMIES];
 static u16 held_frame[MAX_ENEMIES];  // a Broken enemy's animation frame
 
 static int enemy_slot_of(u8* object) {
@@ -114,6 +119,7 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
     int burn = 0;
     int broken = 0;
     int poison = 0;
+    int flicker = 0;   // a dark frame of the Break flicker
     if (object == BRIAN_OBJECT) {
         frame++;
         poison = eo_status_poisoned();
@@ -124,6 +130,7 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
         }
         burn = eo_status_burn_stacks(slot) > 0;
         broken = eo_combat_broken(slot);
+        flicker = flash_frames[slot] > 0 && (flash_frames[slot] & 2) != 0;
         // A Broken enemy's animation is held back: its frame only moves on every BROKEN_ANIM_STEP draws (the
         // game advances it by one after each draw).
         u16* anim_frame = (u16*)(object + BATTLE_DATA_ANIM_FRAME);
@@ -133,7 +140,7 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
         held_frame[slot] = *anim_frame;
         was_broken[slot] = (u8)broken;
     }
-    if (!burn && !broken && !poison) {
+    if (!burn && !broken && !poison && !flicker) {
         return;
     }
     int p = pulse();
@@ -159,6 +166,9 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
                 for (int ch = 0; ch < 3; ch++) {
                     c[ch] = toward(c[ch], (u8)(c[ch] * poison_keep[ch] / 100), p);
                 }
+            }
+            for (int ch = 0; ch < 3 && flicker; ch++) {
+                c[ch] = (u8)(c[ch] * FLICKER_LIGHT / 100);
             }
         }
         eo_gfx(light_load[i], (u32)light);
@@ -268,6 +278,9 @@ void eo_fx_shield_hit(int slot, int broke) {
     if (slot < 0 || slot >= MAX_ENEMIES) {
         return;
     }
+    if (broke) {
+        flash_frames[slot] = BREAK_FLASH_FRAMES;
+    }
     int count = broke ? BREAK_GLINTS : GLINTS;
     for (int i = 0; i < count; i++) {
         f32 pos[3];
@@ -316,6 +329,9 @@ void eo_fx_update(void) {
     static u32 ticks = 0;
     ticks++;
     for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (flash_frames[i] > 0) {
+            flash_frames[i]--;
+        }
         if (ENEMY_HP(i) > 0 && eo_combat_broken(i) && ticks % HEAD_GLINT_EVERY == 0) {
             spawn_head_glint(i);
         }
