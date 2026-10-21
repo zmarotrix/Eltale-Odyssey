@@ -36,7 +36,7 @@ static const char unknown_name[] = "???";
 
 static u8 spell_tier[SCHOOLS][SPELLS];
 static u8 spell_vanilla_level[SCHOOLS][SPELLS];
-static const char* spell_names[SCHOOLS][SPELLS];  // the game's own names
+static const char* spell_names[SCHOOLS][SPELLS];  // each spell's name (spell_text.c)
 static int tables_ready = 0;
 static int dirty = 1;
 
@@ -59,7 +59,8 @@ static void set_discovered(int school, int index) {
     gEo.discovered[bit / 8] |= (u8)(1 << (bit % 8));
 }
 
-// From main.c at boot, before any save is loaded: remember the vanilla tiers and names.
+// From main.c at boot, before any save is loaded: remember the vanilla tiers, and use the overhaul's spell names
+// (spell_text.c) in place of the game's "... LV1" ones.
 void eo_spirits_init_tables(void) {
     for (int s = 0; s < SCHOOLS; s++) {
         for (int i = 0; i < SPELLS; i++) {
@@ -67,7 +68,8 @@ void eo_spirits_init_tables(void) {
             u16 level = *(u16*)(stats + SPELL_LEVEL_REQ);
             spell_vanilla_level[s][i] = (u8)level;
             spell_tier[s][i] = tier_for_level(level);
-            spell_names[s][i] = SPELL_NAME_TABLES[s][i];
+            spell_names[s][i] = eo_spell_name(s, i);
+            SPELL_NAME_TABLES[s][i] = spell_names[s][i];
         }
     }
     tables_ready = 1;

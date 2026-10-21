@@ -148,6 +148,7 @@ void eo_icons_begin(void);                 // loads the icon palette; call befor
 void eo_icon_draw(int icon, s32 x, s32 y);  // 12 x 12
 int eo_screen_pos(f32 x, f32 y, f32 z, s32* sx, s32* sy);  // scene point to screen; 0 if off screen
 const char* eo_spell_description(int school, int index);
+const char* eo_spell_name(int school, int index);
 int eo_spirits_known(int school, int index);
 s32 eo_strlen(const char* text);  // characters in a zero-terminated string
 

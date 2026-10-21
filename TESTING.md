@@ -120,6 +120,11 @@ No floating icons or plates over enemies, and no explanation of what Boost does:
       by the end (current numbers allow it only near the end), and can points be refunded?
 - [ ] Existing saves get points for spirits already found and keep the spells their levels already allowed.
 
+## Spell names (new)
+
+Every spell has its own name, no levels (Rock, Boulder, ...); the list is in mod/src/spell_text.c.
+- [ ] The spell bar and the "Learned ..." notice use them (spell bar checked by Claude). Names you'd change?
+
 ## Status colors and one status at a time (new)
 
 - [ ] Every status has its own color, pulsing on the model through fog: Burn red, Poison purple, Compression
