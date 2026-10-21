@@ -108,3 +108,29 @@ RECOMP_HOOK("boss_give_reward") void eo_gold_on_boss_reward(s32 boss) {
         GOLD += boss_gold[boss];
     }
 }
+
+// Defeat costs gold (game design document, "Old-school friction"): falling in battle sends Brian back to the
+// last inn with half his gold, as in Dragon Quest. Seen as HP reaching 0, then coming back (the respawn).
+static int defeated = 0;
+
+RECOMP_HOOK_RETURN("frame_build") void eo_gold_check_defeat(void) {
+    if (gGameMode != 1) {
+        return;
+    }
+    if (((u16*)gPlayerMainData)[2] == 0) {
+        defeated = 1;
+        return;
+    }
+    if (!defeated) {
+        return;
+    }
+    defeated = 0;
+    u32 lost = GOLD / 2;
+    GOLD -= lost;
+    char line1[24];
+    char line2[24];
+    eo_gold_resync();
+    eo_format_amount(line1, "Gold", GOLD, NOTICE_COLUMNS, "");
+    eo_format_amount(line2, "Lost", lost, NOTICE_COLUMNS, "");
+    eo_gold_notice(line1, line2);
+}

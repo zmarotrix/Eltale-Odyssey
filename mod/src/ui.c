@@ -101,6 +101,14 @@ void eo_ui_text(s32 x, s32 y, const char* text) {
     ui_draw_text(x, y, encoded);
 }
 
+char* eo_append(char* out, const char* text) {
+    while (*text != '\0') {
+        *out++ = *text++;
+    }
+    *out = '\0';
+    return out;
+}
+
 void eo_format_amount(char* out, const char* label, u32 amount, int columns, const char* unit) {
     char number[12];
     eo_format_u32(number, "", amount, "");

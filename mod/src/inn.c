@@ -18,7 +18,7 @@
 // Dialogue text (research/npcs): the message buffer, control bytes, and where the window opens. The game
 // opens it at the top or bottom depending on a screen value (player_update, before msgwin_open).
 #define MESSAGE_BUFFER_SIZE 0x400
-#define PRICE_PAGE_MAX 40
+#define PRICE_PAGE_MAX 96
 #define TEXT_CHOICE_BOX 0xF2
 #define TEXT_PAGE_BREAK 0xF0
 #define TEXT_END        0xFF
@@ -132,8 +132,14 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_inn_on_greeting(void) {
             return;  // no Yes/No box in this text: leave it alone
         }
         if (gMessageBuffer[i] == TEXT_CHOICE_BOX) {
-            char page[32];
-            eo_format_u32(page, "That will be ", tonight_price(), " gold.");
+            char page[64];
+            char* end = page;
+            eo_format_u32(page, "That will be ", tonight_price(), " gold.\nToday is ");
+            while (*end) {
+                end++;
+            }
+            end = eo_append(end, eo_weekday_name(gCurrentDay));
+            eo_append(end, ".");
             u8* out = &gMessageBuffer[i];
             *out++ = TEXT_PAGE_BREAK;
             out = eo_text_encode(out, page);
@@ -170,11 +176,7 @@ RECOMP_HOOK("player_state_talking") void eo_inn_on_answer(void) {
         char text[96];
         eo_format_u32(line1, "costs ", price, " gold, and you\n");
         eo_format_u32(line2, "only have ", GOLD, ".");
-        char* out = text;
-        for (const char* s = "I'm sorry, but a night\n"; *s; s++) *out++ = *s;
-        for (const char* s = line1; *s; s++) *out++ = *s;
-        for (const char* s = line2; *s; s++) *out++ = *s;
-        *out = '\0';
+        eo_append(eo_append(eo_append(text, "I'm sorry, but a night\n"), line1), line2);
         say(text);
         return;
     }
@@ -184,6 +186,7 @@ RECOMP_HOOK("player_state_talking") void eo_inn_on_answer(void) {
     gEo.last_rest_time = eo_now();
     GOLD -= price;  // shown by the gold notice once the HUD is back
     eo_status_cure_poison();  // a night's rest cures poison along with the heal
+    eo_calendar_on_rest();    // and you wake at dawn
 }
 
 // True if a price window at height y would cover any open message window (shadows included).

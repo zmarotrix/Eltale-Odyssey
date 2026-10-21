@@ -170,6 +170,11 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_shop_on_greeting(void) {
     if (shop < 0) {
         return;
     }
+    if (eo_is_night()) {
+        // Old-school shop hours: closed at night, open again at dawn.
+        eo_text_encode_full(gMessageBuffer, "We're closed for the night.\nCome back in the morning.");
+        return;
+    }
     eo_text_encode_full(gMessageBuffer, "Welcome, traveler. Have a\nlook at what I have today.");
     shop_pending = shop;
 }
@@ -285,7 +290,7 @@ static void draw_shop(void) {
     if (message_timer > 0) {
         message_timer--;
     }
-    hud_draw_sprite(1, WIN_X + 8, LIST_Y + cursor * ROW_H - 1, 8, 0xD);  // the game's pointing-hand cursor
+    hud_draw_sprite(1, WIN_X + 6, LIST_Y + cursor * ROW_H - 1, 16, 13);  // the game's pointing-hand cursor (16 x 13)
 }
 
 // The shop window draws over the field HUD; the greeting closes first, then the window opens.

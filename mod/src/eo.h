@@ -12,7 +12,7 @@
 s32 pak_read(s32 pak, s32 file, s32 offset, s32 size, void* buf);
 s32 pak_write(s32 pak, s32 file, s32 offset, s32 size, void* buf);
 void hud_draw_text(s32 x, s32 y, s32 palette, const char* text);
-void hud_draw_sprite(s32 image, s32 x, s32 y, s32 a3, s32 a4);  // one of the 55 menu images (1 = hand cursor)
+void hud_draw_sprite(s32 image, s32 x, s32 y, s32 width, s32 height);  // a menu image (1 = hand, 16 x 13)
 void ui_draw_rect(s32 style, s32 x, s32 y, s32 w, s32 h);
 void ui_draw_text(s32 x, s32 y, const u8* text);  // text in the game's own encoding
 void sfx_play(s32 sound, s32 arg1, s32 volume);
@@ -85,6 +85,14 @@ void eo_text_encode_full(u8* out, const char* text);
 // "<label><amount right-aligned so the two fill `columns` characters><unit>": amounts line up in the
 // fixed-width dialogue font.
 void eo_format_amount(char* out, const char* label, u32 amount, int columns, const char* unit);
+
+// Copies text to out and returns the new end (out stays zero-terminated).
+char* eo_append(char* out, const char* text);
+
+// ---- Calendar (calendar.c) ----
+const char* eo_weekday_name(u32 day);
+int eo_is_night(void);
+void eo_calendar_on_rest(void);  // a paid night: wake at dawn
 
 // ---- Boot steps, run in order by main.c ----
 void eo_enemy_spells_init(void);
