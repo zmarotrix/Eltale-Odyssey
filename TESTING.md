@@ -36,6 +36,8 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
       Enemies keep the vanilla numbers. How does each element feel in Holy Plains?
 - [ ] **Burn**: hit something with a Fire spell; from your next turn it takes extra damage numbers each turn for
       3 turns, stacking up to 3 hits. Burn can kill.
+- [x] **Burn visuals**: a burning enemy pulses red; small embers rise from it when burn damage lands (ticks and
+      ignition only). (Checked by you.)
 - [ ] **Fire Bomb** on a burning enemy sets off all its remaining Burn at once.
 - [ ] **Poison**: Man Eaters and Bumbershoots can poison you (about 1 hit in 3). a purple drop icon right of the HP
       bar, 5% max HP per turn for 4 turns, also ticks outside battle, never below 1 HP. Water healing or an inn
