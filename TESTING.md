@@ -60,6 +60,7 @@ Note: Holy Plains enemies die before they can be Broken; Break matters from toug
 
 ## Known rough edges
 
-- Enemies show no Burn icon yet (damage numbers only); icons come with the battle UI work.
+- Burn shows as "B1"-"B3" in the enemy list (checked by Claude, including a Burn tick that kills).
+- The enemy list partly covers the game's own target-name box; the battle UI pass will sort out placement.
 - "!" isn't in the dialogue font table we decoded, so new text avoids it.
 - Changing gold with the dev panel shows up as "Paid"/"Won" in the gold notice.

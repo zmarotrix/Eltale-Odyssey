@@ -303,11 +303,13 @@ RECOMP_HOOK_RETURN("pad_read") void eo_combat_read_input(void) {
 #define CHARGE_WIN_W (9 * 8 + 20)
 #define CHARGE_WIN_H 36
 
-// One row per enemy: name, shields (or "Broken"), weakness ("?" until revealed).
-#define NAME_CHARS 10
-#define SHIELD_COL 11
-#define WEAKNESS_COL 18
-#define FOE_COLS 23
+// One row per enemy: name, shields (or "Broken"), weakness ("?" until revealed), Burn stacks ("B3").
+// 21 columns keep the panel clear of the HUD's HP box.
+#define NAME_CHARS 9
+#define SHIELD_COL 10
+#define WEAKNESS_COL 13
+#define BURN_COL 19
+#define FOE_COLS 21
 #define FOES_WIN_W (FOE_COLS * 8 + 20)
 #define FOES_WIN_X (320 - 16 - 3 - FOES_WIN_W)
 #define FOES_WIN_Y 16
@@ -365,8 +367,13 @@ static void draw_panels(void) {
             eo_format_amount(line, "", g->shields, 2, "");
             eo_ui_text(FOES_WIN_X + 10 + SHIELD_COL * 8, y, line);
         }
-        if (g->weakness != NO_WEAKNESS) {
+        if (g->weakness != NO_WEAKNESS && !g->broken) {
             eo_ui_text(FOES_WIN_X + 10 + WEAKNESS_COL * 8, y, g->revealed ? element_names[g->weakness] : "?");
+        }
+        int stacks = eo_status_burn_stacks(i);
+        if (stacks > 0) {
+            eo_format_amount(line, "B", (u32)stacks, 2, "");
+            eo_ui_text(FOES_WIN_X + 10 + BURN_COL * 8, y, line);
         }
         y += FOE_ROW_H;
     }

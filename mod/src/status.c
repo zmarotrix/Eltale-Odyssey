@@ -244,6 +244,17 @@ static void poison_tick(int in_battle) {
     }
 }
 
+int eo_status_burn_stacks(int slot) {
+    if (slot < 0 || slot >= MAX_ENEMIES || burns[slot].turns_left == 0) {
+        return 0;
+    }
+    int n = 0;
+    for (int i = 0; i < BURN_STACKS; i++) {
+        n += burns[slot].stacks[i] != 0;
+    }
+    return n;
+}
+
 void eo_status_cure_poison(void) {
     poison_turns = 0;
 }

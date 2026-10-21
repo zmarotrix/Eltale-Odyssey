@@ -105,6 +105,7 @@ int eo_combat_active_school(void);  // its element (0 Fire .. 3 Wind), -1 if non
 
 // ---- Status effects (status.c) ----
 void eo_status_cure_poison(void);
+int eo_status_burn_stacks(int enemy_slot);  // 0-3
 
 // ---- Gold display (gold.c) ----
 void eo_gold_resync(void);

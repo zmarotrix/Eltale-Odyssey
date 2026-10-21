@@ -11,6 +11,11 @@ function wr([string]$addrHex, [string]$hex) {
 if (-not $NoRestart) {
     Stop-Process -Name Quest64Recompiled -Confirm:$false -ErrorAction SilentlyContinue
     Wait-Process -Name Quest64Recompiled -Timeout 10 -ErrorAction SilentlyContinue
+    # Install the latest build of the mod (the closing game can hold the file for a moment).
+    $nrm = "G:\Projects\Quest 64 PC\Eltale-Odyssey\mod\build\eltale_odyssey.nrm"
+    for ($i = 0; $i -lt 20; $i++) {
+        try { Copy-Item $nrm "$env:LOCALAPPDATA\Quest64Recompiled\mods\" -Force -ErrorAction Stop; break } catch { Start-Sleep -Milliseconds 500 }
+    }
     Start-Sleep 1
     $r = "G:\Projects\Quest 64 PC\Quest64-Recomp"
     Start-Process -FilePath "$r\build-Release\Quest64Recompiled.exe" -ArgumentList "--dev-panel", "--quick-start" -WorkingDirectory $r | Out-Null
