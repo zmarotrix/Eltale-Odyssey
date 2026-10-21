@@ -249,6 +249,8 @@ static u16 hit_element;
 static u8 hit_was_broken;
 static u8 hit_was_frozen;
 static u8 hit_was_burning;
+static u8 hit_was_weak;
+static u8 hit_was_resisted;
 static u16 last_brian_spell = 0xFFFF;
 
 RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u16 power, u16 element, u16 flags, void* attacker) {
@@ -273,6 +275,10 @@ RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u1
     u8* target_status = *(u8**)(ENEMY_BATTLE_DATA(slot) + 0x68);
     hit_was_frozen = !g->broken && target_status != 0 && (*(u16*)target_status & STATUS_RESTRICTION_BIT);
     hit_was_burning = eo_status_burn_stacks(slot) > 0;
+    // The game's element rule: the opposite element hits x1.25 (the guard's weakness), the same one x0.5.
+    u16 own = ENEMY_RECORD(slot) != 0 ? *(u16*)(ENEMY_RECORD(slot) + RECORD_ELEMENT) : 0xFF;
+    hit_was_weak = hit_kind == HIT_SPELL && g->weakness != NO_WEAKNESS && element == g->weakness;
+    hit_was_resisted = hit_kind == HIT_SPELL && element < 4 && element == own;
     if (hit_kind != HIT_SPELL || g->broken) {
         return;
     }
@@ -291,6 +297,40 @@ RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u1
         weakness_bonus_given++;
     }
     crack_shields(slot, element == EARTH && eo_talent(TALENT_FAULT_LINE) ? 2 : 1);
+}
+
+// Damage numbers: 9 slots of 0x1C bytes at 0x800873D0 (+0x00 the fighter's battle data, +0x04 digits, +0x0C timer,
+// starting at 45 when spawned, +0x14 digit count), filled by damage_popup_spawn through count_digits (which also
+// writes the digits).
+#define POPUPS 0x800873D0
+#define POPUP_COUNT 9
+#define POPUP_SIZE 0x1C
+#define POPUP_NEW_TIMER 0x2D
+s32 count_digits(s32 value, u8* digits, s32 arg);
+
+// Colors (playtest, 2026-10-21: "Mechanically weakened damage can be blue, mechanically buffed damage can be orange or
+// red"). A popup's kind (+0x10) indexes the RGBA table at 0x8004CFA4 (0 white, 1 green, 2 pale blue; game data
+// follows it). The mod's colors live in the console's spare 4 MB (see icons.c) and are reached with a kind large
+// enough to index there.
+#define POPUP_KIND 0x10
+#define POPUP_COLOR_TABLE 0x8004CFA4
+#define POPUP_COLORS ((u32*)0x807F2000)
+enum { POPUP_PLAIN, POPUP_WEAKENED, POPUP_BUFFED };
+static const u32 popup_colors[] = { 0xFFFFFFFF, 0x5AA0FFFF, 0xFF9A30FF };
+
+// Sets the number just spawned over an enemy (the game shows the hit before the mod adjusts it) and its color.
+static void set_popup(int slot, u32 amount, int look) {
+    for (int i = 0; i < POPUP_COUNT; i++) {
+        u8* p = (u8*)(POPUPS + i * POPUP_SIZE);
+        if (*(u8**)p == ENEMY_BATTLE_DATA(slot) && *(u16*)(p + 0x0C) == POPUP_NEW_TIMER) {
+            *(s32*)(p + 0x14) = count_digits((s32)amount, p + 0x04, 1);
+            if (look != POPUP_PLAIN) {
+                POPUP_COLORS[look] = popup_colors[look];
+                *(u32*)(p + POPUP_KIND) = ((u32)&POPUP_COLORS[look] - POPUP_COLOR_TABLE) / 4;
+            }
+            return;
+        }
+    }
 }
 
 RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) {
@@ -322,23 +362,37 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
         percent += (u32)eo_equip_element_percent(hit_element) +
                    SCHOOL_TALENT_PERCENT * (u32)eo_talent(school_talent[hit_element]);
     }
+    // Which way the mechanics pushed this hit, for the number's color: a weakness hit, a Broken, burning or frozen
+    // bonus or a stoke on a burning foe buffs it; the foe resisting the element or a stoke on a foe that isn't
+    // burning weakens it. Gear bonuses alone leave it white.
+    int buffed = hit_was_weak || hit_was_broken || percent > (u32)(hit_element < 4 ? eo_equip_element_percent(hit_element) +
+                 SCHOOL_TALENT_PERCENT * eo_talent(school_talent[hit_element]) : 0);
+    int weakened = hit_was_resisted;
+    u32 shown = hit;
     // Stoking Fire spells: weak on a foe that isn't burning (the HP the extra 30% took comes back; if the full hit
     // killed it, it stays down), strong on one that is.
     if (hit_kind == HIT_SPELL && (last_brian_spell >> 8) == FIRE && eo_fire_kind(last_brian_spell & 0xFF) == FIRE_STOKE) {
         if (hit_was_burning) {
             percent += STOKE_BURNING_PERCENT - 100;
-        } else if (hp > 0) {
-            u32 back = hit * (100 - STOKE_FRESH_PERCENT) / 100;
-            u16 max_hp = *(u16*)(ENEMY_RECORD(slot) + RECORD_MAX_HP);
-            hp = (u16)(hp + back > max_hp ? max_hp : hp + back);
-            ENEMY_HP(slot) = hp;
+            buffed = 1;
+        } else {
+            weakened = 1;
+            if (hp > 0) {
+                u32 back = hit * (100 - STOKE_FRESH_PERCENT) / 100;
+                u16 max_hp = *(u16*)(ENEMY_RECORD(slot) + RECORD_MAX_HP);
+                hp = (u16)(hp + back > max_hp ? max_hp : hp + back);
+                ENEMY_HP(slot) = hp;
+                shown = hit - back;
+            }
         }
     }
     extra += hit * percent / 100;
     if (extra > 0 && hp > 0) {
-        ENEMY_HP(slot) = extra >= hp ? 0 : (u16)(hp - extra);
-        damage_popup_spawn(ENEMY_BATTLE_DATA(slot), 0, (s32)extra);
+        u32 dealt = extra >= hp ? hp : extra;
+        ENEMY_HP(slot) = (u16)(hp - dealt);
+        shown += dealt;   // one number for the whole hit
     }
+    set_popup(slot, shown, buffed ? POPUP_BUFFED : weakened ? POPUP_WEAKENED : POPUP_PLAIN);
     // Ember Staff: a staff hit sets the foe burning; on a foe already burning it flares instead, spreading the
     // Burn to the enemies around it (status.c).
     // Firebrand: any staff sets foes burning (only the Ember Staff flares).
