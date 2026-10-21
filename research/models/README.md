@@ -24,9 +24,11 @@ Findings from the burn and Break visuals (2026-10-20/21). Function names are in 
   texture (`0x80209220`), combine `FC127E03 FFFFF378` and `SetPrimColor E90000FF`: the cape's red is that prim
   color. Changing it recolors the cape (tested: green).
 - Brown pieces (hair or boots) use prim `4B2500FF`; skin-tone pieces `D5B94BFF` / `D5B63CFF`.
-- The staff isn't identified yet: candidates are the textured pieces at `0x8011ABF0` / `0x8011AD50` /
-  `0x8011AA90` (RGBA16 textures `0x80108BB0`, `0x801083B0`). Painting them was inconclusive because the staff was
-  hidden behind Brian in the test shot.
+- **Staff**: one bone (`0x8020BFE0` on the test save) loading two RGBA16 textures: the shaft (`0x80209340`, 16 x 16,
+  tile word `07010140`) then the head (`0x80209540`, 16 x 32, tile word `07054140`). Other parts of Brian share the
+  shaft's tile layout (`0x80207D60`), so find the head first and take the shaft load just before it.
+- Cape pieces: the SetPrimColor comes a few commands after the combine (texture and vertex loads in between).
+- appearance.c recolors both from Brian's equipment.
 
 ## Particles
 

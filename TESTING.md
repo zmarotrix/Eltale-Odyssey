@@ -167,6 +167,10 @@ sparkle floats over the target. Z doesn't swing or cast while the talent is lear
 
 ## Equipment (new, only partly checked)
 
+**Gear colors**: Brian's cape takes his robe's color (none: red, Traveler's Robe: brown, Tidecloth Robe: deep
+blue) and his staff its staff's (starting staff: wood, Ember: red-orange, Heavy: iron grey, Stone: amber, Tide:
+blue, Gale: green). Checked by Claude: Tide Staff + Tidecloth Robe. Swap gear at an inn to see the others.
+
 Only Brian's starting staff (no staff equipped) gives MP back on staff hits; every other staff doesn't.
 
 **D-pad down** in the field opens the **Equipment** window: staff, robe, charm and sigil slots. You can look
