@@ -1,10 +1,13 @@
 param([int]$Fire = 8, [int]$Earth = 34, [int]$Water = 8, [int]$Wind = 8, [int]$Hp = 160, [int]$Mp = 50,
-      [int]$Defense = 18, [int]$Agility = 18)
+      [int]$Defense = 18, [int]$Agility = 35, [switch]$SetupOnly, [switch]$FightOnly)
 # Zelse difficulty test (RAM only; never save afterwards). Gives Brian a typical end-of-beat-2 build (pacing plan:
 # 44 spirits plus about 10 battle levels, focused on Earth, Zelse's weakness), the gear he could own by then, Earth
 # attuned to tier 4 and Water to tier 2 with 22 Spirit Points left for talents, marks Solvaring beaten (charm slot),
 # then warps to Zelse's map and puts Brian inside the boss's trigger range, so the fight starts.
 # Back up the save first (dev panel Saves, or POST /api/saves/backup).
+# -SetupOnly: stats, gear and items only, so talents can be bought (D-pad up) before the fight; then -FightOnly.
+# Agility 35 gives about 82% to hit Zelse (agility 60): 100 x a / (a + 60 / 8). 18 gave 71% and felt like constant
+# misses (playtest, 2026-10-21).
 $h = @{ "X-Q64-Dev" = "1" }
 function m($a, $n) { ((Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:43064/api/mem?addr=0x$a&len=$n" -Headers $h -TimeoutSec 2).Content | ConvertFrom-Json).hex }
 function wr([string]$a, [string]$hex) { $n = [Convert]::ToUInt32($a, 16); Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://127.0.0.1:43064/api/mem" -Headers $h -ContentType "application/json" -Body "{`"addr`":$n,`"hex`":`"$hex`"}" | Out-Null }
@@ -14,6 +17,16 @@ function at([uint32]$base, [int]$off) { ($base + $off).ToString("x8") }
 $map = Get-Content "G:\Projects\Quest 64 PC\Eltale-Odyssey\mod\build\mod.map"
 $geo = [Convert]::ToUInt32(((($map | Select-String " gEo$").Line -split '\s+')[0]), 16)
 
+if (-not $FightOnly) {
+# Recovery items a player would carry into Zelse: 3 Healing Potions, 2 Honey Bread, 2 Heroes Drinks, 1 Mint Leaves
+# (game item IDs), put into empty inventory slots (0x8008CF78, one item ID per byte, 0xFF = empty).
+$inv = m "8008CF78" 0x96
+$give = @(3, 3, 3, 2, 2, 7, 7, 6)
+$k = 0
+for ($i = 0; $i -lt 0x96 -and $k -lt $give.Count; $i++) {
+    if ($inv.Substring($i * 2, 2) -eq "ff") { wr ((0x8008CF78 + $i).ToString("x8")) ($give[$k].ToString("x2")); $k++ }
+}
+"gave $k items"
 # Spirits: tiers Fire 1, Earth 4, Water 2, Wind 1 (3 + 6 + 10 + 3 = 22 of 44 points spent), 22 left.
 wr (at $geo 0x11) "16"
 wr (at $geo 0x14) "01040201"
@@ -27,6 +40,10 @@ wr "8007D19C" ($d.ToString("x2"))
 $body = @{ fire = $Fire; earth = $Earth; water = $Water; wind = $Wind; hp = $Hp; maxHp = $Hp; mp = $Mp; maxMp = $Mp;
            defense = $Defense; agility = $Agility } | ConvertTo-Json -Compress
 Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://127.0.0.1:43064/api/brian" -Headers $h -ContentType "application/json" -Body $body | Out-Null
+
+(Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:43064/api/brian" -Headers $h).Content
+}
+if ($SetupOnly) { "Set up. Buy talents (D-pad up), then run again with -FightOnly."; return }
 
 # Zelse's field location (boss table 0x803A9AD0, record 1): map, submap, x, z.
 $loc = m "803A9AE8" 24
