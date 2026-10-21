@@ -116,7 +116,7 @@ RECOMP_HOOK_RETURN("pad_read") void eo_lockon_input(void) {
         int next = pick_target();
         if (next >= 0) {
             target = next;
-            sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+            eo_sfx(SFX_CONFIRM);
         }
     }
     if (!alive(target)) {

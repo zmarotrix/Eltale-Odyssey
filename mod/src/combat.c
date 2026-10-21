@@ -175,7 +175,7 @@ static int break_sound_timer = 0;
 
 static void play_break_sounds(void) {
     if (break_sounds_left > 0 && --break_sound_timer <= 0) {
-        sfx_play(SFX_BREAK, 0xFF, 0x40);
+        eo_sfx(SFX_BREAK);
         break_sounds_left--;
         break_sound_timer = BREAK_SOUND_GAP;
     }
@@ -214,7 +214,7 @@ static void crack_shields(int i, int count) {
     if (g->shields == 0) {
         break_enemy(i);
     } else if (SFX_SHIELD_HIT != 0) {
-        sfx_play(SFX_SHIELD_HIT, 0xFF, 0x40);
+        eo_sfx(SFX_SHIELD_HIT);
     }
     eo_fx_shield_hit(i, g->broken);
 }
@@ -502,10 +502,10 @@ RECOMP_HOOK_RETURN("pad_read") void eo_combat_read_input(void) {
     u8 most = charge < MAX_BOOST ? charge : MAX_BOOST;
     if ((gPadButtonsNew & BTN_DUP) && boost < most) {
         boost++;
-        sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+        eo_sfx(SFX_CONFIRM);
     } else if ((gPadButtonsNew & BTN_DDOWN) && boost > 0) {
         boost--;
-        sfx_play(SFX_CANCEL, 0xFF, 0x40);
+        eo_sfx(SFX_CANCEL);
     }
     if (boost > most) {
         boost = most;

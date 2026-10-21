@@ -208,3 +208,20 @@ void eo_ui_small(s32 x, s32 y, int palette, const char* text) {
     buf[n] = '\0';
     hud_draw_text(x, y, palette, buf);
 }
+
+// ---- Sounds ----
+
+static u32 sfx_frame = 0;      // counts frames (frame_build)
+static u32 sfx_last_frame = 0xFFFFFFFF;
+
+RECOMP_HOOK_RETURN("frame_build") void eo_sfx_frame(void) {
+    sfx_frame++;
+}
+
+void eo_sfx(s32 sound) {
+    if (sfx_last_frame == sfx_frame) {
+        return;
+    }
+    sfx_last_frame = sfx_frame;
+    sfx_play_scaled(0, sound, 0xFF);
+}

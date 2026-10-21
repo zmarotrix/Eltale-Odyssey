@@ -156,7 +156,7 @@ RECOMP_HOOK("projectile_init") void eo_spirits_on_projectile(void* caster, u16 s
     char name[24];
     eo_title_case(name, spell_names[s][i], 20);
     eo_notice("Learned ", name);
-    sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+    eo_sfx(SFX_CONFIRM);
 }
 
 // ---- Every frame: set up saves, count new spirits ----
@@ -248,7 +248,7 @@ RECOMP_HOOK_RETURN("pad_read") void eo_spirits_read_input(void) {
             cursor = 0;
             pressed = 0;
             gPadButtonsNew = 0;
-            sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+            eo_sfx(SFX_CONFIRM);
         }
         return;
     }
@@ -270,13 +270,13 @@ RECOMP_HOOK_RETURN("pad_read") void eo_spirits_read_input(void) {
 static void try_attune(int s) {
     int next = gEo.tiers[s] + 1;
     if (next > TIERS || ELEMENT_LEVELS[s] < tier_min_level[next] || gEo.spirit_points < tier_cost[next]) {
-        sfx_play(SFX_CANCEL, 0xFF, 0x40);
+        eo_sfx(SFX_CANCEL);
         return;
     }
     gEo.spirit_points = (u8)(gEo.spirit_points - tier_cost[next]);
     gEo.tiers[s] = (u8)next;
     dirty = 1;
-    sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+    eo_sfx(SFX_CONFIRM);
 }
 
 static void handle_input(void) {
@@ -285,11 +285,11 @@ static void handle_input(void) {
     int rows = page == 0 ? SCHOOLS : TALENTS_PER_SCHOOL;
     if (p & BTN_B) {
         window_open = 0;
-        sfx_play(SFX_CANCEL, 0xFF, 0x40);
+        eo_sfx(SFX_CANCEL);
     } else if (p & (BTN_DLEFT | BTN_DRIGHT)) {
         page = (page + ((p & BTN_DRIGHT) ? 1 : PAGES - 1)) % PAGES;
         cursor = 0;
-        sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+        eo_sfx(SFX_CONFIRM);
     } else if (p & BTN_DUP) {
         cursor = (cursor + rows - 1) % rows;
     } else if (p & BTN_DDOWN) {
@@ -298,9 +298,9 @@ static void handle_input(void) {
         if (page == 0) {
             try_attune(cursor);
         } else if (eo_talent_learn((page - 1) * TALENTS_PER_SCHOOL + cursor)) {
-            sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+            eo_sfx(SFX_CONFIRM);
         } else {
-            sfx_play(SFX_CANCEL, 0xFF, 0x40);
+            eo_sfx(SFX_CANCEL);
         }
     }
 }

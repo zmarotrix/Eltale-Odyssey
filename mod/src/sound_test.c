@@ -35,7 +35,7 @@ RECOMP_HOOK_RETURN("pad_read") void eo_sound_test_input(void) {
         play = 1;
     }
     if (play) {
-        sfx_play(sound, 0xFF, 0x40);
+        eo_sfx(sound);
     }
     gPadButtonsNew &= (u16)~(BTN_DUP | BTN_DLEFT | BTN_DRIGHT | 0x0400);
 }
@@ -50,7 +50,7 @@ RECOMP_HOOK_RETURN("frame_build") void eo_sound_test_mailbox(void) {
     if ((request & 0xFFFF0000) == SOUND_REQUEST_TAG) {
         *SOUND_MAILBOX = 0;
         sound = (int)(request & 0xFF);
-        sfx_play(sound, 0xFF, 0x40);
+        eo_sfx(sound);
     }
 }
 

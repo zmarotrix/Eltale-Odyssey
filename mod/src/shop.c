@@ -330,7 +330,7 @@ static void handle_input(void) {
         return;
     }
     if (pressed & BTN_B) {
-        sfx_play(SFX_CANCEL, 0xFF, 0x40);
+        eo_sfx(SFX_CANCEL);
         say_message(goodbye_lines[gCurrentDay % 2], TEXT_GOOD);
         closing = GOODBYE_FRAMES;
         return;
@@ -344,14 +344,14 @@ static void handle_input(void) {
     } else if (pressed & BTN_A) {
         u8 good = stock[cursor];
         if (is_equipment(good) && eo_equipment_owned(good - EQ_BASE)) {
-            sfx_play(SFX_CANCEL, 0xFF, 0x40);
+            eo_sfx(SFX_CANCEL);
             say_message("YOU ALREADY HAVE ONE OF THOSE.", TEXT_WARN);
         } else if (GOLD < good_price(good)) {
-            sfx_play(SFX_CANCEL, 0xFF, 0x40);
+            eo_sfx(SFX_CANCEL);
             char line[40];
             say_message(eo_text_fill(line, "YOU'RE %a GOLD SHORT.", 0, good_price(good) - GOLD, 0), TEXT_WARN);
         } else if (!is_equipment(good) && inventory_count_item(INVENTORY_EMPTY) == 0) {
-            sfx_play(SFX_CANCEL, 0xFF, 0x40);
+            eo_sfx(SFX_CANCEL);
             say_message("YOUR BAG'S FULL.", TEXT_WARN);
         } else {
             GOLD -= good_price(good);
@@ -361,7 +361,7 @@ static void handle_input(void) {
                 inventory_add_item(good);
             }
             eo_gold_resync();  // the shop shows the gold itself
-            sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+            eo_sfx(SFX_CONFIRM);
             say_message(thanks_lines[sales++ % (sizeof(thanks_lines) / sizeof(thanks_lines[0]))], TEXT_GOOD);
         }
     }

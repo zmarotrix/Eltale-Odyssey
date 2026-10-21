@@ -156,7 +156,7 @@ RECOMP_HOOK_RETURN("pad_read") void eo_equipment_read_input(void) {
             pressed = 0;
             message = 0;
             gPadButtonsNew = 0;
-            sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+            eo_sfx(SFX_CONFIRM);
         }
         return;
     }
@@ -190,7 +190,7 @@ static void handle_input(void) {
     pressed = 0;
     int count = choosing ? choice_count : SLOT_COUNT;
     if (p & BTN_B) {
-        sfx_play(SFX_CANCEL, 0xFF, 0x40);
+        eo_sfx(SFX_CANCEL);
         if (choosing) {
             choosing = 0;
             cursor = slot_cursor;
@@ -209,23 +209,23 @@ static void handle_input(void) {
     } else if (p & BTN_A) {
         if (!choosing) {
             if (!slot_open(cursor)) {
-                sfx_play(SFX_CANCEL, 0xFF, 0x40);
+                eo_sfx(SFX_CANCEL);
                 message = "This slot isn't open yet.";
             } else if (!eo_inn_here()) {
-                sfx_play(SFX_CANCEL, 0xFF, 0x40);
+                eo_sfx(SFX_CANCEL);
                 message = "Change equipment at an inn.";
             } else {
                 slot_cursor = cursor;
                 list_choices(cursor);
                 choosing = 1;
                 cursor = 0;
-                sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+                eo_sfx(SFX_CONFIRM);
             }
         } else {
             gEo.equipped[slot_cursor] = (u8)(choices[cursor] + 1);
             choosing = 0;
             cursor = slot_cursor;
-            sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+            eo_sfx(SFX_CONFIRM);
         }
     }
 }

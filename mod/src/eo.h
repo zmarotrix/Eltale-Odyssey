@@ -16,6 +16,10 @@ void hud_draw_sprite(s32 image, s32 x, s32 y, s32 width, s32 height);  // a menu
 void ui_draw_rect(s32 style, s32 x, s32 y, s32 w, s32 h);
 void ui_draw_text(s32 x, s32 y, const u8* text);  // text in the game's own encoding
 void sfx_play(s32 sound, s32 arg1, s32 volume);
+void sfx_play_scaled(s32 channel, s32 sound, s32 volume);
+// Plays a sound the way the game's own menus do (sfx_play_scaled on channel 0), at most one a frame. Calling sfx_play
+// directly for every page flip crashed the game when flipping fast (playtest, 2026-10-21).
+void eo_sfx(s32 sound);
 
 // ---- Game data ----
 extern u32 gGameState;
