@@ -27,6 +27,8 @@
 #define SEARING_PERCENT 5
 #define AFTERSHOCK_PERCENT 10      // on top of Earth Boost's 40 per charge
 #define CYCLONE_CHANCE 5
+#define STOKE_FRESH_PERCENT 70     // a stoking Fire spell on a foe that isn't burning
+#define STOKE_BURNING_PERCENT 140  // ... and on one that is
 #define NO_WEAKNESS 0xFF
 
 #define ENEMY_SLOTS 0x8007C998
@@ -319,6 +321,18 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     } else if (hit_element < 4) {
         percent += (u32)eo_equip_element_percent(hit_element) +
                    SCHOOL_TALENT_PERCENT * (u32)eo_talent(school_talent[hit_element]);
+    }
+    // Stoking Fire spells: weak on a foe that isn't burning (the HP the extra 30% took comes back; if the full hit
+    // killed it, it stays down), strong on one that is.
+    if (hit_kind == HIT_SPELL && (last_brian_spell >> 8) == FIRE && eo_fire_kind(last_brian_spell & 0xFF) == FIRE_STOKE) {
+        if (hit_was_burning) {
+            percent += STOKE_BURNING_PERCENT - 100;
+        } else if (hp > 0) {
+            u32 back = hit * (100 - STOKE_FRESH_PERCENT) / 100;
+            u16 max_hp = *(u16*)(ENEMY_RECORD(slot) + RECORD_MAX_HP);
+            hp = (u16)(hp + back > max_hp ? max_hp : hp + back);
+            ENEMY_HP(slot) = hp;
+        }
     }
     extra += hit * percent / 100;
     if (extra > 0 && hp > 0) {

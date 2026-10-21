@@ -48,6 +48,10 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
       3 turns, stacking up to 3 hits. Burn can kill.
 - [x] **Burn visuals**: a burning enemy pulses red; small embers rise from it when burn damage lands (ticks and
       ignition only). (Checked by you.)
+- [ ] **Kindle and stoke**: only kindling Fire spells set foes burning: Ember, Twin Flame, Seeker, Blaze, Flame
+      Volley (checked by Claude: Ember). Stoking spells don't burn but deal 70% to a foe that isn't burning and
+      140% to one that is: Scald, Pyre, Magma, Searing Steam (not checked yet; the damage number still shows the
+      full hit when it's reduced). Detonate sets off the Burn already there.
 - [ ] **Fire Bomb** on a burning enemy sets off all its remaining Burn at once.
 - [ ] **Poison**: Man Eaters and Bumbershoots can poison you (about 1 hit in 3). Brian pulses purple, 5% max HP per turn for 4 turns, also ticks outside battle, never below 1 HP. Water healing or an inn
       night cures it.

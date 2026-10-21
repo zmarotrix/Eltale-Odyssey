@@ -240,6 +240,10 @@ int eo_talent_learn(int talent);   // 1 if a rank was learned now (level and poi
 int eo_lockon_target(void);   // enemy slot Brian is locked onto, -1 if none
 void eo_fx_lockon_marker(int enemy_slot);   // fx.c: the sparkle over the target's head
 
+// ---- Fire's kinds of spell (status.c) ----
+enum { FIRE_OTHER, FIRE_KINDLE, FIRE_STOKE };
+int eo_fire_kind(int index);   // Fire spell index 0-14
+
 // ---- One status at a time (status.c) ----
 // 1 if `fighter` (battle data) has a status that keeps a new one off. `by_brian`: the new status is Brian's
 // (Shifting Winds lets his through). `except_burn`: the new status is Burn, which stacks on a burning foe.

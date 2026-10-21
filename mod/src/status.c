@@ -159,6 +159,20 @@ static void burn_tick_all(void) {
 
 #define SPELL_FIRE_BOMB 0x000A   // Fire school, index 10
 
+// Fire's two kinds of damage spell (playtest, 2026-10-21: "Fire spells should be slightly weaker but apply a burn,
+// and then some spells should do less damage and not burn, unless they are already burning and then do more"):
+// kindling spells set foes burning; stoking spells don't, but hit burning foes harder (combat.c). Detonate (Fire
+// Bomb) does neither: it sets off the Burn already there.
+int eo_fire_kind(int index) {
+    switch (index) {
+        case 0: case 1: case 3: case 5: case 9:   // Ember, Twin Flame, Seeker, Blaze, Flame Volley
+            return FIRE_KINDLE;
+        case 4: case 8: case 12: case 14:         // Scald, Pyre, Magma, Searing Steam
+            return FIRE_STOKE;
+    }
+    return FIRE_OTHER;
+}
+
 // The spell Brian launched last (projectile_init runs for every shot, Brian's and enemies').
 static u16 brian_spell = 0xFFFF;
 
@@ -211,7 +225,8 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_enemy_damage(void) 
     if ((brian_spell == SPELL_FIRE_BOMB || boost >= 3) && burns[slot].turns_left > 0) {
         burn_ignite(slot);
     }
-    if (hit > 0 && ENEMY_HP(slot) > 0 && !eo_status_blocks(ENEMY_BATTLE_DATA(slot), 1, 1)) {
+    int kindles = (brian_spell >> 8) == 0 && eo_fire_kind(brian_spell & 0xFF) == FIRE_KINDLE;
+    if (kindles && hit > 0 && ENEMY_HP(slot) > 0 && !eo_status_blocks(ENEMY_BATTLE_DATA(slot), 1, 1)) {
         u32 amount = (u32)hit * (u32)eo_status_burn_percent() / 100;
         for (int i = 0; i <= boost; i++) {
             burn_add_stack(slot, (u16)(amount < 1 ? 1 : amount));
