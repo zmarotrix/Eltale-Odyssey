@@ -76,8 +76,8 @@ typedef struct {
     // Equipment (equipment.c)
     u32 owned_equipment;   // one bit per piece
     u8 equipped[4];        // staff, robe, charm, sigil: piece + 1, 0 = none
-    u32 talents;           // one bit per talent learned (talents.c)
-    u8 reserved[116];
+    u8 talent_ranks[40];   // ranks learned per talent (talents.c)
+    u8 reserved[80];
 } EoSaveBlock;
 
 _Static_assert(sizeof(EoSaveBlock) == 160, "the save block must fill the 160 free bytes exactly");
@@ -160,24 +160,34 @@ int eo_combat_broken(int enemy_slot);
 int eo_status_poisoned(void);
 void eo_fx_update(void);              // every frame in battle
 
-// ---- Talents (talents.c): bought with Spirit Points in the Spirits window ----
+// ---- Talents (talents.c): a tree per element, bought rank by rank with Spirit Points ----
 enum {
-    TALENT_SMOULDER, TALENT_FANNED_FLAMES,     // Fire
-    TALENT_BEDROCK, TALENT_SHATTER,            // Earth
-    TALENT_DEEP_FREEZE, TALENT_UNDERTOW,       // Water
-    TALENT_SHIFTING_WINDS, TALENT_CROSSWIND,   // Wind
+    // Fire
+    TALENT_SMOULDER, TALENT_FANNED_FLAMES, TALENT_KINDLING, TALENT_CONFLAGRATION, TALENT_FIREBRAND,
+    TALENT_WILDFIRE, TALENT_SEARING, TALENT_HEAT_HAZE, TALENT_INFERNO,
+    // Earth
+    TALENT_BEDROCK, TALENT_WEIGHT, TALENT_STONESKIN, TALENT_SHATTER, TALENT_FAULT_LINE,
+    TALENT_AFTERSHOCK, TALENT_BULWARK, TALENT_LANDSLIDE, TALENT_EPICENTRE,
+    // Water
+    TALENT_DEEP_FREEZE, TALENT_WELLSPRING, TALENT_TIDAL_FORCE, TALENT_STILL_WATERS, TALENT_UNDERTOW,
+    TALENT_FROSTBITE, TALENT_RIPTIDE, TALENT_UNDERCURRENT, TALENT_GLACIER,
+    // Wind
+    TALENT_CROSSWIND, TALENT_GALE_FORCE, TALENT_TAILWIND, TALENT_SHIFTING_WINDS, TALENT_EYE_OF_THE_STORM,
+    TALENT_CYCLONE, TALENT_SECOND_WIND, TALENT_UPDRAFT, TALENT_MAELSTROM,
     TALENT_COUNT
 };
+#define TALENTS_PER_SCHOOL 9
 typedef struct {
     const char* name;
     u8 school;
     u8 level;          // element level needed
-    u8 cost;           // Spirit Points
+    u8 ranks;          // most ranks
+    u8 cost;           // Spirit Points per rank
     const char* effect;
 } TalentInfo;
 const TalentInfo* eo_talent_info(int talent);
-int eo_talent(int talent);         // learned?
-int eo_talent_learn(int talent);   // 1 if learned now (level and points checked)
+int eo_talent(int talent);         // ranks learned, 0 = none
+int eo_talent_learn(int talent);   // 1 if a rank was learned now (level and points checked)
 
 // ---- One status at a time (status.c) ----
 // 1 if `fighter` (battle data) has a status that keeps a new one off. `by_brian`: the new status is Brian's

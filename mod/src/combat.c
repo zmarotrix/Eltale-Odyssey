@@ -20,7 +20,13 @@
 #define MAX_BOOST 3
 #define START_CHARGE 1
 #define BROKEN_BONUS_PERCENT 50
-#define SHATTER_BONUS_PERCENT 80   // with Earth's Shatter talent
+// Talents (talents.c) bending these rules, per rank.
+#define SCHOOL_TALENT_PERCENT 4    // Kindling, Weight, Tidal Force, Gale Force
+#define SHATTER_PERCENT 15
+#define FROSTBITE_PERCENT 15
+#define SEARING_PERCENT 5
+#define AFTERSHOCK_PERCENT 10      // on top of Earth Boost's 40 per charge
+#define CYCLONE_CHANCE 5
 #define NO_WEAKNESS 0xFF
 
 #define ENEMY_SLOTS 0x8007C998
@@ -74,6 +80,8 @@ static u8 spent_last_turn = 0;
 static u8 spent_this_turn = 0;
 static u8 weakness_bonus_given = 0;
 static u8 reflected_this_battle = 0;  // Mirror Shard
+static u8 bulwark_used = 0;           // Bulwark talent
+static u32 turns_taken = 0;           // Brian's turns this battle (Still Waters)
 
 // The boost of the spell being cast right now (0 when none), and what was changed for it.
 static u8 active_boost = 0;
@@ -81,6 +89,18 @@ static u8 active_school = 0;
 static u8* active_spell = 0;
 static u16 saved_base;
 static u16 saved_shots;
+
+static const u8 school_talent[4] = { TALENT_KINDLING, TALENT_WEIGHT, TALENT_TIDAL_FORCE, TALENT_GALE_FORCE };
+
+// Most charge Brian can hold: 5, more with Updraft.
+static u8 max_charge(void) {
+    return (u8)(MAX_CHARGE + eo_talent(TALENT_UPDRAFT));
+}
+
+static void gain_charge(int amount) {
+    int c = charge + amount;
+    charge = (u8)(c > max_charge() ? max_charge() : c);
+}
 
 static int in_battle(void) {
     return (gBattleState & BATTLE_ACTIVE) != 0;
@@ -131,7 +151,10 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
                       element == WIND ? EARTH : NO_WEAKNESS;
         g->max_shields = g->shields = shields_for(record, boss);
     }
-    charge = (u8)(START_CHARGE + (eo_talent(TALENT_BEDROCK) ? 1 : 0));
+    charge = 0;
+    gain_charge(START_CHARGE + eo_talent(TALENT_BEDROCK));
+    bulwark_used = 0;
+    turns_taken = 0;
     boost = 0;
     spent_last_turn = spent_this_turn = 0;
     weakness_bonus_given = 0;
@@ -147,8 +170,30 @@ static void break_enemy(int i) {
     g->broken = 1;
     u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
     *(u16*)status |= STATUS_RESTRICTION_BIT;   // its next turn is skipped by the game itself
-    status[STATUS_RESTRICTION_DURATION] = 1;
+    status[STATUS_RESTRICTION_DURATION] = (u8)(1 + eo_talent(TALENT_EPICENTRE));
     sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+    // Landslide: the Break cracks a shield off every other foe (never their last).
+    if (eo_talent(TALENT_LANDSLIDE)) {
+        for (int k = 0; k < MAX_ENEMIES; k++) {
+            if (k != i && ENEMY_HP(k) > 0 && !guards[k].broken && guards[k].shields > 1) {
+                guards[k].shields--;
+                eo_fx_shield_hit(k, 0);
+            }
+        }
+    }
+}
+
+// Knocks shields off a foe (a weakness hit, Cyclone, Glacier); at 0 it Breaks.
+static void crack_shields(int i, int count) {
+    Guard* g = &guards[i];
+    if (g->broken || g->shields == 0) {
+        return;
+    }
+    g->shields = (u8)(g->shields > count ? g->shields - count : 0);
+    if (g->shields == 0) {
+        break_enemy(i);
+    }
+    eo_fx_shield_hit(i, g->broken);
 }
 
 static void freeze_enemy(int i, int turns) {
@@ -157,6 +202,12 @@ static void freeze_enemy(int i, int turns) {
         turns = 1;  // bosses resist control effects
     }
     *(u16*)status |= STATUS_RESTRICTION_BIT;
+    if (eo_talent(TALENT_RIPTIDE)) {
+        gain_charge(1);
+    }
+    if (eo_talent(TALENT_GLACIER)) {
+        crack_shields(i, 1);
+    }
     if (status[STATUS_RESTRICTION_DURATION] < turns) {
         status[STATUS_RESTRICTION_DURATION] = (u8)turns;
     }
@@ -171,6 +222,8 @@ static int hit_kind = HIT_NONE;
 static u16 hit_hp;
 static u16 hit_element;
 static u8 hit_was_broken;
+static u8 hit_was_frozen;
+static u8 hit_was_burning;
 static u16 last_brian_spell = 0xFFFF;
 
 RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u16 power, u16 element, u16 flags, void* attacker) {
@@ -192,18 +245,27 @@ RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u1
     hit_element = element;
     Guard* g = &guards[slot];
     hit_was_broken = g->broken;
-    if (hit_kind != HIT_SPELL || g->weakness == NO_WEAKNESS || element != g->weakness || g->broken) {
+    u8* target_status = *(u8**)(ENEMY_BATTLE_DATA(slot) + 0x68);
+    hit_was_frozen = !g->broken && target_status != 0 && (*(u16*)target_status & STATUS_RESTRICTION_BIT);
+    hit_was_burning = eo_status_burn_stacks(slot) > 0;
+    if (hit_kind != HIT_SPELL || g->broken) {
+        return;
+    }
+    if (g->weakness == NO_WEAKNESS || element != g->weakness) {
+        // Cyclone: a Wind hit may crack a shield anyway.
+        if (element == WIND && get_rand(100) < CYCLONE_CHANCE * eo_talent(TALENT_CYCLONE)) {
+            crack_shields(slot, 1);
+        }
         return;
     }
     g->revealed = 1;
-    if (!weakness_bonus_given && charge < MAX_CHARGE) {
-        charge++;
-        weakness_bonus_given = 1;
+    // Weakness hits give charge once a turn; Tailwind: twice, then every time.
+    int tailwind = eo_talent(TALENT_TAILWIND);
+    if (tailwind >= 2 || weakness_bonus_given < 1 + tailwind) {
+        gain_charge(1);
+        weakness_bonus_given++;
     }
-    if (g->shields > 0 && --g->shields == 0) {
-        break_enemy(slot);
-    }
-    eo_fx_shield_hit(slot, g->broken);
+    crack_shields(slot, element == EARTH && eo_talent(TALENT_FAULT_LINE) ? 2 : 1);
 }
 
 RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) {
@@ -220,23 +282,34 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     // Extra damage on top of the hit: a Broken foe takes 50% more, the staff adds its flat bonus, and a staff
     // that favours the spell's element adds 10%.
     u32 extra = 0;
+    u32 percent = 0;
     if (hit_was_broken) {
-        extra += hit * (eo_talent(TALENT_SHATTER) ? SHATTER_BONUS_PERCENT : BROKEN_BONUS_PERCENT) / 100;
+        percent += BROKEN_BONUS_PERCENT + SHATTER_PERCENT * (u32)eo_talent(TALENT_SHATTER);
+    } else if (hit_was_frozen) {
+        percent += FROSTBITE_PERCENT * (u32)eo_talent(TALENT_FROSTBITE);
+    }
+    if (hit_was_burning) {
+        percent += SEARING_PERCENT * (u32)eo_talent(TALENT_SEARING);
     }
     if (hit_kind == HIT_STAFF) {
         extra += (u32)eo_equip_staff_bonus();
     } else if (hit_element < 4) {
-        extra += hit * (u32)eo_equip_element_percent(hit_element) / 100;
+        percent += (u32)eo_equip_element_percent(hit_element) +
+                   SCHOOL_TALENT_PERCENT * (u32)eo_talent(school_talent[hit_element]);
     }
+    extra += hit * percent / 100;
     if (extra > 0 && hp > 0) {
         ENEMY_HP(slot) = extra >= hp ? 0 : (u16)(hp - extra);
         damage_popup_spawn(ENEMY_BATTLE_DATA(slot), 0, (s32)extra);
     }
     // Ember Staff: a staff hit sets the foe burning; on a foe already burning it flares instead, spreading the
     // Burn to the enemies around it (status.c).
-    if (hit_kind == HIT_STAFF && eo_equipment_worn(EQ_EMBER_STAFF)) {
+    // Firebrand: any staff sets foes burning (only the Ember Staff flares).
+    if (hit_kind == HIT_STAFF && (eo_equipment_worn(EQ_EMBER_STAFF) || eo_talent(TALENT_FIREBRAND))) {
         if (eo_status_burn_stacks(slot) > 0) {
-            eo_status_flare(slot);
+            if (eo_equipment_worn(EQ_EMBER_STAFF)) {
+                eo_status_flare(slot);
+            }
         } else if (ENEMY_HP(slot) > 0) {
             eo_status_add_burn(slot, (u16)(hit * (u32)eo_status_burn_percent() / 100 + 1));
         }
@@ -251,7 +324,7 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     // A boosted damaging Water spell freezes its target, if it has no other status (status.c); Deep Freeze holds it
     // a turn longer.
     if (active_boost > 0 && active_school == WATER && ENEMY_HP(slot) > 0 && !eo_status_blocks(ENEMY_BATTLE_DATA(slot), 1, 0)) {
-        freeze_enemy(slot, active_boost + (eo_talent(TALENT_DEEP_FREEZE) ? 1 : 0));
+        freeze_enemy(slot, active_boost + eo_talent(TALENT_DEEP_FREEZE) + eo_talent(TALENT_EYE_OF_THE_STORM));
     }
 }
 
@@ -260,7 +333,10 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
 static int mirror_slot = -1;
 static u16 mirror_hp;
 
+static u16 bulwark_hp;
+
 RECOMP_HOOK("player_take_damage") void eo_combat_before_brian_damage(u16 power, u16 flags, void* attacker) {
+    bulwark_hp = ((u16*)gPlayerMainData)[2];
     mirror_slot = -1;
     if (!in_battle() || reflected_this_battle || power == 0 || !is_enemy_battle_data(attacker) ||
         !eo_equipment_worn(EQ_MIRROR_SHARD)) {
@@ -271,6 +347,12 @@ RECOMP_HOOK("player_take_damage") void eo_combat_before_brian_damage(u16 power, 
 }
 
 RECOMP_HOOK_RETURN("player_take_damage") void eo_combat_after_brian_damage(void) {
+    // Bulwark: the first hit Brian takes each fight is halved.
+    u16* hp = (u16*)gPlayerMainData + 2;
+    if (in_battle() && !bulwark_used && eo_talent(TALENT_BULWARK) && *hp < bulwark_hp) {
+        *hp = (u16)(*hp + (bulwark_hp - *hp) / 2);
+        bulwark_used = 1;
+    }
     if (mirror_slot < 0) {
         return;
     }
@@ -319,11 +401,18 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
             g->shields = g->max_shields;
         }
     }
-    if (!spent_last_turn && charge < MAX_CHARGE) {
-        charge++;
+    if (!spent_last_turn) {
+        gain_charge(eo_talent(TALENT_MAELSTROM) ? 2 : 1);
     }
     spent_last_turn = 0;
     weakness_bonus_given = 0;
+    // Still Waters: MP at the start of Brian's turns (every other turn at rank 1, every turn at rank 2).
+    turns_taken++;
+    int still = eo_talent(TALENT_STILL_WATERS);
+    u16* mp = (u16*)gPlayerMainData + 4;
+    if ((still >= 2 || (still == 1 && (turns_taken & 1))) && mp[0] < mp[1]) {
+        mp[0]++;
+    }
 }
 
 // Brian launches a spell: spend the chosen boost on it. projectile_init runs for every shot; the boost is
@@ -344,7 +433,8 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     u8* stats = SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE;
     u16 type = *(u16*)(stats + SPELL_TYPE);
     int echo = school == WATER && type == SPELL_TYPE_DAMAGE && eo_equipment_worn(EQ_TIDAL_ECHO);
-    if (boost == 0 && !echo) {
+    int wellspring = school == WATER && type == SPELL_TYPE_HEAL ? eo_talent(TALENT_WELLSPRING) : 0;
+    if (boost == 0 && !echo && !wellspring) {
         return;
     }
     active_spell = stats;
@@ -360,17 +450,20 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
         base = (u16)(base * 3 / 4);
     }
     if (school == EARTH && type == SPELL_TYPE_DAMAGE) {
-        base = (u16)(base * (100 + 40 * boost) / 100);
+        base = (u16)(base * (100 + (40 + AFTERSHOCK_PERCENT * eo_talent(TALENT_AFTERSHOCK)) * boost) / 100);
     } else if (school == WATER && type == SPELL_TYPE_HEAL) {
-        base = (u16)(base * (100 + 30 * boost) / 100 + boost);
+        base = (u16)(base * (100 + 30 * boost + 10 * wellspring) / 100 + boost);
     } else if (school == WIND && type == SPELL_TYPE_DAMAGE) {
-        shots = (u16)(shots + (eo_talent(TALENT_CROSSWIND) ? 3 : 2) * boost);
+        shots = (u16)(shots + (2 + eo_talent(TALENT_CROSSWIND)) * boost);
     }
     *(u16*)(stats + SPELL_BASE) = base;
     *(u16*)(stats + SPELL_SHOTS) = shots;
     if (boost > 0) {
         charge -= boost;
         spent_this_turn = 1;
+        if (boost >= MAX_BOOST && eo_talent(TALENT_SECOND_WIND)) {
+            gain_charge(1);   // Second Wind
+        }
     }
     boost = 0;
 }
@@ -413,7 +506,7 @@ RECOMP_HOOK_RETURN("pad_read") void eo_combat_read_input(void) {
 s32 spell_find_by_inputs(u16 count, u8* inputs);
 
 static void draw_charge(void) {
-    for (int i = 0; i < MAX_CHARGE; i++) {
+    for (int i = 0; i < max_charge(); i++) {
         int icon = i < charge - boost ? ICON_CHARGE_FULL : i < charge ? ICON_CHARGE_SPEND : ICON_CHARGE_EMPTY;
         eo_icon_draw(icon, CHARGE_X + i * CHARGE_STEP, CHARGE_Y);
     }

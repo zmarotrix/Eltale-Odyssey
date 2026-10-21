@@ -131,21 +131,27 @@ No floating icons or plates over enemies, and no explanation of what Boost does:
 
 ## Talents (new)
 
-The Spirits window (D-pad up) has two pages: **ATTUNE** (tiers) and **TALENTS**; D-pad left / right switches.
-Talents cost Spirit Points and need that element's level:
+The Spirits window (D-pad up) has five pages: **ATTUNE** and one talent tree per element (FIRE, EARTH, WATER,
+WIND); D-pad left / right switches. Each tree has 9 talents with ranks (pips); deeper rows need a higher element
+level (1, 3, 6, 10, 12, 16, 20, 25, 30). Each rank costs 2 Spirit Points, capstones 5: about 150 points fill
+every tree, on top of 92 for full attunement, out of 98 in the game.
 
-| Talent | Element | Needs | Effect |
+| Fire | Earth | Water | Wind |
 |---|---|---|---|
-| Smoulder | Fire | Lv 5, 3 SP | Burn lasts one more turn |
-| Fanned Flames | Fire | Lv 12, 5 SP | Burn stacks 45% of the hit instead of 30% |
-| Bedrock | Earth | Lv 5, 3 SP | Start battles with 2 charge |
-| Shatter | Earth | Lv 12, 5 SP | Broken foes take 80% more instead of 50% |
-| Deep Freeze | Water | Lv 5, 3 SP | Freeze lasts one more turn |
-| Undertow | Water | Lv 12, 5 SP | Your Water healing also ends your status (at the next tick) |
-| Shifting Winds | Wind | Lv 5, 3 SP | Your statuses ignore the one-status limit |
-| Crosswind | Wind | Lv 12, 5 SP | Wind Boost gives 3 shots per charge instead of 2 |
+| Smoulder 2: Burn +1 turn | Bedrock 2: +1 starting charge | Deep Freeze 2: Freeze +1 turn | Crosswind 2: Wind Boost +1 shot per charge |
+| Fanned Flames 3: Burn +5% of the hit | Weight 3: Earth +4% | Wellspring 3: Water healing +10% | Gale Force 3: Wind +4% |
+| Kindling 3: Fire +4% | Stoneskin 3: Defense +2 | Tidal Force 3: Water +4% | Tailwind 2: weakness charge twice a turn, then every hit |
+| Conflagration 2: ignition +25% | Shatter 2: Broken +15% | Still Waters 2: +1 MP every other turn / every turn | Shifting Winds 1: your statuses ignore the limit |
+| Firebrand 1: any staff hit burns | Fault Line 1: Earth weak hits take 2 shields | Undertow 1: Water healing ends your status | Eye of the Storm 2: your statuses +1 turn |
+| Wildfire 2: a burning foe's death spreads its Burn (50/100%) | Aftershock 2: Earth Boost +10% per charge | Frostbite 2: frozen foes +15% | Cyclone 3: Wind hits 5% chance to crack any shield |
+| Searing 3: burning foes +5% | Bulwark 1: first hit each fight halved | Riptide 1: freezing gives 1 charge | Second Wind 1: Boost 3 gives 1 charge back |
+| Heat Haze 1: Burn ticks give 1 MP | Landslide 1: a Break cracks every other foe | Undercurrent 3: Water spells 10% free | Updraft 2: hold 1 more charge |
+| Inferno (cap): Burn stacks to 4 | Epicentre (cap): Broken one more turn | Glacier (cap): freezing cracks a shield | Maelstrom (cap): 2 charge a turn |
 
-- [ ] The page draws (checked by Claude); learning a talent (needs points) and each effect: not checked.
+(Numbers are per rank.)
+
+- [ ] Pages draw (checked by Claude). Learning ranks and every effect: not checked yet (needs points and levels;
+      the dev panel's Brian tab can raise element levels, and Spirit Points can be set from the Memory tab).
 
 ## Equipment (new, only partly checked)
 

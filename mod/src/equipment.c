@@ -84,7 +84,8 @@ int eo_equip_poison_immune(void) {
 #define BRIAN_BATTLE_DEFENSE (*(u16*)0x8007BBC0)
 
 RECOMP_HOOK_RETURN("player_battle_init") void eo_equipment_on_battle_init(void) {
-    BRIAN_BATTLE_DEFENSE = (u16)(BRIAN_BATTLE_DEFENSE + eo_equip_defense());
+    // Robes, and Earth's Stoneskin talent (2 a rank).
+    BRIAN_BATTLE_DEFENSE = (u16)(BRIAN_BATTLE_DEFENSE + eo_equip_defense() + 2 * eo_talent(TALENT_STONESKIN));
 }
 
 // ---- Slots open with the story ----
@@ -290,8 +291,15 @@ s32 get_rand(s32 n);  // 0..n-1
 
 static u16 mp_before_cast;
 
+#define BRIAN_SPELL_PRESSES ((u8*)0x8007BBD1)   // element of each press
+#define BRIAN_SPELL_COUNT (*(u16*)0x8007BBD4)   // presses
+s32 spell_find_by_inputs(u16 count, u8* inputs);
+static int cast_school = -1;   // the spell being cast's element
+
 RECOMP_HOOK("spell_cast_init") void eo_equipment_before_cast(void) {
     mp_before_cast = BRIAN_MP;
+    s32 spell = BRIAN_SPELL_COUNT > 0 && BRIAN_SPELL_COUNT <= 3 ? spell_find_by_inputs(BRIAN_SPELL_COUNT, BRIAN_SPELL_PRESSES) : -1;
+    cast_school = spell >= 0 ? (spell >> 8) & 0xF : -1;
 }
 
 RECOMP_HOOK_RETURN("spell_cast_init") void eo_equipment_after_cast(void) {
@@ -300,6 +308,11 @@ RECOMP_HOOK_RETURN("spell_cast_init") void eo_equipment_after_cast(void) {
         return;
     }
     u16 cost = (u16)(mp_before_cast - mp);
+    // Water's Undercurrent talent: 10% a rank that a Water spell costs nothing.
+    if (cast_school == 2 && get_rand(100) < 10 * eo_talent(TALENT_UNDERCURRENT)) {
+        BRIAN_MP = mp_before_cast;
+        return;
+    }
     int charm = worn_in(SLOT_CHARM);
     if (charm == EQ_PILGRIMS_SOUL) {
         BRIAN_MP = (u16)(mp + cost / 2);            // spells cost half (rounded up)

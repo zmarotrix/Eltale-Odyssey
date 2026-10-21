@@ -21,8 +21,13 @@
 // with one enemy or three. Research: research/battle/README.md (turns, damage) and research/enemies.
 
 #define MAX_ENEMIES 6
-#define BURN_STACKS 3
+#define BURN_STACKS 4        // room for Inferno's fourth; 3 without it
+#define BASE_BURN_STACKS 3
 #define BURN_PERCENT 30
+#define FANNED_PERCENT 5     // more per Fanned Flames rank
+#define CONFLAGRATION_PERCENT 25
+#define WILDFIRE_PERCENT 50  // of the dying foe's strongest stack, per rank
+#define FLARE_RADIUS 70.0f   // battle units; a pack's members stand about 20-60 apart
 #define BURN_TURNS 3
 #define POISON_TURNS 4
 #define POISON_PERCENT 5
@@ -44,6 +49,8 @@
 #define BRIAN_STATUS_BITS (*(u16*)0x8007BB38)
 #define BRIAN_HP     (((u16*)gPlayerMainData)[2])
 #define BRIAN_MAX_HP (((u16*)gPlayerMainData)[3])
+#define BRIAN_MP     (((u16*)gPlayerMainData)[4])
+#define BRIAN_MAX_MP (((u16*)gPlayerMainData)[5])
 
 #define CURRENT_SET_ROW (*(u32**)0x8007D0BC)
 #define SET_TABLE 0x80054160
@@ -87,10 +94,24 @@ static int is_enemy_battle_data(void* p) {
 
 // ---- Burn ----
 
+static int burn_stack_limit(void) {
+    return BASE_BURN_STACKS + (eo_talent(TALENT_INFERNO) ? 1 : 0);
+}
+
+static u16 strongest_stack(int slot) {
+    u16 strongest = 0;
+    for (int i = 0; i < BURN_STACKS; i++) {
+        if (burns[slot].stacks[i] > strongest) {
+            strongest = burns[slot].stacks[i];
+        }
+    }
+    return strongest;
+}
+
 static void burn_add_stack(int slot, u16 amount) {
     Burn* b = &burns[slot];
     int weakest = 0;
-    for (int i = 0; i < BURN_STACKS; i++) {
+    for (int i = 0; i < burn_stack_limit(); i++) {
         if (b->stacks[i] < b->stacks[weakest]) {
             weakest = i;
         }
@@ -98,7 +119,7 @@ static void burn_add_stack(int slot, u16 amount) {
     if (amount > b->stacks[weakest]) {
         b->stacks[weakest] = amount;
     }
-    b->turns_left = (u8)(BURN_TURNS + (eo_talent(TALENT_SMOULDER) ? 1 : 0));
+    b->turns_left = (u8)(BURN_TURNS + eo_talent(TALENT_SMOULDER));
     b->fresh = 1;
 }
 
@@ -123,6 +144,12 @@ static void burn_tick_all(void) {
         if (total > 0) {
             eo_fx_burn_hit(slot);
             enemy_take_damage(slot, (u16)(total > 0xFFFF ? 0xFFFF : total), ELEMENT_FIRE, DAMAGE_NO_ELEMENT, burn_attacker);
+            if (eo_talent(TALENT_HEAT_HAZE) && BRIAN_MP < BRIAN_MAX_MP) {
+                BRIAN_MP++;   // Heat Haze
+            }
+        }
+        if (b->turns_left == 0) {
+            continue;   // the tick killed it (Wildfire's death watch cleared its Burn)
         }
         if (--b->turns_left == 0) {
             *b = (Burn){ 0 };
@@ -149,6 +176,7 @@ static void burn_ignite(int slot) {
         total += b->stacks[i];
     }
     total *= b->turns_left;
+    total = total * (100 + CONFLAGRATION_PERCENT * (u32)eo_talent(TALENT_CONFLAGRATION)) / 100;
     *b = (Burn){ 0 };
     if (total > 0 && ENEMY_HP(slot) > 0) {
         eo_fx_burn_hit(slot);
@@ -188,6 +216,23 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_enemy_damage(void) 
         for (int i = 0; i <= boost; i++) {
             burn_add_stack(slot, (u16)(amount < 1 ? 1 : amount));
         }
+    }
+}
+
+// Any damage that kills a burning foe sets off Wildfire.
+static void wildfire(int slot);
+static int death_watch_slot = -1;
+
+RECOMP_HOOK("enemy_take_damage") void eo_status_watch_death(s32 slot, u16 power, u16 element, u16 flags, void* attacker) {
+    death_watch_slot = slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0 && burns[slot].turns_left > 0 ? slot : -1;
+}
+
+RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_death_watch(void) {
+    int slot = death_watch_slot;
+    death_watch_slot = -1;
+    if (slot >= 0 && ENEMY_HP(slot) == 0) {
+        wildfire(slot);
+        burns[slot] = (Burn){ 0 };
     }
 }
 
@@ -240,20 +285,32 @@ void eo_status_add_burn(int slot, u16 amount) {
 
 // Ember Staff flare (playtest, 2026-10-21): a staff hit on a burning foe throws its Burn onto every enemy within
 // FLARE_RADIUS of it, as a stack as strong as the foe's strongest.
-#define FLARE_RADIUS 70.0f   // battle units; a pack's members stand about 20-60 apart
+
+static void spread_burn(int slot, u16 amount);
+static void wildfire(int slot);
 
 void eo_status_flare(int slot) {
     if (slot < 0 || slot >= MAX_ENEMIES || burns[slot].turns_left == 0) {
         return;
     }
-    u16 strongest = 0;
-    for (int i = 0; i < BURN_STACKS; i++) {
-        if (burns[slot].stacks[i] > strongest) {
-            strongest = burns[slot].stacks[i];
-        }
-    }
-    f32* from = (f32*)(ENEMY_SLOTS + slot * ENEMY_SLOT_SIZE + 0x24);   // battle data: x, y, z
     eo_fx_flare(slot);
+    spread_burn(slot, strongest_stack(slot));
+}
+
+// Wildfire: a burning foe that dies throws its Burn onto the foes around it.
+static void wildfire(int slot) {
+    int rank = eo_talent(TALENT_WILDFIRE);
+    u16 amount = (u16)(strongest_stack(slot) * WILDFIRE_PERCENT * rank / 100);
+    if (rank == 0 || burns[slot].turns_left == 0 || amount == 0) {
+        return;
+    }
+    eo_fx_flare(slot);
+    spread_burn(slot, amount);
+}
+
+// Every live foe within FLARE_RADIUS of `slot` (and free to take Burn) gets a stack of `amount`.
+static void spread_burn(int slot, u16 amount) {
+    f32* from = (f32*)(ENEMY_SLOTS + slot * ENEMY_SLOT_SIZE + 0x24);   // battle data: x, y, z
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (i == slot || ENEMY_HP(i) == 0) {
             continue;
@@ -262,7 +319,7 @@ void eo_status_flare(int slot) {
         f32 dx = to[0] - from[0];
         f32 dz = to[2] - from[2];
         if (dx * dx + dz * dz <= FLARE_RADIUS * FLARE_RADIUS && !eo_status_blocks(to, 1, 1)) {
-            burn_add_stack(i, strongest);
+            burn_add_stack(i, amount);
             eo_fx_burn_hit(i);
         }
     }
@@ -367,7 +424,7 @@ RECOMP_HOOK_RETURN("frame_build") void eo_status_frame(void) {
 #define ALWAYS_LANDS_MODE 2
 
 int eo_status_burn_percent(void) {
-    return eo_talent(TALENT_FANNED_FLAMES) ? BURN_PERCENT * 3 / 2 : BURN_PERCENT;
+    return BURN_PERCENT + FANNED_PERCENT * eo_talent(TALENT_FANNED_FLAMES);
 }
 
 int eo_status_blocks(void* fighter, int by_brian, int except_burn) {
@@ -439,6 +496,28 @@ RECOMP_HOOK_RETURN("spell_status_roll") void eo_status_after_roll(void) {
     *(u16*)(roll_spell + SPELL_STATUS_MODE) = saved_mode;
     STATUS_CHANCE[roll_status] = saved_chance;
     roll_blocked = 0;
+}
+
+// Eye of the Storm: statuses Brian applies last longer. spell_status_set_duration(projectile, target, status) sets the
+// countdown at the target's stats + 2 + status; add to it afterwards.
+#define PROJECTILE_CASTER 0x24
+static u8* storm_countdown = 0;
+
+RECOMP_HOOK("spell_status_set_duration") void eo_status_before_duration(u8* projectile, u8* target, s32 status) {
+    storm_countdown = 0;
+    if (status < 0 || status >= 12 || target == 0 || *(void**)(projectile + PROJECTILE_CASTER) != BRIAN_BATTLE_DATA ||
+        eo_talent(TALENT_EYE_OF_THE_STORM) == 0) {
+        return;
+    }
+    u8* stats = *(u8**)(target + BATTLE_DATA_STATS);
+    storm_countdown = stats != 0 ? stats + 2 + status : 0;
+}
+
+RECOMP_HOOK_RETURN("spell_status_set_duration") void eo_status_after_duration(void) {
+    if (storm_countdown != 0) {
+        *storm_countdown = (u8)(*storm_countdown + eo_talent(TALENT_EYE_OF_THE_STORM));
+        storm_countdown = 0;
+    }
 }
 
 // ---- Display ----
