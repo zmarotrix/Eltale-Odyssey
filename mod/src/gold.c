@@ -103,9 +103,27 @@ static const u16 boss_gold[] = {
     0,     // 7 Mammon (the ending follows)
 };
 
+// Charms and sigils are found, not bought: bosses carry them (pacing plan, "Build pieces"; first pass).
+static const s8 boss_piece[] = {
+    EQ_GAMBLERS_COIN,  // 0 Solvaring (and the charm slot opens)
+    EQ_LEECH_PILLAR,   // 1 Zelse (and the sigil slot opens)
+    EQ_TIDAL_ECHO,     // 2 Nepty
+    -1,                // 3 Shilf
+    -1,                // 4 Fargo
+    EQ_MIRROR_SHARD,   // 5 Guilty
+    -1,                // 6 Beigis
+    -1,                // 7 Mammon
+};
+
 RECOMP_HOOK("boss_give_reward") void eo_gold_on_boss_reward(s32 boss) {
-    if (boss >= 0 && boss < (s32)(sizeof(boss_gold) / sizeof(boss_gold[0]))) {
-        GOLD += boss_gold[boss];
+    if (boss < 0 || boss >= (s32)(sizeof(boss_gold) / sizeof(boss_gold[0]))) {
+        return;
+    }
+    GOLD += boss_gold[boss];
+    int piece = boss_piece[boss];
+    if (piece >= 0 && !eo_equipment_owned(piece)) {
+        eo_equipment_give(piece);
+        eo_notice("Found ", eo_equipment_info(piece)->name);
     }
 }
 

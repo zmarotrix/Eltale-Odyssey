@@ -43,6 +43,23 @@ encoding (`research/modding-notes-text/Text Information.tsv`): `0x00`–`0x19` l
 (numerals, upper/lower case), `0x7F` space, `0xE0` line break, `0xF0` page break, `0xF2` yes/no box, `0xFF` end,
 `0xA0`–`0xA3` colors. The drawer splits each byte with the masks `0x80`, `0x60` and `0x1F`.
 
+### Dialogue font: punctuation and symbols (checked in-game, 2026-10-20)
+
+Rendered every code with a test mod and read the screenshot. Modes: `0x80` digits, `0x81` uppercase, `0x82`
+lowercase; `0x7F` is a space in any mode.
+
+| Mode | Code | Glyph |
+|---|---|---|
+| digits | `0x00`-`0x09` | 0-9 |
+| digits | `0x0A` `0x0B` | `!` `?` |
+| digits | `0x0C`-`0x0F` | Japanese brackets 「 」 『 』 |
+| digits | `0x10` `0x11` `0x12` `0x13` `0x14` `0x15` | `.` `,` `…` `·` `:` `-` |
+| digits | `0x16` `0x17` | ♪ ♡ |
+| lowercase | `0x1A` `0x1B` `0x1C` | `'` `”` `“` |
+| uppercase | `0x1A` | `&` |
+
+There is no `+`, `%` or `/`. Codes `0x18`-`0x1F` (digits) and `0x1D`-`0x1F` (letters) draw nothing.
+
 ## Menu images
 
 The game has 55 menu images (`menu_sprites.png`): a table of sizes (width, height bytes) at `0x8005F014` and of

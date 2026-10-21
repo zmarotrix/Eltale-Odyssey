@@ -11,7 +11,7 @@
 #define SHOP_TEXT_CONDITION 7
 #define ROTATING_SLOTS 3
 #define MAX_STAPLES 4
-#define MAX_POOL 8
+#define MAX_POOL 10
 #define MAX_ROWS (MAX_STAPLES + ROTATING_SLOTS)
 
 // Live NPC slots: 16 x 0x84 bytes; +0x80 points at the NPC's map record (+0x02 text condition, +0x08 text ID).
@@ -72,6 +72,9 @@ static const ItemInfo items[ITEM_COUNT] = {
 };
 
 #define END 0xFF
+// Goods at EQ_BASE and up are the overhaul's equipment (equipment.c), not game items.
+#define EQ_BASE 0x40
+#define EQ(piece) (EQ_BASE + (piece))
 
 typedef struct {
     u16 text_id;      // the shopkeeper's first text ID (NPC record +0x08), from the NPC Locations sheet
@@ -80,22 +83,48 @@ typedef struct {
 } Shop;
 
 static const Shop shops[] = {
-    { 0x1BB0, { FRESH_BREAD, DEW_DROP, WHITE_WINGS, END },                  // Ingram, Melrode
+    { 0x1BB0, { FRESH_BREAD, DEW_DROP, WHITE_WINGS, EQ(EQ_TRAVELERS_ROBE) },                      // Ingram, Melrode
               { HONEY_BREAD, MINT_LEAVES, REPLICA, SILVER_AMULET, YELLOW_WINGS, END } },
-    { 0x36B8, { FRESH_BREAD, HONEY_BREAD, DEW_DROP, YELLOW_WINGS },         // Thom, Dondoran
-              { MINT_LEAVES, HEALING_POTION, REPLICA, SILVER_AMULET, CELINES_BELL, WHITE_WINGS, END } },
-    { 0x5880, { HONEY_BREAD, MINT_LEAVES, BLUE_WINGS, END },                // Jiryo, Larapool
-              { HEALING_POTION, HEROES_DRINK, SILENT_FLUTE, CELINES_BELL, GIANTS_SHOES, SILVER_AMULET, YELLOW_WINGS, END } },
-    { 0x6928, { HONEY_BREAD, MINT_LEAVES, GREEN_WINGS, END },               // Anette, Normoon
-              { HEALING_POTION, HEROES_DRINK, SILENT_FLUTE, CELINES_BELL, GIANTS_SHOES, GOLDEN_AMULET, SPIRIT_LIGHT, BLUE_WINGS } },
-    { 0x7900, { HEALING_POTION, HEROES_DRINK, RED_WINGS, END },             // Ring, Limelin
-              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL, GREEN_WINGS, END } },
-    { 0xB3B0, { HEALING_POTION, HEROES_DRINK, END },                        // Bronze, Greenoch
-              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, REPLICA, RED_WINGS, END } },
-    { 0x87B8, { HEALING_POTION, HEROES_DRINK, BLACK_WINGS, END },           // Tom, Brannoch
-              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL, RED_WINGS, END } },
+    { 0x36B8, { FRESH_BREAD, HONEY_BREAD, YELLOW_WINGS, EQ(EQ_HEAVY_STAFF) },                    // Thom, Dondoran
+              { DEW_DROP, MINT_LEAVES, HEALING_POTION, REPLICA, SILVER_AMULET, CELINES_BELL, WHITE_WINGS,
+                EQ(EQ_EMBER_STAFF), END } },
+    { 0x5880, { HONEY_BREAD, MINT_LEAVES, BLUE_WINGS, END },                                      // Jiryo, Larapool
+              { HEALING_POTION, HEROES_DRINK, SILENT_FLUTE, CELINES_BELL, GIANTS_SHOES, SILVER_AMULET, YELLOW_WINGS,
+                EQ(EQ_STONE_STAFF), EQ(EQ_TRAVELERS_ROBE), END } },
+    { 0x6928, { HONEY_BREAD, MINT_LEAVES, GREEN_WINGS, END },                                     // Anette, Normoon
+              { HEALING_POTION, HEROES_DRINK, SILENT_FLUTE, CELINES_BELL, GIANTS_SHOES, GOLDEN_AMULET, SPIRIT_LIGHT,
+                BLUE_WINGS, EQ(EQ_TIDE_STAFF), EQ(EQ_PILGRIMS_SOUL) } },
+    { 0x7900, { HEALING_POTION, HEROES_DRINK, RED_WINGS, END },                                   // Ring, Limelin
+              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL, GREEN_WINGS,
+                EQ(EQ_GALE_STAFF), EQ(EQ_TIDECLOTH_ROBE), END } },
+    { 0xB3B0, { HEALING_POTION, HEROES_DRINK, END },                                              // Bronze, Greenoch
+              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, REPLICA, RED_WINGS, EQ(EQ_TIDECLOTH_ROBE),
+                EQ(EQ_EMBER_STAFF), END } },
+    { 0x87B8, { HEALING_POTION, HEROES_DRINK, BLACK_WINGS, END },                                 // Tom, Brannoch
+              { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, GIANTS_SHOES, SILENT_FLUTE, CELINES_BELL, RED_WINGS,
+                EQ(EQ_HEAVY_STAFF), EQ(EQ_TIDECLOTH_ROBE), END } },
 };
 #define SHOP_COUNT (sizeof(shops) / sizeof(shops[0]))
+
+static int is_equipment(u8 good) {
+    return good >= EQ_BASE && good != END;
+}
+
+static const char* good_name(u8 good) {
+    return is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->name : items[good].name;
+}
+
+static u32 good_price(u8 good) {
+    return is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->price : items[good].price;
+}
+
+static const char* good_effect(u8 good) {
+    return is_equipment(good) ? eo_equipment_info(good - EQ_BASE)->effect : items[good].effect;
+}
+
+static u32 good_owned(u8 good) {
+    return is_equipment(good) ? (u32)eo_equipment_owned(good - EQ_BASE) : (u32)inventory_count_item(good);
+}
 
 static int shop_for_text(u16 text_id) {
     for (u32 i = 0; i < SHOP_COUNT; i++) {
@@ -256,16 +285,23 @@ static void handle_input(void) {
         cursor = (cursor + 1) % stock_count;
         message_timer = 0;
     } else if (pressed & BTN_A) {
-        u8 item = stock[cursor];
-        if (GOLD < items[item].price) {
+        u8 good = stock[cursor];
+        if (is_equipment(good) && eo_equipment_owned(good - EQ_BASE)) {
+            sfx_play(SFX_CANCEL, 0xFF, 0x40);
+            say_message("You already have one.");
+        } else if (GOLD < good_price(good)) {
             sfx_play(SFX_CANCEL, 0xFF, 0x40);
             say_message("Not enough gold.");
-        } else if (inventory_count_item(INVENTORY_EMPTY) == 0) {
+        } else if (!is_equipment(good) && inventory_count_item(INVENTORY_EMPTY) == 0) {
             sfx_play(SFX_CANCEL, 0xFF, 0x40);
             say_message("You can't carry any more.");
         } else {
-            GOLD -= items[item].price;
-            inventory_add_item(item);
+            GOLD -= good_price(good);
+            if (is_equipment(good)) {
+                eo_equipment_give(good - EQ_BASE);
+            } else {
+                inventory_add_item(good);
+            }
             eo_gold_resync();  // the shop shows the gold itself
             sfx_play(SFX_CONFIRM, 0xFF, 0x40);
             say_message("Thank you.");
@@ -281,16 +317,16 @@ static void draw_shop(void) {
     eo_format_amount(line, "Gold", GOLD, 11, "");
     eo_ui_text(WIN_X + WIN_W - 12 - 11 * 8, TITLE_Y, line);
     for (int i = 0; i < stock_count; i++) {
-        const ItemInfo* item = &items[stock[i]];
+        u8 good = stock[i];
         s32 y = LIST_Y + i * ROW_H;
-        eo_ui_text(NAME_X, y, item->name);
-        eo_format_amount(line, "", item->price, 5, "");
+        eo_ui_text(NAME_X, y, good_name(good));
+        eo_format_amount(line, "", good_price(good), 5, "");
         eo_ui_text(PRICE_X, y, line);
-        eo_format_amount(line, "x", (u32)inventory_count_item(stock[i]), 3, "");
+        eo_format_amount(line, "x", good_owned(good), 3, "");
         eo_ui_text(OWNED_X, y, line);
     }
     s32 info_y = LIST_Y + stock_count * ROW_H + 6;
-    eo_ui_text(WIN_X + 12, info_y, message_timer > 0 ? message : items[stock[cursor]].effect);
+    eo_ui_text(WIN_X + 12, info_y, message_timer > 0 ? message : good_effect(stock[cursor]));
     if (message_timer > 0) {
         message_timer--;
     }

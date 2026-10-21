@@ -216,10 +216,24 @@ RECOMP_HOOK("player_take_damage") void eo_status_before_brian_damage(u16 power, 
 }
 
 RECOMP_HOOK_RETURN("player_take_damage") void eo_status_after_brian_damage(void) {
-    if (poison_pending && BRIAN_HP > 0 && BRIAN_HP < poison_hp_before && get_rand(100) < POISON_CHANCE) {
+    if (poison_pending && BRIAN_HP > 0 && BRIAN_HP < poison_hp_before && !eo_equip_poison_immune() &&
+        get_rand(100) < POISON_CHANCE) {
         poison_turns = POISON_TURNS;
     }
     poison_pending = 0;
+}
+
+void eo_status_add_burn(int slot, u16 amount) {
+    if (slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0) {
+        burn_add_stack(slot, amount);
+    }
+}
+
+// Damage that ignores element and defense (the stand-in attacker), through the game's own damage routine.
+void eo_status_fixed_damage(int slot, u16 amount) {
+    if (slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0 && amount > 0) {
+        enemy_take_damage(slot, amount, ELEMENT_FIRE, DAMAGE_NO_ELEMENT, burn_attacker);
+    }
 }
 
 static void poison_tick(int in_battle) {

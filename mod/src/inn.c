@@ -225,3 +225,7 @@ RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
     eo_ui_text(PRICE_WIN_X + 10, y + 7, line1);
     eo_ui_text(PRICE_WIN_X + 10, y + 21, line2);
 }
+
+int eo_inn_here(void) {
+    return current_inn() >= 0;
+}

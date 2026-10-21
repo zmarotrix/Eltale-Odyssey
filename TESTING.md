@@ -73,9 +73,30 @@ Note: Holy Plains enemies die before they can be Broken; Break matters from toug
       by the end (current numbers allow it only near the end), and can points be refunded?
 - [ ] Existing saves get points for spirits already found and keep the spells their levels already allowed.
 
+## Equipment (new, only partly checked)
+
+**D-pad down** in the field opens the **Equipment** window: staff, robe, charm and sigil slots. You can look
+anywhere but change equipment only at an inn. The charm slot opens after Solvaring, the sigil slot after Zelse.
+
+| Piece | Slot | Effect | Where |
+|---|---|---|---|
+| Heavy Staff | Staff | Staff damage 12 more | Dondoran shop (always) |
+| Ember Staff | Staff | Staff 6 more, Fire 1.1x, staff hits may Burn | Dondoran / Greenoch rotating |
+| Stone / Tide / Gale Staff | Staff | Staff 3 more, Earth / Water / Wind 1.1x | Larapool / Normoon / Limelin rotating |
+| Traveler's Robe | Robe | Defense 4 more | Melrode shop (always), Larapool rotating |
+| Tidecloth Robe | Robe | Defense 8 more, immune to Poison | Limelin / Greenoch / Brannoch rotating |
+| Gambler's Coin | Charm | Each cast costs no MP or double | Solvaring |
+| Pilgrim's Soul | Charm | Spells cost half, staff hits give no MP | Normoon rotating (rare) |
+| Mirror Shard | Charm | The first hit you take each fight is reflected | Guilty |
+| Leech Pillar | Sigil | Water Pillar heals you a quarter of its damage | Zelse |
+| Tidal Echo | Sigil | Water spells cast twice at 0.75x | Nepty |
+
+- Checked by Claude: the Equipment window opens and shows the slots (charm and sigil locked on your save).
+- [ ] Not checked yet: equipping, each effect in battle, buying pieces in shops, boss rewards ("Found ...").
+
 ## Known rough edges
 
 - Burn shows as "B1"-"B3" in the enemy list (checked by Claude, including a Burn tick that kills).
 - The enemy list partly covers the game's own target-name box; the battle UI pass will sort out placement.
-- "!" isn't in the dialogue font table we decoded, so new text avoids it.
+- The dialogue font has no + % or / (full symbol table in research/menus), so effects read like "Fire 1.1x".
 - Changing gold with the dev panel shows up as "Paid"/"Won" in the gold notice.

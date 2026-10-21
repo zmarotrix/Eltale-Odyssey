@@ -123,7 +123,8 @@ void eo_spirits_mark_dirty(void) {
 static int notice_timer = 0;
 static char notice[40];
 
-static void show_notice(const char* a, const char* b) {
+// A short notice at the bottom of the screen: a followed by b (for example "Learned " + a spell name).
+void eo_notice(const char* a, const char* b) {
     eo_append(eo_append(notice, a), b);
     notice_timer = NOTICE_FRAMES;
 }
@@ -144,7 +145,7 @@ RECOMP_HOOK("projectile_init") void eo_spirits_on_projectile(void* caster, u16 s
     SPELL_NAME_TABLES[s][i] = spell_names[s][i];
     char name[24];
     eo_title_case(name, spell_names[s][i], 20);
-    show_notice("Learned ", name);
+    eo_notice("Learned ", name);
     sfx_play(SFX_CONFIRM, 0xFF, 0x40);
 }
 
@@ -161,7 +162,7 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
     if (spirits > gEo.spirits_counted) {
         gEo.spirit_points = (u8)(gEo.spirit_points + (spirits - gEo.spirits_counted));
         gEo.spirits_counted = (u8)spirits;
-        show_notice("Spirit Point gained", "");
+        eo_notice("Spirit Point gained", "");
     }
     if (dirty) {
         apply();
@@ -193,8 +194,13 @@ static int cursor = 0;
 static u16 pressed = 0;
 static int stick_held = 0;
 
+int eo_spirits_window_open(void) {
+    return window_open;
+}
+
 static int field_idle(void) {
-    return gGameMode == 1 && !(gBattleState & 0x1) && !(gGameState & 0x3) && !eo_shop_is_open();
+    return gGameMode == 1 && !(gBattleState & 0x1) && !(gGameState & 0x3) && !eo_shop_is_open() &&
+           !eo_equipment_window_open();
 }
 
 RECOMP_HOOK_RETURN("pad_read") void eo_spirits_read_input(void) {

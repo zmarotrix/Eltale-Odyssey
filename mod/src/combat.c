@@ -54,6 +54,7 @@ enum { FIRE, EARTH, WATER, WIND };
 
 s32 enemy_take_damage(s32 slot, u16 power, u16 element, u16 flags, void* attacker);
 void damage_popup_spawn(void* battle_data, s32 kind, s32 amount);
+s32 get_rand(s32 n);  // 0..n-1
 extern u16 gBattleState;
 extern u16 gPadButtonsNew;
 
@@ -71,6 +72,7 @@ static u8 boost = 0;           // chosen for the next cast
 static u8 spent_last_turn = 0;
 static u8 spent_this_turn = 0;
 static u8 weakness_bonus_given = 0;
+static u8 reflected_this_battle = 0;  // Mirror Shard
 
 // The boost of the spell being cast right now (0 when none), and what was changed for it.
 static u8 active_boost = 0;
@@ -130,6 +132,7 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
     weakness_bonus_given = 0;
     active_boost = 0;
     active_spell = 0;
+    reflected_this_battle = 0;
 }
 
 // ---- Break ----
@@ -154,22 +157,37 @@ static void freeze_enemy(int i, int turns) {
     }
 }
 
-// Hits from Brian: remember the target's HP, count weakness hits.
+// Hits from Brian: remember the target's HP, count weakness hits. The staff calls enemy_take_damage with
+// flags 0x8004; burn ticks and reflected hits use plain 0x8000 and are ignored here.
+#define STAFF_FLAGS 0x8004
+enum { HIT_NONE, HIT_SPELL, HIT_STAFF };
 static int hit_slot = -1;
+static int hit_kind = HIT_NONE;
 static u16 hit_hp;
+static u16 hit_element;
 static u8 hit_was_broken;
+static u16 last_brian_spell = 0xFFFF;
 
 RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u16 power, u16 element, u16 flags, void* attacker) {
     hit_slot = -1;
-    if (!in_battle() || slot < 0 || slot >= MAX_ENEMIES || power == 0 || (flags & 0x8000) ||
-        is_enemy_battle_data(attacker)) {
-        return;  // not a spell from Brian (burn ticks and the staff carry flag 0x8000)
+    hit_kind = HIT_NONE;
+    if (!in_battle() || slot < 0 || slot >= MAX_ENEMIES || power == 0 || is_enemy_battle_data(attacker)) {
+        return;
+    }
+    if (flags & 0x8000) {
+        if (flags != STAFF_FLAGS) {
+            return;
+        }
+        hit_kind = HIT_STAFF;
+    } else {
+        hit_kind = HIT_SPELL;
     }
     hit_slot = slot;
     hit_hp = ENEMY_HP(slot);
+    hit_element = element;
     Guard* g = &guards[slot];
     hit_was_broken = g->broken;
-    if (g->weakness == NO_WEAKNESS || element != g->weakness || g->broken) {
+    if (hit_kind != HIT_SPELL || g->weakness == NO_WEAKNESS || element != g->weakness || g->broken) {
         return;
     }
     g->revealed = 1;
@@ -189,18 +207,69 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
         return;
     }
     u16 hp = ENEMY_HP(slot);
-    // A Broken foe takes 50% more from Brian's hits.
-    if (hit_was_broken && hp > 0 && hp < hit_hp) {
-        u16 extra = (u16)((hit_hp - hp) * BROKEN_BONUS_PERCENT / 100);
-        if (extra > 0) {
-            ENEMY_HP(slot) = extra >= hp ? 0 : (u16)(hp - extra);
-            damage_popup_spawn(ENEMY_BATTLE_DATA(slot), 0, extra);
-        }
+    u32 hit = hp < hit_hp ? (u32)(hit_hp - hp) : 0;
+    if (hit == 0) {
+        return;
+    }
+    // Extra damage on top of the hit: a Broken foe takes 50% more, the staff adds its flat bonus, and a staff
+    // that favours the spell's element adds 10%.
+    u32 extra = 0;
+    if (hit_was_broken) {
+        extra += hit * BROKEN_BONUS_PERCENT / 100;
+    }
+    if (hit_kind == HIT_STAFF) {
+        extra += (u32)eo_equip_staff_bonus();
+    } else if (hit_element < 4) {
+        extra += hit * (u32)eo_equip_element_percent(hit_element) / 100;
+    }
+    if (extra > 0 && hp > 0) {
+        ENEMY_HP(slot) = extra >= hp ? 0 : (u16)(hp - extra);
+        damage_popup_spawn(ENEMY_BATTLE_DATA(slot), 0, (s32)extra);
+    }
+    // Ember Staff: staff hits may set the foe burning.
+    if (hit_kind == HIT_STAFF && ENEMY_HP(slot) > 0 && get_rand(100) < eo_equip_staff_burn_chance()) {
+        eo_status_add_burn(slot, (u16)(hit * 30 / 100 + 1));
+    }
+    // Leech Pillar: Water Pillar (Lv1-3) heals Brian for a quarter of the damage it deals.
+    if (hit_kind == HIT_SPELL && eo_equipment_worn(EQ_LEECH_PILLAR) &&
+        (last_brian_spell == 0x200 || last_brian_spell == 0x201 || last_brian_spell == 0x204)) {
+        u16* stats = (u16*)gPlayerMainData;
+        u32 healed = stats[2] + (hit + extra) / 4;
+        stats[2] = (u16)(healed > stats[3] ? stats[3] : healed);
     }
     // A boosted damaging Water spell freezes its target.
     if (active_boost > 0 && active_school == WATER && ENEMY_HP(slot) > 0) {
         freeze_enemy(slot, active_boost);
     }
+}
+
+// ---- Mirror Shard: the first hit Brian takes in a fight is reflected at the attacker ----
+
+static int mirror_slot = -1;
+static u16 mirror_hp;
+
+RECOMP_HOOK("player_take_damage") void eo_combat_before_brian_damage(u16 power, u16 flags, void* attacker) {
+    mirror_slot = -1;
+    if (!in_battle() || reflected_this_battle || power == 0 || !is_enemy_battle_data(attacker) ||
+        !eo_equipment_worn(EQ_MIRROR_SHARD)) {
+        return;
+    }
+    mirror_slot = (int)(((u32)attacker - 0x24 - ENEMY_SLOTS) / ENEMY_SLOT_SIZE);
+    mirror_hp = ((u16*)gPlayerMainData)[2];
+}
+
+RECOMP_HOOK_RETURN("player_take_damage") void eo_combat_after_brian_damage(void) {
+    if (mirror_slot < 0) {
+        return;
+    }
+    u16* stats = (u16*)gPlayerMainData;
+    if (stats[2] < mirror_hp) {
+        u16 damage = (u16)(mirror_hp - stats[2]);
+        stats[2] = mirror_hp;
+        reflected_this_battle = 1;
+        eo_status_fixed_damage(mirror_slot, damage);
+    }
+    mirror_slot = -1;
 }
 
 // ---- Charge, boost and the turn clock ----
@@ -248,7 +317,11 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
 // Brian launches a spell: spend the chosen boost on it. projectile_init runs for every shot; the boost is
 // applied on the first one of the turn and undone when his turn ends.
 RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 spell) {
-    if (!brians_turn() || is_enemy_battle_data(caster) || boost == 0 || active_spell != 0) {
+    if (is_enemy_battle_data(caster)) {
+        return;
+    }
+    last_brian_spell = spell & 0x0FFF;
+    if (!brians_turn() || active_spell != 0) {
         return;
     }
     u16 school = (spell >> 8) & 0xF;
@@ -257,21 +330,36 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
         return;
     }
     u8* stats = SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE;
+    u16 type = *(u16*)(stats + SPELL_TYPE);
+    int echo = school == WATER && type == SPELL_TYPE_DAMAGE && eo_equipment_worn(EQ_TIDAL_ECHO);
+    if (boost == 0 && !echo) {
+        return;
+    }
     active_spell = stats;
     active_school = (u8)school;
     active_boost = boost;
     saved_base = *(u16*)(stats + SPELL_BASE);
     saved_shots = *(u16*)(stats + SPELL_SHOTS);
-    u16 type = *(u16*)(stats + SPELL_TYPE);
-    if (school == EARTH && type == SPELL_TYPE_DAMAGE) {
-        *(u16*)(stats + SPELL_BASE) = (u16)(saved_base * (100 + 40 * boost) / 100);
-    } else if (school == WATER && type == SPELL_TYPE_HEAL) {
-        *(u16*)(stats + SPELL_BASE) = (u16)(saved_base * (100 + 30 * boost) / 100 + boost);
-    } else if (school == WIND && type == SPELL_TYPE_DAMAGE) {
-        *(u16*)(stats + SPELL_SHOTS) = (u16)(saved_shots + 2 * boost);
+    u16 base = saved_base;
+    u16 shots = saved_shots;
+    if (echo) {
+        // Tidal Echo: every Water spell is cast twice, each at 75%.
+        shots = (u16)(shots * 2);
+        base = (u16)(base * 3 / 4);
     }
-    charge -= boost;
-    spent_this_turn = 1;
+    if (school == EARTH && type == SPELL_TYPE_DAMAGE) {
+        base = (u16)(base * (100 + 40 * boost) / 100);
+    } else if (school == WATER && type == SPELL_TYPE_HEAL) {
+        base = (u16)(base * (100 + 30 * boost) / 100 + boost);
+    } else if (school == WIND && type == SPELL_TYPE_DAMAGE) {
+        shots = (u16)(shots + 2 * boost);
+    }
+    *(u16*)(stats + SPELL_BASE) = base;
+    *(u16*)(stats + SPELL_SHOTS) = shots;
+    if (boost > 0) {
+        charge -= boost;
+        spent_this_turn = 1;
+    }
     boost = 0;
 }
 

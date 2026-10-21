@@ -18,6 +18,10 @@
 #define TEXT_PERIOD      0x10   // in digit mode
 #define TEXT_COMMA       0x11   // in digit mode
 #define TEXT_QUESTION    0x0B   // in digit mode
+#define TEXT_EXCLAMATION 0x0A   // in digit mode
+#define TEXT_COLON       0x14   // in digit mode
+#define TEXT_DASH        0x15   // in digit mode
+#define TEXT_AMPERSAND   0x1A   // in uppercase mode
 #define TEXT_APOSTROPHE  0x1A   // in lowercase mode
 
 // Same commands the dialogue box sends before ui_draw_rect: palette mode on, load the 256-color window palette.
@@ -46,7 +50,7 @@ void eo_ui_window(s32 x, s32 y, s32 w, s32 h) {
 }
 
 // Converts plain text to the game's encoding, without the color/line-start prefix or the end byte; returns
-// the end of the output. Letters, digits, spaces, . , ? and ' are supported; '\n' is a line break and '\f'
+// the end of the output. Letters, digits, spaces and . , ? ! : - ' & are supported; '\n' is a line break and '\f'
 // a page break (waits for A). Codes decoded from the game's own dialogue (research/npcs).
 u8* eo_text_encode(u8* out, const char* text) {
     int mode = 0;
@@ -63,9 +67,13 @@ u8* eo_text_encode(u8* out, const char* text) {
         } else if (c >= '0' && c <= '9') {
             want = TEXT_MODE_DIGITS;
             code = (u8)(c - '0');
-        } else if (c == '.' || c == ',' || c == '?') {
+        } else if (c == '.' || c == ',' || c == '?' || c == '!' || c == ':' || c == '-') {
             want = TEXT_MODE_DIGITS;
-            code = c == '.' ? TEXT_PERIOD : c == ',' ? TEXT_COMMA : TEXT_QUESTION;
+            code = c == '.' ? TEXT_PERIOD : c == ',' ? TEXT_COMMA : c == '?' ? TEXT_QUESTION :
+                   c == '!' ? TEXT_EXCLAMATION : c == ':' ? TEXT_COLON : TEXT_DASH;
+        } else if (c == '&') {
+            want = TEXT_MODE_UPPER;
+            code = TEXT_AMPERSAND;
         } else if (c == '\'') {
             want = TEXT_MODE_LOWER;
             code = TEXT_APOSTROPHE;

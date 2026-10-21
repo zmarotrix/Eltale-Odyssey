@@ -73,7 +73,10 @@ typedef struct {
     u8 pad2;
     u8 tiers[4];           // attuned tier per element, 1-5
     u8 discovered[8];      // 60 bits: school * 15 + index
-    u8 reserved[128];
+    // Equipment (equipment.c)
+    u32 owned_equipment;   // one bit per piece
+    u8 equipped[4];        // staff, robe, charm, sigil: piece + 1, 0 = none
+    u8 reserved[120];
 } EoSaveBlock;
 
 _Static_assert(sizeof(EoSaveBlock) == 160, "the save block must fill the 160 free bytes exactly");
@@ -114,7 +117,35 @@ int eo_combat_active_boost(void);   // Spirit Charge spent on the spell being ca
 int eo_combat_active_school(void);  // its element (0 Fire .. 3 Wind), -1 if none
 
 // ---- Spirits (spirits.c) ----
-void eo_spirits_mark_dirty(void);  // the save block changed: rewrite the spell locks and names
+void eo_spirits_mark_dirty(void);
+void eo_notice(const char* a, const char* b);  // bottom-of-screen notice, a and b joined  // the save block changed: rewrite the spell locks and names
+
+// ---- Equipment (equipment.c) ----
+enum {
+    EQ_EMBER_STAFF, EQ_HEAVY_STAFF, EQ_STONE_STAFF, EQ_TIDE_STAFF, EQ_GALE_STAFF,
+    EQ_TRAVELERS_ROBE, EQ_TIDECLOTH_ROBE,
+    EQ_PILGRIMS_SOUL, EQ_GAMBLERS_COIN, EQ_MIRROR_SHARD,
+    EQ_TIDAL_ECHO, EQ_LEECH_PILLAR,
+    EQUIPMENT_COUNT
+};
+typedef struct {
+    const char* name;
+    u8 slot;          // 0 staff, 1 robe, 2 charm, 3 sigil
+    u16 price;        // in shops; 0 = not sold
+    const char* effect;
+} EquipmentInfo;
+const EquipmentInfo* eo_equipment_info(int piece);
+int eo_equipment_owned(int piece);
+int eo_equipment_worn(int piece);
+void eo_equipment_give(int piece);
+int eo_equipment_window_open(void);
+int eo_equip_staff_bonus(void);
+int eo_equip_element_percent(int element);
+int eo_equip_staff_burn_chance(void);
+int eo_equip_defense(void);
+int eo_equip_poison_immune(void);
+int eo_spirits_window_open(void);
+int eo_inn_here(void);  // standing in one of the 17 inn/save rooms
 
 // ---- Shops (shop.c) ----
 int eo_shop_is_open(void);
@@ -122,6 +153,8 @@ int eo_shop_is_open(void);
 // ---- Status effects (status.c) ----
 void eo_status_cure_poison(void);
 int eo_status_burn_stacks(int enemy_slot);  // 0-3
+void eo_status_add_burn(int enemy_slot, u16 amount);
+void eo_status_fixed_damage(int enemy_slot, u16 amount);  // ignores element and defense
 
 // ---- Gold display (gold.c) ----
 void eo_gold_resync(void);
