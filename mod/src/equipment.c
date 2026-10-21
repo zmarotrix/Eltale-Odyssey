@@ -13,10 +13,10 @@ enum { SLOT_STAFF, SLOT_ROBE, SLOT_CHARM, SLOT_SIGIL, SLOT_COUNT };
 
 static const EquipmentInfo catalog[EQUIPMENT_COUNT] = {
     [EQ_EMBER_STAFF]    = { "Ember Staff",       SLOT_STAFF, 900,  "Fire 1.1x. Hits spread Burn." },
-    [EQ_HEAVY_STAFF]    = { "Heavy Staff",       SLOT_STAFF, 700,  "Staff 12 more." },
-    [EQ_STONE_STAFF]    = { "Stone Staff",       SLOT_STAFF, 800,  "Staff 3 more, Earth 1.1x." },
-    [EQ_TIDE_STAFF]     = { "Tide Staff",        SLOT_STAFF, 800,  "Staff 3 more, Water 1.1x." },
-    [EQ_GALE_STAFF]     = { "Gale Staff",        SLOT_STAFF, 800,  "Staff 3 more, Wind 1.1x." },
+    [EQ_HEAVY_STAFF]    = { "Heavy Staff",       SLOT_STAFF, 700,  "Swings deal 12 more damage." },
+    [EQ_STONE_STAFF]    = { "Stone Staff",       SLOT_STAFF, 800,  "Swings 3 more, Earth 1.1x." },
+    [EQ_TIDE_STAFF]     = { "Tide Staff",        SLOT_STAFF, 800,  "Swings 3 more, Water 1.1x." },
+    [EQ_GALE_STAFF]     = { "Gale Staff",        SLOT_STAFF, 800,  "Swings 3 more, Wind 1.1x." },
     [EQ_TRAVELERS_ROBE] = { "Traveler's Robe",   SLOT_ROBE,  300,  "Defense 4 more." },
     [EQ_TIDECLOTH_ROBE] = { "Tidecloth Robe",    SLOT_ROBE,  1200, "Defense 8 more, no Poison." },
     [EQ_PILGRIMS_SOUL]  = { "Pilgrim's Soul",    SLOT_CHARM, 2500, "Half-cost spells, no staff MP." },
