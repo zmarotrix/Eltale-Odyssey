@@ -231,6 +231,36 @@ void eo_status_add_burn(int slot, u16 amount) {
     }
 }
 
+// Ember Staff flare (playtest, 2026-10-21): a staff hit on a burning foe throws its Burn onto every enemy within
+// FLARE_RADIUS of it, as a stack as strong as the foe's strongest.
+#define FLARE_RADIUS 70.0f   // battle units; a pack's members stand about 20-60 apart
+
+void eo_status_flare(int slot) {
+    if (slot < 0 || slot >= MAX_ENEMIES || burns[slot].turns_left == 0) {
+        return;
+    }
+    u16 strongest = 0;
+    for (int i = 0; i < BURN_STACKS; i++) {
+        if (burns[slot].stacks[i] > strongest) {
+            strongest = burns[slot].stacks[i];
+        }
+    }
+    f32* from = (f32*)(ENEMY_SLOTS + slot * ENEMY_SLOT_SIZE + 0x24);   // battle data: x, y, z
+    eo_fx_flare(slot);
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (i == slot || ENEMY_HP(i) == 0) {
+            continue;
+        }
+        f32* to = (f32*)(ENEMY_SLOTS + i * ENEMY_SLOT_SIZE + 0x24);
+        f32 dx = to[0] - from[0];
+        f32 dz = to[2] - from[2];
+        if (dx * dx + dz * dz <= FLARE_RADIUS * FLARE_RADIUS) {
+            burn_add_stack(i, strongest);
+            eo_fx_burn_hit(i);
+        }
+    }
+}
+
 // Damage that ignores element and defense (the stand-in attacker), through the game's own damage routine.
 void eo_status_fixed_damage(int slot, u16 amount) {
     if (slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0 && amount > 0) {
@@ -310,17 +340,9 @@ RECOMP_HOOK_RETURN("frame_build") void eo_status_frame(void) {
 
 // ---- Display ----
 
-// Brian's poison shows as a drop next to the HUD's HP box (under the charge diamonds in battle); no turn count.
-#define POISON_ICON_X 112
-#define POISON_ICON_Y 24
-#define POISON_ICON_Y_BATTLE 38
-
-RECOMP_HOOK_RETURN("hud_draw_main") void eo_status_draw(void) {
-    if (poison_turns == 0) {
-        return;
-    }
-    eo_icons_begin();
-    eo_icon_draw(ICON_POISON, POISON_ICON_X, (gBattleState & BATTLE_ACTIVE) ? POISON_ICON_Y_BATTLE : POISON_ICON_Y);
+// Brian's poison shows on Brian himself (fx.c), with no icon or turn count.
+int eo_status_poisoned(void) {
+    return poison_turns > 0;
 }
 
 // Set up the stand-in burn attacker once (from main.c).

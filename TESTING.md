@@ -42,8 +42,7 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
 - [x] **Burn visuals**: a burning enemy pulses red; small embers rise from it when burn damage lands (ticks and
       ignition only). (Checked by you.)
 - [ ] **Fire Bomb** on a burning enemy sets off all its remaining Burn at once.
-- [ ] **Poison**: Man Eaters and Bumbershoots can poison you (about 1 hit in 3). a purple drop icon right of the HP
-      bar, 5% max HP per turn for 4 turns, also ticks outside battle, never below 1 HP. Water healing or an inn
+- [ ] **Poison**: Man Eaters and Bumbershoots can poison you (about 1 hit in 3). Brian pulses purple, 5% max HP per turn for 4 turns, also ticks outside battle, never below 1 HP. Water healing or an inn
       night cures it.
 
 ## Spirit Charge, shields and Break (new)
@@ -78,14 +77,19 @@ Note: Holy Plains enemies die before they can be Broken; Break matters from toug
       amounts. (Checked by Claude.)
 - [ ] Shop window: a coin after each price and before your gold (not checked yet).
 
-## Battle display, second pass (new)
+## Battle display: everything on the models (new)
 
-- [ ] **Spell window**: element gem and description; below it the MP cost (red if you can't pay) and, once you
-      pick a Boost (press D-pad up before choosing elements), what it does: "BOOST 2: DAMAGE X1.8",
-      "4 MORE SHOTS", "FREEZES FOR 2 TURNS", "NO EFFECT ON THIS SPELL"... (Checked by Claude.)
-- [ ] **Enemy plates**: a small plate over each enemy with its statuses and its shields as pips (bright = still
-      up, dark = knocked off). Plates that would cover the spell bar hide while you pick a spell. Is showing
-      the shield count OK, or should shields stay hidden too? (Checked by Claude.)
+No floating icons or plates over enemies, and no explanation of what Boost does: find out by trying.
+
+- [ ] **Spell window**: element gem and description, then the MP cost (red if you can't pay). (Checked by Claude.)
+- [ ] **Shield hit**: a weakness hit throws white glints off the enemy; nothing says how many shields are left.
+- [ ] **Broken**: a bigger burst of white and pale gold glints; while Broken the enemy is a little darker, glints
+      drift around its head, and its idle animation crawls at about 1/8 speed. (Checked by Claude, forced.)
+- [ ] **Poisoned** (you): Brian pulses purple, in battle and in the field; no icon. (Checked by Claude, forced;
+      it's subtle, say if it needs to be stronger.)
+- [ ] **Ember Staff flare**: a staff hit sets the enemy burning; a staff hit on an enemy that's already burning
+      flares: embers burst out and its strongest Burn spreads to every enemy within reach (about a pack's
+      width). (Spread checked by Claude with a test trigger; you saw the flare in play.)
 
 ## Smaller windows
 
@@ -115,7 +119,7 @@ anywhere but change equipment only at an inn. The charm slot opens after Solvari
 | Piece | Slot | Effect | Where |
 |---|---|---|---|
 | Heavy Staff | Staff | Staff damage 12 more | Dondoran shop (always) |
-| Ember Staff | Staff | Staff 6 more, Fire 1.1x, staff hits may Burn | Dondoran / Greenoch rotating |
+| Ember Staff | Staff | Staff 6 more, Fire 1.1x; hits Burn, and flare (spread Burn) on a burning foe | Dondoran / Greenoch rotating |
 | Stone / Tide / Gale Staff | Staff | Staff 3 more, Earth / Water / Wind 1.1x | Larapool / Normoon / Limelin rotating |
 | Traveler's Robe | Robe | Defense 4 more | Melrode shop (always), Larapool rotating |
 | Tidecloth Robe | Robe | Defense 8 more, immune to Poison | Limelin / Greenoch / Brannoch rotating |

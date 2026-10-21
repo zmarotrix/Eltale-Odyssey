@@ -12,7 +12,7 @@
 enum { SLOT_STAFF, SLOT_ROBE, SLOT_CHARM, SLOT_SIGIL, SLOT_COUNT };
 
 static const EquipmentInfo catalog[EQUIPMENT_COUNT] = {
-    [EQ_EMBER_STAFF]    = { "Ember Staff",       SLOT_STAFF, 900,  "Staff 6 more, Fire 1.1x, Burns." },
+    [EQ_EMBER_STAFF]    = { "Ember Staff",       SLOT_STAFF, 900,  "Fire 1.1x. Hits spread Burn." },
     [EQ_HEAVY_STAFF]    = { "Heavy Staff",       SLOT_STAFF, 700,  "Staff 12 more." },
     [EQ_STONE_STAFF]    = { "Stone Staff",       SLOT_STAFF, 800,  "Staff 3 more, Earth 1.1x." },
     [EQ_TIDE_STAFF]     = { "Tide Staff",        SLOT_STAFF, 800,  "Staff 3 more, Water 1.1x." },
@@ -65,10 +65,6 @@ int eo_equip_element_percent(int element) {
     int favoured = staff == EQ_EMBER_STAFF ? 0 : staff == EQ_STONE_STAFF ? 1 : staff == EQ_TIDE_STAFF ? 2 :
                    staff == EQ_GALE_STAFF ? 3 : -1;
     return favoured == element ? 10 : 0;
-}
-
-int eo_equip_staff_burn_chance(void) {
-    return worn_in(SLOT_STAFF) == EQ_EMBER_STAFF ? 10 : 0;
 }
 
 int eo_equip_defense(void) {

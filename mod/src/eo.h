@@ -152,6 +152,11 @@ s32 eo_strlen(const char* text);  // characters in a zero-terminated string
 
 // ---- Burn visuals (fx.c) ----
 void eo_fx_burn_hit(int enemy_slot);  // flames rise from the enemy for a moment
+void eo_fx_shield_hit(int enemy_slot, int broke);  // glints fly off the enemy (more when it breaks)
+void eo_fx_flare(int enemy_slot);     // a ring of embers bursting out from the enemy
+void eo_status_flare(int enemy_slot); // Ember Staff: spread the enemy's Burn to those around it
+int eo_combat_broken(int enemy_slot);
+int eo_status_poisoned(void);
 void eo_fx_update(void);              // every frame in battle
 
 // ---- Equipment (equipment.c) ----
@@ -175,7 +180,6 @@ void eo_equipment_give(int piece);
 int eo_equipment_window_open(void);
 int eo_equip_staff_bonus(void);
 int eo_equip_element_percent(int element);
-int eo_equip_staff_burn_chance(void);
 int eo_equip_defense(void);
 int eo_equip_poison_immune(void);
 int eo_spirits_window_open(void);
