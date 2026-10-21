@@ -1,5 +1,6 @@
-# Ember Staff flare test: equips the Ember Staff (RAM only), burns enemy 0, puts it in front of Brian with enemy 1
-# just behind it, swings the staff, and logs HP, burns and the debug counters.
+# Ember Staff flare test setup: equips the Ember Staff (RAM only), burns enemy 0, moves it in front of Brian with
+# enemy 1 just behind it, swings the staff, and logs HP and burns. Moving an enemy in memory doesn't always put it in
+# the staff's reach; when the swing misses, the turn simply ends.
 $s = $PSScriptRoot
 $h = @{ "X-Q64-Dev" = "1" }
 function m($a, $n) { ((Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:43064/api/mem?addr=0x$a&len=$n" -Headers $h).Content | ConvertFrom-Json).hex }
@@ -7,7 +8,7 @@ function wr($a, $hex) { $n = [Convert]::ToUInt32($a, 16); Invoke-WebRequest -Use
 function f($hex) { [BitConverter]::ToSingle([BitConverter]::GetBytes([Convert]::ToUInt32($hex, 16)), 0) }
 function fh([single]$v) { ([BitConverter]::ToUInt32([BitConverter]::GetBytes($v), 0)).ToString("x8") }
 function sym($name) { $map = Get-Content "G:\Projects\Quest 64 PC\Eltale-Odyssey\mod\build\mod.map"; (($map | Select-String " $name$").Line -split '\s+')[0] }
-$geo = sym "gEo"; $burns = sym "burns"; $dbg = sym "eo_debug_flares"
+$geo = sym "gEo"; $burns = sym "burns"
 for ($i = 0; $i -lt 40; $i++) { if ((m "8008C592" 2) -eq "0001") { break }; Start-Sleep -Milliseconds 250 }
 "state " + (m "8008C592" 2)
 wr (([Convert]::ToUInt32($geo, 16) + 36).ToString("x8")) "01"
@@ -21,7 +22,7 @@ Start-Sleep -Milliseconds 200
 & "$s\inp.ps1" "A@300" | Out-Null
 $last = ""
 foreach ($k in 1..40) {
-    $line = "hp0 " + (m "8007C9A2" 2) + " hp1 " + (m "8007CACA" 2) + " burns " + (m $burns 16) + " flares " + (m $dbg 8) + " last " + (m (sym "eo_debug_last_hit") 16)
+    $line = "hp0 " + (m "8007C9A2" 2) + " hp1 " + (m "8007CACA" 2) + " burns " + (m $burns 16)
     if ($line -ne $last) { "t$k $line"; $last = $line }
     if ($k -eq 6) { & "$s\shot.ps1" "$s\flare.png" | Out-Null }
     Start-Sleep -Milliseconds 50
