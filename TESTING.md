@@ -177,6 +177,8 @@ sparkle floats over the target. Z doesn't swing or cast while the talent is lear
 **Gear colors**: Brian's cape takes his robe's color (none: red, Traveler's Robe: brown, Tidecloth Robe: deep
 blue) and his staff its staff's (starting staff: wood, Ember: red-orange, Heavy: iron grey, Stone: amber, Tide:
 blue, Gale: green). Checked by Claude: Tide Staff + Tidecloth Robe. Swap gear at an inn to see the others.
+The red collar on Brian's chest follows the robe too, and the gem in its middle follows the charm (Pilgrim's Soul
+green, Gambler's Coin gold, Mirror Shard violet; no charm keeps the game's). Checked by Claude in memory only.
 
 - [ ] **Wool Cloak** from the shepherd's hut chest ("Brian found a Wool Cloak!"; checked by Claude). Saves that
       already opened that chest get the cloak on load.

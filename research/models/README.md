@@ -29,7 +29,10 @@ Findings from the burn and Break visuals (2026-10-20/21). Function names are in 
   tile word `07010140`) then the head (`0x80209540`, 16 x 32, tile word `07054140`). Other parts of Brian share the
   shaft's tile layout (`0x80207D60`), so find the head first and take the shaft load just before it.
 - Cape pieces: the SetPrimColor comes a few commands after the combine (texture and vertex loads in between).
-- appearance.c recolors both from Brian's equipment.
+- **Collar and chest gem**: the chest bone loads the gem (`0x80207F60`, RGBA16 16 x 16, tile `07010040`) and right
+  after it the red collar (`0x80208160`, RGBA16 24 x 16, timg `FD100017`, tile `07050150`). The white shirt is
+  `0x80207D60`.
+- appearance.c recolors the cape, staff, collar and gem from Brian's equipment.
 
 ## Particles
 
