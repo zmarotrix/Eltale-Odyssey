@@ -40,6 +40,20 @@ RECOMP_HOOK_RETURN("pad_read") void eo_sound_test_input(void) {
     gPadButtonsNew &= (u16)~(BTN_DUP | BTN_DLEFT | BTN_DRIGHT | 0x0400);
 }
 
+// The dev panel's Sounds tab (Quest64-Recomp assets/devpanel) asks for a sound by writing SOUND_REQUEST_TAG | id
+// here; it's played on the next frame and cleared. In the console's spare 4 MB (see icons.c), never used by the game.
+#define SOUND_MAILBOX ((volatile u32*)0x807F1F00)
+#define SOUND_REQUEST_TAG 0x534E0000   // "SN"
+
+RECOMP_HOOK_RETURN("frame_build") void eo_sound_test_mailbox(void) {
+    u32 request = *SOUND_MAILBOX;
+    if ((request & 0xFFFF0000) == SOUND_REQUEST_TAG) {
+        *SOUND_MAILBOX = 0;
+        sound = (int)(request & 0xFF);
+        sfx_play(sound, 0xFF, 0x40);
+    }
+}
+
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_sound_test_draw(void) {
     if (!showing) {
         return;
