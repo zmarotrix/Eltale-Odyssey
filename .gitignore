@@ -8,3 +8,6 @@
 # Build output
 build/
 __pycache__/
+
+# Test screenshots show game graphics: never commit them
+tools/test/*.png
