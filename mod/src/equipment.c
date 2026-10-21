@@ -12,11 +12,11 @@
 enum { SLOT_STAFF, SLOT_ROBE, SLOT_CHARM, SLOT_SIGIL, SLOT_COUNT };
 
 static const EquipmentInfo catalog[EQUIPMENT_COUNT] = {
-    [EQ_EMBER_STAFF]    = { "Ember Staff",       SLOT_STAFF, 900,  "Fire 1.1x. Hits spread Burn." },
+    [EQ_EMBER_STAFF]    = { "Ember Staff",       SLOT_STAFF, 900,  "Fire 1.1x. Swings spread Burn." },
     [EQ_HEAVY_STAFF]    = { "Heavy Staff",       SLOT_STAFF, 700,  "Swings deal 12 more damage." },
-    [EQ_STONE_STAFF]    = { "Stone Staff",       SLOT_STAFF, 800,  "Swings 3 more, Earth 1.1x." },
-    [EQ_TIDE_STAFF]     = { "Tide Staff",        SLOT_STAFF, 800,  "Swings 3 more, Water 1.1x." },
-    [EQ_GALE_STAFF]     = { "Gale Staff",        SLOT_STAFF, 800,  "Swings 3 more, Wind 1.1x." },
+    [EQ_STONE_STAFF]    = { "Stone Staff",       SLOT_STAFF, 800,  "Earth 1.1x. Swings: +3 defense." },
+    [EQ_TIDE_STAFF]     = { "Tide Staff",        SLOT_STAFF, 800,  "Water 1.1x. Swings heal you." },
+    [EQ_GALE_STAFF]     = { "Gale Staff",        SLOT_STAFF, 800,  "Wind 1.1x. Move 30% farther." },
     [EQ_TRAVELERS_ROBE] = { "Traveler's Robe",   SLOT_ROBE,  300,  "Defense 4 more." },
     [EQ_TIDECLOTH_ROBE] = { "Tidecloth Robe",    SLOT_ROBE,  1200, "Defense 8 more, no Poison." },
     [EQ_PILGRIMS_SOUL]  = { "Pilgrim's Soul",    SLOT_CHARM, 2500, "Half-cost spells, no staff MP." },
@@ -84,7 +84,7 @@ int eo_equip_staff_bonus(void) {
         case EQ_HEAVY_STAFF: return 12;
         case EQ_STONE_STAFF:
         case EQ_TIDE_STAFF:
-        case EQ_GALE_STAFF: return 3;
+        case EQ_GALE_STAFF: return 6;   // the four element staves alike (playtest, 2026-10-21)
         case EQ_TITAN_STAFF: return 30;
         case EQ_PHOENIX_STAFF:
         case EQ_LEVIATHAN_STAFF:
@@ -137,10 +137,15 @@ int eo_equip_poison_immune(void) {
 // ---- Robe defense: added to Brian's battle copy of Defense when a battle starts ----
 
 #define BRIAN_BATTLE_DEFENSE (*(u16*)0x8007BBC0)
+#define BRIAN_MOVE_MULTIPLIER (*(f32*)0x8007BBC8)   // 1.0 from brian_battle_init
 
 RECOMP_HOOK_RETURN("player_battle_init") void eo_equipment_on_battle_init(void) {
     // Robes, and Earth's Stoneskin talent (2 a rank).
     BRIAN_BATTLE_DEFENSE = (u16)(BRIAN_BATTLE_DEFENSE + eo_equip_defense() + 2 * eo_talent(TALENT_STONESKIN));
+    // Gale Staff: Brian moves 30% farther each turn.
+    if (worn_in(SLOT_STAFF) == EQ_GALE_STAFF) {
+        BRIAN_MOVE_MULTIPLIER *= 1.3f;
+    }
 }
 
 // ---- Slots open with the story ----

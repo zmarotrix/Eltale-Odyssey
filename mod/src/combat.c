@@ -28,6 +28,9 @@
 #define AFTERSHOCK_PERCENT 10      // on top of Earth Boost's 40 per charge
 #define CYCLONE_CHANCE 5
 #define STONE_MEMORY_PERCENT 15
+#define STONE_GUARD_STEP 3
+#define STONE_GUARD_MAX 12
+#define BRIAN_DEFENSE_NOW (*(u16*)0x8007BBC0)   // in-battle defense
 #define PRISM_PERCENT 20
 #define GLASS_PERCENT 25
 #define STOKE_FRESH_PERCENT 70     // a stoking Fire spell on a foe that isn't burning
@@ -92,6 +95,7 @@ static u32 turn_swing_used = 0;       // turns_taken + 1 when Brian last swung (
 static u8 earth_streak = 0;           // Earth spells cast in a row (Stone Memory)
 static u8 last_cast_school = 0xFF;    // element of Brian's last spell (Prism Sigil)
 static u8 element_changed = 0;
+static u8 stone_guard = 0;            // defense the Stone Staff has added this fight
 
 // The boost of the spell being cast right now (0 when none), and what was changed for it.
 static u8 active_boost = 0;
@@ -170,6 +174,7 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
     earth_streak = 0;
     last_cast_school = 0xFF;
     element_changed = 0;
+    stone_guard = 0;
     boost = 0;
     spent_last_turn = spent_this_turn = 0;
     weakness_bonus_given = 0;
@@ -419,9 +424,9 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
         shown += dealt;   // one number for the whole hit
     }
     set_popup(slot, shown, buffed ? POPUP_BUFFED : weakened ? POPUP_WEAKENED : POPUP_PLAIN);
-    // Ember Staff: a staff hit sets the foe burning; on a foe already burning it flares instead, spreading the
-    // Burn to the enemies around it (status.c).
-    // Firebrand: any staff sets foes burning (only the Ember Staff flares).
+    // Ember Staff: a staff hit on a burning foe detonates it, spreading the Burn to the enemies around it (status.c);
+    // it never starts a Burn itself (playtest, 2026-10-21: it was far ahead of the other element staves).
+    // Phoenix Staff and Firebrand: staff hits set foes burning.
     if (hit_kind == HIT_STAFF && turn_swing_used != turns_taken + 1) {
         turn_swing_used = turns_taken + 1;   // the first swing this turn
         if (eo_equipment_worn(EQ_SPELLSTRIKE)) {
@@ -431,14 +436,24 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
             crack_shields(slot, 1);   // Titan Staff
         }
     }
-    if (hit_kind == HIT_STAFF && (eo_equipment_worn(EQ_EMBER_STAFF) || eo_equipment_worn(EQ_PHOENIX_STAFF) ||
-                                  eo_talent(TALENT_FIREBRAND))) {
+    if (hit_kind == HIT_STAFF) {
         if (eo_status_burn_stacks(slot) > 0) {
             if (eo_equipment_worn(EQ_EMBER_STAFF)) {
                 eo_status_flare(slot);
             }
-        } else if (ENEMY_HP(slot) > 0) {
+        } else if (ENEMY_HP(slot) > 0 && (eo_equipment_worn(EQ_PHOENIX_STAFF) || eo_talent(TALENT_FIREBRAND))) {
             eo_status_add_burn(slot, (u16)(hit * (u32)eo_status_burn_percent() / 100 + 1));
+        }
+        // Stone Staff: every swing hardens Brian, +3 defense for the rest of the fight (up to +12).
+        if (eo_equipment_worn(EQ_STONE_STAFF) && stone_guard < STONE_GUARD_MAX) {
+            stone_guard = (u8)(stone_guard + STONE_GUARD_STEP);
+            BRIAN_DEFENSE_NOW = (u16)(BRIAN_DEFENSE_NOW + STONE_GUARD_STEP);
+        }
+        // Tide Staff: swings heal Brian for half the damage they deal.
+        if (eo_equipment_worn(EQ_TIDE_STAFF)) {
+            u16* stats = (u16*)gPlayerMainData;
+            u32 healed = stats[2] + (shown + 1) / 2;
+            stats[2] = (u16)(healed > stats[3] ? stats[3] : healed);
         }
     }
     // Leech Pillar: Water Pillar (Lv1-3) heals Brian for a quarter of the damage it deals.

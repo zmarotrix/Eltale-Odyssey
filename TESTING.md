@@ -204,8 +204,10 @@ anywhere but change equipment only at an inn. The charm slot opens after Solvari
 | Piece | Slot | Effect | Where |
 |---|---|---|---|
 | Heavy Staff | Staff | Staff damage 12 more | Dondoran shop (always) |
-| Ember Staff | Staff | Staff 6 more, Fire 1.1x; hits Burn, and flare (spread Burn) on a burning foe | Dondoran / Greenoch rotating |
-| Stone / Tide / Gale Staff | Staff | Staff 3 more, Earth / Water / Wind 1.1x | Larapool / Normoon / Limelin rotating |
+| Ember Staff | Staff | Swings 6 more, Fire 1.1x; a swing on a burning foe detonates it, spreading its Burn (no longer starts a Burn) | Dondoran / Greenoch rotating |
+| Stone Staff | Staff | Swings 6 more, Earth 1.1x; each swing +3 defense for the fight (up to +12) | Larapool rotating |
+| Tide Staff | Staff | Swings 6 more, Water 1.1x; swings heal you for half their damage | Normoon rotating |
+| Gale Staff | Staff | Swings 6 more, Wind 1.1x; move 30% farther in battle | Limelin rotating |
 | Traveler's Robe | Robe | Defense 4 more | Melrode shop (always), Larapool rotating |
 | Tidecloth Robe | Robe | Defense 8 more, immune to Poison | Limelin / Greenoch / Brannoch rotating |
 | Gambler's Coin | Charm | Each cast costs no MP or double | Solvaring |
@@ -263,6 +265,14 @@ Tier gates now match the level vanilla needed for each tier's first spell: Lv 7 
 3 / 6 / 10 / 15 Spirit Points (was Lv 6 / 14 / 22 / 30 for 2 / 4 / 7 / 10). One element to tier 5 is 34 points;
 the game has 98 and talents share them. Tiers you already attuned stay attuned.
 Epicentre no longer makes a Broken boss lose two turns (bosses lose one, like Freeze).
+
+## Element staves (changed)
+
+The Ember Staff was far ahead of the other three, so all four now give swings +6 and their element 1.1x, plus a
+perk each (table above). Detonations (Ember Staff swings and Wildfire) play the Ember spell's sound (0x0F).
+- Checked by Claude in battle: Gale move 1.3x; Stone defense 5 to 17 over four hits (capped); Tide healed 5 from a
+  10-damage swing; an Ember swing on a burning foe spread a Burn stack to the foe next to it. The sound wasn't
+  heard (no audio in tests).
 
 ## Balance pass (new, 2026-10-21)
 

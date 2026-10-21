@@ -1,4 +1,4 @@
-# Ember Staff flare test setup: equips the Ember Staff (RAM only), burns enemy 0, moves it in front of Brian with
+# Ember Staff detonation test setup: equips the Ember Staff (RAM only), burns enemy 0, moves it in front of Brian with
 # enemy 1 just behind it, swings the staff, and logs HP and burns. Moving an enemy in memory doesn't always put it in
 # the staff's reach; when the swing misses, the turn simply ends.
 $s = $PSScriptRoot
@@ -12,7 +12,7 @@ $geo = sym "gEo"; $burns = sym "burns"
 for ($i = 0; $i -lt 40; $i++) { if ((m "8008C592" 2) -eq "0001") { break }; Start-Sleep -Milliseconds 250 }
 "state " + (m "8008C592" 2)
 wr (([Convert]::ToUInt32($geo, 16) + 36).ToString("x8")) "01"
-wr $burns "0003000000000300"
+wr $burns "00030000000000000300"   # stacks[4] (u16), turns_left 3, fresh 0
 $b = m "8007BACC" 12; $bx = f $b.Substring(0, 8); $bz = f $b.Substring(16, 8)
 $e = m "8007C9BC" 12; $ex = f $e.Substring(0, 8); $ez = f $e.Substring(16, 8)
 $d = [math]::Sqrt(($ex - $bx) * ($ex - $bx) + ($ez - $bz) * ($ez - $bz)); $ux = ($ex - $bx) / $d; $uz = ($ez - $bz) / $d

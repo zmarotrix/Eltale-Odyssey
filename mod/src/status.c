@@ -27,6 +27,7 @@
 #define FANNED_PERCENT 5     // more per Fanned Flames rank
 #define CONFLAGRATION_PERCENT 25
 #define WILDFIRE_PERCENT 50  // of the dying foe's strongest stack, per rank
+#define SFX_DETONATE 0x0F     // the Ember spell's own sound (playtest, 2026-10-21)
 #define FLARE_RADIUS 70.0f   // battle units; a pack's members stand about 20-60 apart
 #define BURN_TURNS 3
 #define POISON_TURNS 4
@@ -310,6 +311,7 @@ void eo_status_flare(int slot) {
         return;
     }
     eo_fx_flare(slot);
+    eo_sfx(SFX_DETONATE);
     spread_burn(slot, strongest_stack(slot));
 }
 
@@ -321,6 +323,7 @@ static void wildfire(int slot) {
         return;
     }
     eo_fx_flare(slot);
+    eo_sfx(SFX_DETONATE);
     spread_burn(slot, amount);
 }
 
