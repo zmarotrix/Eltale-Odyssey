@@ -112,6 +112,16 @@ static const Shop shops[] = {
 };
 #define SHOP_COUNT (sizeof(shops) / sizeof(shops[0]))
 
+// Restocks by beat (pacing plan, "Gold and shops"): after Zelse, Melrode and Dondoran carry the long road's goods;
+// after Shilf, the four early towns carry the late game's. Added to the shop's rotating pool, so they still
+// compete for the daily slots.
+s32 boss_is_defeated(s32 boss);
+#define BOSS_ZELSE 1
+#define BOSS_SHILF 3
+#define RESTOCK_SHOPS 4   // the first four shops: Melrode, Dondoran, Larapool, Normoon
+static const u8 restock_zelse[] = { HEALING_POTION, HEROES_DRINK, GIANTS_SHOES, END };
+static const u8 restock_shilf[] = { SPIRIT_LIGHT, DRAGONS_POTION, GOLDEN_AMULET, END };
+
 // How many of each good a shop has each day (playtest, 2026-10-21: "items should be limited per day, especially
 // mana and HP recovery"). Equipment: one.
 static const u8 daily_stock[ITEM_COUNT] = {
@@ -184,11 +194,34 @@ static void build_stock(int shop) {
     for (int i = 0; i < MAX_STAPLES && s->staples[i] != END; i++) {
         stock[stock_count++] = s->staples[i];
     }
+    u8 pool[MAX_POOL + 6];
     int pool_size = 0;
     while (pool_size < MAX_POOL && s->pool[pool_size] != END) {
+        pool[pool_size] = s->pool[pool_size];
         pool_size++;
     }
-    u8 picked[MAX_POOL] = { 0 };
+    const u8* extras[2] = { 0, 0 };
+    if (shop < 2 && boss_is_defeated(BOSS_ZELSE)) {
+        extras[0] = restock_zelse;
+    }
+    if (shop < RESTOCK_SHOPS && boss_is_defeated(BOSS_SHILF)) {
+        extras[1] = restock_shilf;
+    }
+    for (int e = 0; e < 2; e++) {
+        for (int k = 0; extras[e] != 0 && extras[e][k] != END; k++) {
+            int have = 0;   // skip what the shop already sells
+            for (int j = 0; j < pool_size; j++) {
+                have |= pool[j] == extras[e][k];
+            }
+            for (int j = 0; j < stock_count; j++) {
+                have |= stock[j] == extras[e][k];
+            }
+            if (!have && pool_size < MAX_POOL + 6) {
+                pool[pool_size++] = extras[e][k];
+            }
+        }
+    }
+    u8 picked[MAX_POOL + 6] = { 0 };
     u32 seed = (u32)(shop + 1) * 7919u + (u32)gCurrentDay * 104729u;
     for (int n = 0; n < ROTATING_SLOTS && n < pool_size; n++) {
         int pick = (int)(next_random(&seed) % (u32)pool_size);
@@ -196,7 +229,7 @@ static void build_stock(int shop) {
             pick = (pick + 1) % pool_size;
         }
         picked[pick] = 1;
-        stock[stock_count++] = s->pool[pick];
+        stock[stock_count++] = pool[pick];
     }
 }
 

@@ -246,6 +246,15 @@ you can already cast but haven't discovered (lowest tier first): the shopkeeper 
 EARTH EARTH") and the notice says "Learned ...". With nothing left to teach, the shop refuses the sale.
 - Checked by Claude: Melrode, bought with 1000 gold set in RAM; it taught Boulder (game closed, not saved).
 
+## Restocks by beat (new)
+
+After Zelse, Melrode and Dondoran can roll Healing Potions, Heroes Drinks and Giant's Shoes; after Shilf, Melrode,
+Dondoran, Larapool and Normoon can roll Spirit Light, Dragon's Potion and Golden Amulets. They join the rotating
+pool, so they still compete for the three daily slots.
+- Checked by Claude: shelves unchanged on a save before Zelse. Not yet seen after a boss.
+- Rough edge: on the day you beat the boss, a shop you already visited that day may show counts for the old
+  shelf until the next morning.
+
 ## Attunement tiers (changed)
 
 Tier gates now match the level vanilla needed for each tier's first spell: Lv 7 / 16 / 25 / 36, costing
