@@ -69,6 +69,15 @@ them yourself. For now the weakness is always the element opposite the monster's
 
 Note: Holy Plains enemies die before they can be Broken; Break matters from tougher areas on.
 
+## Icons in the windows (new)
+
+- [ ] Spirits window: element gems, five tier pips per element (purple = attuned), points as a purple pip; the
+      next-tier line is green when you meet it, red when you don't. (Checked by Claude.)
+- [ ] Equipment window: slot icons (staff, robe, charm, sigil), a lock on closed slots. (Checked by Claude.)
+- [ ] Gold notice: coin and total, the change in green (won) or red (spent). Inn price window: coins after the
+      amounts. (Checked by Claude.)
+- [ ] Shop window: a coin after each price and before your gold (not checked yet).
+
 ## Smaller windows
 
 - [ ] Shop, Spirits, Equipment, the inn's price window and the gold notice now use the HUD's small font, so they
