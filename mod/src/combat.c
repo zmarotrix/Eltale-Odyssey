@@ -235,10 +235,14 @@ static void break_enemy(int i) {
 #define SFX_SHIELD_HIT 0x27
 
 // A boss's new weakness: a random element other than its own and the one it had, hidden again until hit. Guilty and
-// Mammon (no element, so no weakness at first) can gain one this way.
+// Mammon have no element and never get a weakness (playtest, 2026-10-21): their shields only fall to other means
+// (Titan Staff, Cyclone, Glacier), or the fight is won without Breaking them.
 static void reroll_weakness(int i) {
     Guard* g = &guards[i];
     u16 own = ENEMY_RECORD(i) != 0 ? *(u16*)(ENEMY_RECORD(i) + RECORD_ELEMENT) : 0xFF;
+    if (g->weakness == NO_WEAKNESS || own >= 4) {
+        return;
+    }
     int next;
     do {
         next = get_rand(4);

@@ -272,8 +272,8 @@ From the design rule that every boss uses at least three tricks (game design doc
 from becoming a rotation"):
 - **Growing shields** (already in): a boss gets one more shield each time it comes back from a Break.
 - **Weakness re-roll**: every boss starts with its usual weakness; each time it comes back from a Break there's a
-  50% chance it rolls a new one (never its own element), hidden again until you hit it. Guilty and Mammon start
-  with none and can gain one this way.
+  50% chance it rolls a new one (never its own element), hidden again until you hit it. Guilty and Mammon have no
+  weakness and never get one: Break them with the Titan Staff, Cyclone or Glacier, or win without Breaking.
 - **Adaptation**: casting the same element 4 or more times in a row, the boss takes 40% less from it (blue number)
   until you cast a different element. Three in a row is free, so Stone Memory still reaches +30%.
 - **Random attacks** (the game's own boss AI).
