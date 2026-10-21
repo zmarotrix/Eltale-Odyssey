@@ -23,7 +23,7 @@
 #define MAX_ENEMIES 6
 #define BURN_STACKS 4        // room for Inferno's fourth; 3 without it
 #define BASE_BURN_STACKS 3
-#define BURN_PERCENT 30
+#define BURN_PERCENT 20      // per stack per turn (30 made Fire the best boss damage by far; balance pass)
 #define FANNED_PERCENT 5     // more per Fanned Flames rank
 #define CONFLAGRATION_PERCENT 25
 #define WILDFIRE_PERCENT 50  // of the dying foe's strongest stack, per rank

@@ -45,7 +45,7 @@ static const TalentInfo talents[TALENT_COUNT] = {
     [TALENT_UNDERCURRENT]   = { "Undercurrent",   2, 25, 3, RANK_COST, "WATER SPELLS MAY COST NO MP." },
     [TALENT_GLACIER]        = { "Glacier",        2, 30, 1, CAPSTONE_COST, "FREEZING A FOE CRACKS A SHIELD." },
     // Wind: many hits, charge and statuses
-    [TALENT_CROSSWIND]      = { "Crosswind",      3, 1,  2, RANK_COST, "WIND BOOST: 1 MORE SHOT A RANK." },
+    [TALENT_CROSSWIND]      = { "Crosswind",      3, 1,  2, RANK_COST, "WIND BOOST GIVES MORE SHOTS." },
     [TALENT_LOCK_ON]        = { "Lock-On",        3, 3,  1, RANK_COST, "HOLD Z TO LOCK ON. TAP TO SWITCH." },
     [TALENT_TAILWIND]       = { "Tailwind",       3, 6,  2, RANK_COST, "MORE CHARGE FROM WEAK HITS." },
     [TALENT_SHIFTING_WINDS] = { "Shifting Winds", 3, 10, 1, RANK_COST, "YOUR STATUSES IGNORE THE LIMIT." },

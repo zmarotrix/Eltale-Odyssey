@@ -207,12 +207,53 @@ anywhere but change equipment only at an inn. The charm slot opens after Solvari
 | Gambler's Coin | Charm | Each cast costs no MP or double | Solvaring |
 | Pilgrim's Soul | Charm | Spells cost half, staff hits give no MP | Normoon rotating (rare) |
 | Mirror Shard | Charm | The first hit you take each fight is reflected | Guilty |
-| Leech Pillar | Sigil | Water Pillar heals you a quarter of its damage | Zelse |
-| Tidal Echo | Sigil | Water spells cast twice at 0.75x | Nepty |
+| Leech Pillar | Sigil | Water Pillar heals you a quarter of its damage | Blue Cave chest #3 (was Heroes Drink) |
+| Tidal Echo | Sigil | Water spells cast twice at 0.65x | Nepty |
 | Wool Cloak | Robe | Defense 2 more, Wind 1.1x, cream cape | Chest in Melrode's shepherd's hut (was Fresh Bread) |
+| Gale Tether | Sigil | Wind spells fire one more shot | Zelse |
+| Lead Mantle | Robe | Defense 10 more, Earth 1.1x | Glencoe Forest cabin chest (was Silent Flute) |
+| Glass Charm | Charm | Deal and take 25% more damage | Cull Hazard chest #5 (was Silent Flute) |
+| Stone Memory | Sigil | Earth spells cast in a row: +15% each, up to +30% | Isle of Skye ship chest (was Dragon's Potion) |
+| Hunter's Charm | Charm | Battles pay half again in gold | Dindom Dries hut chest (was Giant's Shoes) |
+| Spellstrike | Charm | First staff swing each turn gives a charge | Limelin Castle treasury chest #1 (was Silver Amulet) |
+| Prism Staff | Staff | Staff 6 more, all magic 1.1x | Limelin Castle treasury chest #2 (was Celine's Bell) |
+| Ember Heart | Sigil | Kindling adds one more Burn stack | Shamwood, Lavaar's room chest (was Golden Amulet) |
+| Mountain Staff | Staff | Staff 8 more, Earth 1.25x, Earth weakness hits take 2 shields | Baragoon Tunnel chest #6 (was Silver Amulet) |
+| Phoenix Staff | Staff | Staff 8 more, Fire 1.25x, swings Burn | Boil Hole chest #5 (was Dragon's Potion) |
+| Knight's Mantle | Robe | Defense 16 more | Baragoon Moor inn chest #6 (was Celine's Bell) |
+| Leviathan Staff | Staff | Staff 8 more, Water 1.25x, heals 25% more | Brannoch Castle cannon room chest #2 (was Heroes Drink) |
+| Titan Staff | Staff | Staff 30 more; first swing a turn cracks a shield | Brannoch Castle chest (was Golden Amulet) |
+| Skyreed Staff | Staff | Staff 8 more, Wind 1.25x, Wind Boost a little stronger | Leonardo section chest #2 (was Celine's Bell) |
+| Dragon Robe | Robe | Defense 24 more, immune to Poison | Leonardo section chest #4 (was Silver Amulet) |
+| Prism Sigil | Sigil | A spell of a different element from the last: 20% more | Beigis |
+
+The pieces are built around the six styles: Pyromancer (Ember Staff, Ember Heart, Phoenix Staff), Stonewall
+(Lead Mantle, Stone Memory, Mountain Staff), Tidecaller (Leech Pillar, Tidal Echo, Leviathan Staff), Tempest
+(Gale Tether, Pilgrim's Soul, Skyreed Staff), Staff Brawler (Heavy Staff, Spellstrike, Titan Staff) and
+Elementalist (Wool Cloak, Prism Staff, Prism Sigil); wild cards: Gambler's Coin, Hunter's Charm, Glass Charm,
+Mirror Shard. Chest pieces are given on load to saves that already opened those chests.
+
+- [ ] Not checked in game yet: any of the new pieces. Easiest check: open one of those chests (the message
+      should say "Brian found ...") and look in the Equipment window.
 
 - Checked by Claude: the Equipment window opens and shows the slots (charm and sigil locked on your save).
 - [ ] Not checked yet: equipping, each effect in battle, buying pieces in shops, boss rewards ("Found ...").
+
+## Balance pass (new, 2026-10-21)
+
+Full reasoning in `research/balance/README.md`. In short: the new systems make a focused Brian deal about
+1.15x vanilla damage per turn early and 2.2x at the end, so enemies got more HP to match, a bit more than that.
+
+- Normal monsters: HP x1.2 (Holy Plains) up to x2.1 (Mammon's World); attack x1.0 up to x1.2.
+- Bosses: Solvaring 240 HP, Zelse 1054, Nepty 1496, Shilf 1800, Fargo 2850, Guilty 3600, Beigis 3895,
+  Mammon 4945 (vanilla 200 / 680 / 880 / 1000 / 1500 / 1800 / 1900 / 2300).
+- Wind Boost: 40% more shots per charge instead of 2 more (Crosswind and Skyreed add 10% each).
+- Burn: 20% of the kindling hit per stack per turn (was 30%).
+- Tidal Echo: 0.65x twice (was 0.75x). Stone Memory: up to +30% (was 45%).
+- Checked by Claude: the boss records and a Holy Plains battle read back scaled HP; scaling does not pile up
+      when a map is loaded again.
+- [ ] Count Brian's turns per fight. The target is about the same as vanilla, or one more. Tell me which
+      fights feel too long or too short.
 
 ## Known rough edges
 

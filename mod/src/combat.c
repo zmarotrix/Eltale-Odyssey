@@ -374,9 +374,9 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     } else if (hit_element < 4) {
         percent += (u32)eo_equip_element_percent(hit_element) +
                    SCHOOL_TALENT_PERCENT * (u32)eo_talent(school_talent[hit_element]);
-        // Stone Memory: each Earth spell cast in a row hits 15% harder (to 45%).
+        // Stone Memory: each Earth spell cast in a row hits 15% harder (to 30%).
         if (hit_element == EARTH && eo_equipment_worn(EQ_STONE_MEMORY)) {
-            percent += STONE_MEMORY_PERCENT * (u32)(earth_streak > 1 ? (earth_streak - 1 > 3 ? 3 : earth_streak - 1) : 0);
+            percent += STONE_MEMORY_PERCENT * (u32)(earth_streak > 1 ? (earth_streak - 1 > 2 ? 2 : earth_streak - 1) : 0);
         }
         // Prism Sigil: a spell of a different element from the last one hits 20% harder.
         if (eo_equipment_worn(EQ_PRISM_SIGIL) && element_changed) {
@@ -586,17 +586,23 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     u16 base = saved_base;
     u16 shots = saved_shots;
     if (echo) {
-        // Tidal Echo: every Water spell is cast twice, each at 75%.
+        // Tidal Echo: every Water spell is cast twice, each at 65% (1.3x in all; 75% made it a flat 1.5x).
         shots = (u16)(shots * 2);
-        base = (u16)(base * 3 / 4);
+        base = (u16)(base * 65 / 100);
     }
     if (school == EARTH && type == SPELL_TYPE_DAMAGE) {
         base = (u16)(base * (100 + (40 + AFTERSHOCK_PERCENT * eo_talent(TALENT_AFTERSHOCK)) * boost) / 100);
     } else if (school == WATER && type == SPELL_TYPE_HEAL) {
         base = (u16)(base * (100 + 30 * boost + 10 * wellspring + (leviathan ? 25 : 0)) / 100 + boost);
     } else if (school == WIND && type == SPELL_TYPE_DAMAGE) {
-        int per_charge = 2 + eo_talent(TALENT_CROSSWIND) + (eo_equipment_worn(EQ_SKYREED_STAFF) ? 1 : 0);
-        shots = (u16)(shots + per_charge * boost + (tether ? 1 : 0));
+        // Wind Boost: +40% shots per charge (rounded, at least one), +10 points with each Crosswind rank and the
+        // Skyreed Staff. A flat +2 a charge made a 3-charge Wind Cutter 4x (balance pass, 2026-10-21).
+        u32 pct = 40 + 10 * (u32)eo_talent(TALENT_CROSSWIND) + (eo_equipment_worn(EQ_SKYREED_STAFF) ? 10 : 0);
+        u32 extra_shots = ((u32)saved_shots * pct * boost + 50) / 100;
+        if (boost > 0 && extra_shots < (u32)boost) {
+            extra_shots = boost;
+        }
+        shots = (u16)(shots + extra_shots + (tether ? 1 : 0));
     }
     *(u16*)(stats + SPELL_BASE) = base;
     *(u16*)(stats + SPELL_SHOTS) = shots;

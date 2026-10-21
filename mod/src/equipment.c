@@ -22,7 +22,7 @@ static const EquipmentInfo catalog[EQUIPMENT_COUNT] = {
     [EQ_PILGRIMS_SOUL]  = { "Pilgrim's Soul",    SLOT_CHARM, 2500, "Half-cost spells, no staff MP." },
     [EQ_GAMBLERS_COIN]  = { "Gambler's Coin",    SLOT_CHARM, 0,    "Casts cost no MP or double." },
     [EQ_MIRROR_SHARD]   = { "Mirror Shard",      SLOT_CHARM, 0,    "First hit each fight reflects." },
-    [EQ_TIDAL_ECHO]     = { "Tidal Echo",        SLOT_SIGIL, 0,    "Water spells cast twice, 0.75x." },
+    [EQ_TIDAL_ECHO]     = { "Tidal Echo",        SLOT_SIGIL, 0,    "Water spells cast twice, 0.65x." },
     [EQ_LEECH_PILLAR]   = { "Leech Pillar",      SLOT_SIGIL, 0,    "Water Pillar drains a quarter." },
     [EQ_WOOL_CLOAK]     = { "Wool Cloak",        SLOT_ROBE,  0,    "Defense 2 more, Wind 1.1x." },
     // Build pieces found in the world (chests.c) or given by bosses (gold.c). By style:
@@ -36,7 +36,7 @@ static const EquipmentInfo catalog[EQUIPMENT_COUNT] = {
     [EQ_LEAD_MANTLE]    = { "Lead Mantle",       SLOT_ROBE,  0,    "Defense 10 more, Earth 1.1x." },
     [EQ_GALE_TETHER]    = { "Gale Tether",       SLOT_SIGIL, 0,    "Wind spells fire one more shot." },
     [EQ_EMBER_HEART]    = { "Ember Heart",       SLOT_SIGIL, 0,    "Kindling adds one more Burn." },
-    [EQ_STONE_MEMORY]   = { "Stone Memory",      SLOT_SIGIL, 0,    "Earth in a row: 15% more each." },
+    [EQ_STONE_MEMORY]   = { "Stone Memory",      SLOT_SIGIL, 0,    "Earth in a row: 15% more, to 30%." },
     [EQ_SPELLSTRIKE]    = { "Spellstrike",       SLOT_CHARM, 0,    "First swing a turn: 1 charge." },
     [EQ_TITAN_STAFF]    = { "Titan Staff",       SLOT_STAFF, 0,    "Swings 30 more, crack a shield." },
     [EQ_PHOENIX_STAFF]  = { "Phoenix Staff",     SLOT_STAFF, 0,    "Fire 1.25x. Swings burn." },
