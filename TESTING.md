@@ -119,6 +119,34 @@ No floating icons or plates over enemies, and no explanation of what Boost does:
       by the end (current numbers allow it only near the end), and can points be refunded?
 - [ ] Existing saves get points for spirits already found and keep the spells their levels already allowed.
 
+## Status colors and one status at a time (new)
+
+- [ ] Every status has its own color, pulsing on the model through fog: Burn red, Poison purple, Compression
+      yellow, Vampire crimson, Power Staff orange, Freeze/Restriction ice blue, Movement green, Agility teal,
+      Silence white, Soul Searcher gold, Barrier pale blue, MP absorb pink, Defense brown. (Checked by Claude:
+      red and white, forced.) Broken enemies pulse dark and move slowly.
+- [ ] **One status at a time**: a fighter with a status gets no new one until it wears off (spell statuses,
+      Burn, Freeze, Poison; Brian included, so a buffed Brian can't be poisoned and a poisoned Brian can't buff
+      himself). Burn still stacks on a burning foe. Break isn't a status. Not checked in play yet.
+
+## Talents (new)
+
+The Spirits window (D-pad up) has two pages: **ATTUNE** (tiers) and **TALENTS**; D-pad left / right switches.
+Talents cost Spirit Points and need that element's level:
+
+| Talent | Element | Needs | Effect |
+|---|---|---|---|
+| Smoulder | Fire | Lv 5, 3 SP | Burn lasts one more turn |
+| Fanned Flames | Fire | Lv 12, 5 SP | Burn stacks 45% of the hit instead of 30% |
+| Bedrock | Earth | Lv 5, 3 SP | Start battles with 2 charge |
+| Shatter | Earth | Lv 12, 5 SP | Broken foes take 80% more instead of 50% |
+| Deep Freeze | Water | Lv 5, 3 SP | Freeze lasts one more turn |
+| Undertow | Water | Lv 12, 5 SP | Your Water healing also ends your status (at the next tick) |
+| Shifting Winds | Wind | Lv 5, 3 SP | Your statuses ignore the one-status limit |
+| Crosswind | Wind | Lv 12, 5 SP | Wind Boost gives 3 shots per charge instead of 2 |
+
+- [ ] The page draws (checked by Claude); learning a talent (needs points) and each effect: not checked.
+
 ## Equipment (new, only partly checked)
 
 Only Brian's starting staff (no staff equipped) gives MP back on staff hits; every other staff doesn't.

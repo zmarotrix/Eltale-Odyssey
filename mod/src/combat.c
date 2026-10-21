@@ -20,6 +20,7 @@
 #define MAX_BOOST 3
 #define START_CHARGE 1
 #define BROKEN_BONUS_PERCENT 50
+#define SHATTER_BONUS_PERCENT 80   // with Earth's Shatter talent
 #define NO_WEAKNESS 0xFF
 
 #define ENEMY_SLOTS 0x8007C998
@@ -130,7 +131,7 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
                       element == WIND ? EARTH : NO_WEAKNESS;
         g->max_shields = g->shields = shields_for(record, boss);
     }
-    charge = START_CHARGE;
+    charge = (u8)(START_CHARGE + (eo_talent(TALENT_BEDROCK) ? 1 : 0));
     boost = 0;
     spent_last_turn = spent_this_turn = 0;
     weakness_bonus_given = 0;
@@ -220,7 +221,7 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     // that favours the spell's element adds 10%.
     u32 extra = 0;
     if (hit_was_broken) {
-        extra += hit * BROKEN_BONUS_PERCENT / 100;
+        extra += hit * (eo_talent(TALENT_SHATTER) ? SHATTER_BONUS_PERCENT : BROKEN_BONUS_PERCENT) / 100;
     }
     if (hit_kind == HIT_STAFF) {
         extra += (u32)eo_equip_staff_bonus();
@@ -237,7 +238,7 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
         if (eo_status_burn_stacks(slot) > 0) {
             eo_status_flare(slot);
         } else if (ENEMY_HP(slot) > 0) {
-            eo_status_add_burn(slot, (u16)(hit * 30 / 100 + 1));
+            eo_status_add_burn(slot, (u16)(hit * (u32)eo_status_burn_percent() / 100 + 1));
         }
     }
     // Leech Pillar: Water Pillar (Lv1-3) heals Brian for a quarter of the damage it deals.
@@ -247,9 +248,10 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
         u32 healed = stats[2] + (hit + extra) / 4;
         stats[2] = (u16)(healed > stats[3] ? stats[3] : healed);
     }
-    // A boosted damaging Water spell freezes its target.
-    if (active_boost > 0 && active_school == WATER && ENEMY_HP(slot) > 0) {
-        freeze_enemy(slot, active_boost);
+    // A boosted damaging Water spell freezes its target, if it has no other status (status.c); Deep Freeze holds it
+    // a turn longer.
+    if (active_boost > 0 && active_school == WATER && ENEMY_HP(slot) > 0 && !eo_status_blocks(ENEMY_BATTLE_DATA(slot), 1, 0)) {
+        freeze_enemy(slot, active_boost + (eo_talent(TALENT_DEEP_FREEZE) ? 1 : 0));
     }
 }
 
@@ -362,7 +364,7 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     } else if (school == WATER && type == SPELL_TYPE_HEAL) {
         base = (u16)(base * (100 + 30 * boost) / 100 + boost);
     } else if (school == WIND && type == SPELL_TYPE_DAMAGE) {
-        shots = (u16)(shots + 2 * boost);
+        shots = (u16)(shots + (eo_talent(TALENT_CROSSWIND) ? 3 : 2) * boost);
     }
     *(u16*)(stats + SPELL_BASE) = base;
     *(u16*)(stats + SPELL_SHOTS) = shots;

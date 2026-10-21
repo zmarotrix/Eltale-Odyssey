@@ -76,7 +76,8 @@ typedef struct {
     // Equipment (equipment.c)
     u32 owned_equipment;   // one bit per piece
     u8 equipped[4];        // staff, robe, charm, sigil: piece + 1, 0 = none
-    u8 reserved[120];
+    u32 talents;           // one bit per talent learned (talents.c)
+    u8 reserved[116];
 } EoSaveBlock;
 
 _Static_assert(sizeof(EoSaveBlock) == 160, "the save block must fill the 160 free bytes exactly");
@@ -158,6 +159,31 @@ void eo_status_flare(int enemy_slot); // Ember Staff: spread the enemy's Burn to
 int eo_combat_broken(int enemy_slot);
 int eo_status_poisoned(void);
 void eo_fx_update(void);              // every frame in battle
+
+// ---- Talents (talents.c): bought with Spirit Points in the Spirits window ----
+enum {
+    TALENT_SMOULDER, TALENT_FANNED_FLAMES,     // Fire
+    TALENT_BEDROCK, TALENT_SHATTER,            // Earth
+    TALENT_DEEP_FREEZE, TALENT_UNDERTOW,       // Water
+    TALENT_SHIFTING_WINDS, TALENT_CROSSWIND,   // Wind
+    TALENT_COUNT
+};
+typedef struct {
+    const char* name;
+    u8 school;
+    u8 level;          // element level needed
+    u8 cost;           // Spirit Points
+    const char* effect;
+} TalentInfo;
+const TalentInfo* eo_talent_info(int talent);
+int eo_talent(int talent);         // learned?
+int eo_talent_learn(int talent);   // 1 if learned now (level and points checked)
+
+// ---- One status at a time (status.c) ----
+// 1 if `fighter` (battle data) has a status that keeps a new one off. `by_brian`: the new status is Brian's
+// (Shifting Winds lets his through). `except_burn`: the new status is Burn, which stacks on a burning foe.
+int eo_status_blocks(void* fighter, int by_brian, int except_burn);
+int eo_status_burn_percent(void);
 
 // ---- Equipment (equipment.c) ----
 enum {

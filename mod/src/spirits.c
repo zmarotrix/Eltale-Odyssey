@@ -192,6 +192,14 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
 #define BTN_B 0x4000
 #define BTN_DUP 0x0800
 #define BTN_DDOWN 0x0400
+#define BTN_DLEFT 0x0200
+#define BTN_DRIGHT 0x0100
+// The Talents page (D-pad left / right switches pages): one 12-pixel row per talent.
+#define TALENT_ROW_H 12
+#define TALENT_LIST_Y LIST_Y
+#define TALENT_INFO_Y (TALENT_LIST_Y + TALENT_COUNT * TALENT_ROW_H + 3)
+#define TALENT_WIN_H (TALENT_INFO_Y + SMALL_LINE + SMALL_PAD - 2 - WIN_Y)
+#define TALENT_GATE_X (NAME_X + 15 * SMALL_W)
 #define STICK_THRESHOLD 40
 
 extern u16 gPadButtonsNew;
@@ -201,6 +209,7 @@ extern s8 gPadStickY;
 extern u16 gBattleState;
 
 static int window_open = 0;
+static int page = 0;          // 0 attunement, 1 talents
 static int cursor = 0;
 static u16 pressed = 0;
 static int stick_held = 0;
@@ -218,6 +227,7 @@ RECOMP_HOOK_RETURN("pad_read") void eo_spirits_read_input(void) {
     if (!window_open) {
         if (gEo.spirits_ready && field_idle() && (gPadButtonsNew & BTN_DUP)) {
             window_open = 1;
+            page = 0;
             cursor = 0;
             pressed = 0;
             gPadButtonsNew = 0;
@@ -255,16 +265,72 @@ static void try_attune(int s) {
 static void handle_input(void) {
     u16 p = pressed;
     pressed = 0;
+    int rows = page == 0 ? SCHOOLS : TALENT_COUNT;
     if (p & BTN_B) {
         window_open = 0;
         sfx_play(SFX_CANCEL, 0xFF, 0x40);
+    } else if (p & (BTN_DLEFT | BTN_DRIGHT)) {
+        page ^= 1;
+        cursor = 0;
+        sfx_play(SFX_CONFIRM, 0xFF, 0x40);
     } else if (p & BTN_DUP) {
-        cursor = (cursor + SCHOOLS - 1) % SCHOOLS;
+        cursor = (cursor + rows - 1) % rows;
     } else if (p & BTN_DDOWN) {
-        cursor = (cursor + 1) % SCHOOLS;
+        cursor = (cursor + 1) % rows;
     } else if (p & BTN_A) {
-        try_attune(cursor);
+        if (page == 0) {
+            try_attune(cursor);
+        } else if (eo_talent_learn(cursor)) {
+            sfx_play(SFX_CONFIRM, 0xFF, 0x40);
+        } else {
+            sfx_play(SFX_CANCEL, 0xFF, 0x40);
+        }
     }
+}
+
+// The window's top line: the two page names (the open one green) and the unspent points at the right.
+static s32 draw_header(s32 h) {
+    char line[12];
+    eo_ui_window(WIN_X, WIN_Y, WIN_W, h);
+    eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, page == 0 ? TEXT_GOOD : TEXT_DIM, "ATTUNE");
+    eo_ui_small(WIN_X + SMALL_PAD + 8 * SMALL_W, WIN_Y + SMALL_PAD, page == 1 ? TEXT_GOOD : TEXT_DIM, "TALENTS");
+    eo_format_u32(line, "", gEo.spirit_points, "");
+    s32 points_x = WIN_X + WIN_W - SMALL_PAD - eo_strlen(line) * SMALL_W;
+    eo_ui_small(points_x, WIN_Y + SMALL_PAD, TEXT_NORMAL, line);
+    return points_x;
+}
+
+// Talents: each with its element's gem, its name, and either LEARNED or its level gate and cost (green when
+// met, red when not); the bottom line says what the selected one does.
+static void draw_talents(void) {
+    char line[16];
+    s32 points_x = draw_header(TALENT_WIN_H);
+    for (int i = 0; i < TALENT_COUNT; i++) {
+        const TalentInfo* t = eo_talent_info(i);
+        s32 y = TALENT_LIST_Y + i * TALENT_ROW_H + 2;
+        int learned = eo_talent(i);
+        eo_ui_small(NAME_X, y, i == cursor ? TEXT_GOOD : learned ? TEXT_NORMAL : TEXT_DIM, t->name);
+        if (learned) {
+            eo_ui_small(TALENT_GATE_X, y, TEXT_GOOD, "LEARNED");
+        } else {
+            eo_format_u32(line, "LV ", t->level, "");
+            eo_ui_small(TALENT_GATE_X, y, ELEMENT_LEVELS[t->school] >= t->level ? TEXT_GOOD : TEXT_WARN, line);
+            eo_format_u32(line, "", t->cost, "");
+            eo_ui_small(TALENT_GATE_X + 6 * SMALL_W + ICON_W, y, gEo.spirit_points >= t->cost ? TEXT_GOOD : TEXT_WARN, line);
+        }
+    }
+    eo_ui_small(WIN_X + SMALL_PAD, TALENT_INFO_Y, TEXT_NORMAL, eo_talent_info(cursor)->effect);
+
+    eo_icons_begin();
+    eo_icon_draw(ICON_PIP_FULL, points_x - ICON_W, WIN_Y + SMALL_PAD + ICON_TEXT_DY);
+    for (int i = 0; i < TALENT_COUNT; i++) {
+        s32 y = TALENT_LIST_Y + i * TALENT_ROW_H + 2 + ICON_TEXT_DY;
+        eo_icon_draw(ICON_FIRE + eo_talent_info(i)->school, GEM_X, y);
+        if (!eo_talent(i)) {
+            eo_icon_draw(ICON_PIP_FULL, TALENT_GATE_X + 6 * SMALL_W, y);
+        }
+    }
+    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, TALENT_LIST_Y + cursor * TALENT_ROW_H + 2 + ICON_TEXT_DY);
 }
 
 // Text y of a row: centered on the 13-pixel row.
@@ -274,12 +340,11 @@ static s32 row_text_y(int s) {
 
 static void draw_window(void) {
     char line[40];
-    eo_ui_window(WIN_X, WIN_Y, WIN_W, WIN_H);
-    eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, TEXT_NORMAL, "SPIRITS");
-    // Unspent points, top right: a purple pip and the count.
-    eo_format_u32(line, "", gEo.spirit_points, "");
-    s32 points_x = WIN_X + WIN_W - SMALL_PAD - eo_strlen(line) * SMALL_W;
-    eo_ui_small(points_x, WIN_Y + SMALL_PAD, TEXT_NORMAL, line);
+    if (page == 1) {
+        draw_talents();
+        return;
+    }
+    s32 points_x = draw_header(WIN_H);
 
     for (int s = 0; s < SCHOOLS; s++) {
         s32 y = row_text_y(s);

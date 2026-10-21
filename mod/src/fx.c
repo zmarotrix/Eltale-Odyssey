@@ -4,13 +4,14 @@
 // flashing red, and has fire particles coming off them when they take damage"; "There should just be a visual
 // on the enemy"; shields: "just some feedback that you have damaged the enemies shield").
 //
-// Tints: models are lit by the game's lights (three directional and an ambient one, loaded once before the
-// models are drawn). Just before a model with a status is drawn we load changed copies of the four lights,
-// and put the game's own back right after, so only that model changes:
-//   Burn    the enemy pulses red
-//   Broken  the enemy is slightly darker, glints drift around its head, and its animation crawls
-//   Poison  Brian pulses purple (in the field too)
-//
+// Status colors: every status has its own color, pulsed on the model. The models' render mode blends in fog
+// ("fog color x shade alpha"), so just before a model with a status is drawn we set the fog color and a constant
+// fog amount, and put the game's own fog color and range back right after: any color, white included, on just
+// that model. (Lights can only darken: they can't take a model past its own texture colors.)
+//   Burn red, Poison purple, then the game's statuses (status_colors below)
+// Broken: the enemy's lights pulse dark, glints drift around its head, and its animation crawls. When it breaks
+// it also flickers dark for a moment.
+
 // Particles: the game's sparkle particles (the ones spell impacts and enemy deaths spray), from the color table:
 //   Burn damage  small embers rising around the enemy, in reds and orange. The sparkle's own draw commands mix
 //                its color toward white ("texture + (1 - texture) x color"), so embers use a copy that draws
@@ -44,18 +45,41 @@ static const u32 game_light[LIGHT_COUNT] = { 0x80085770, 0x80085780, 0x80085790,
 #define FLAME_GFX ((u32*)(FX_RAM + 0x40))      // the sparkle's draw commands, recolored
 
 #define PULSE_PERIOD 48           // frames per pulse
-#define BURN_RED 75               // percent of the way to full red at the peak
-#define BURN_DIM 90               // percent green and blue drop at the peak
-#define BROKEN_LIGHT 55           // percent of the normal light while Broken (the lights add up past full,
-                                  // so a gentle cut barely shows)
+#define BROKEN_DARK 70            // percent the lights drop at the peak of a Broken enemy's dark pulse
 #define BROKEN_ANIM_STEP 8        // a Broken enemy's animation advances one frame in this many
 #define BATTLE_DATA_ANIM_FRAME 0x54  // u16 frames into the current animation (model_draw reads it)
+#define BATTLE_DATA_STATS 0x68    // pointer to the fighter's stats; +0x00 is its u16 status bits
+#define BRIAN_STATUS (*(u16*)0x8007BB38)
+#define STATUS_RESTRICTION 0x008  // also how Break skips the enemy's turn
 #define BREAK_FLASH_FRAMES 12     // the enemy's model flickers when it breaks
 #define FLICKER_LIGHT 20          // percent of the light on the dark frames
 #define HEAD_GLINT_EVERY 6        // frames between glints around a Broken enemy's head
-// Poison scales each channel down at the peak (pulling toward a color wouldn't show: the lights add up past
-// full brightness), keeping most red and blue: purple.
-static const u8 poison_keep[3] = { 75, 15, 85 };   // percent of each channel at the peak
+
+// Fog: F3D G_SETFOGCOLOR (0xF8) and G_MOVEWORD G_MW_FOG (0xBC000008, fog multiplier << 16 | offset). With a zero
+// multiplier the fog amount is the offset alone.
+#define GFX_FOG_COLOR 0xF8
+#define GFX_FOG_FACTOR 0xBC000008
+#define FOG_SCAN 4096             // commands searched back for the game's current fog settings
+#define FOG_PEAK 0x00A0           // fog offset at the peak of a status pulse
+
+typedef struct { u8 r, g, b; } Rgb;
+static const Rgb burn_color = { 255, 50, 0 };
+static const Rgb poison_color = { 160, 40, 230 };
+// The game's status bits, lowest first (research/battle, "Status effects").
+static const Rgb status_colors[12] = {
+    { 255, 225, 60 },    // 0x001 Compression: yellow
+    { 170, 0, 50 },      // 0x002 Vampire's Touch: crimson
+    { 255, 150, 30 },    // 0x004 Power Staff: orange
+    { 130, 210, 255 },   // 0x008 Restriction (Freeze): ice blue
+    { 70, 230, 100 },    // 0x010 Movement: green
+    { 40, 220, 200 },    // 0x020 Agility: teal
+    { 255, 255, 255 },   // 0x040 Silence: white
+    { 255, 210, 90 },    // 0x080 Soul Searcher: gold
+    { 200, 230, 255 },   // 0x100 Magic Barrier: pale blue
+    { 255, 120, 200 },   // 0x200 MP absorb: pink
+    { 150, 100, 60 },    // 0x400 Defense: brown
+    { 255, 255, 255 },   // 0x800 (unused)
+};
 
 // Particles: the sparkle template the emitters use, and its fields.
 #define SPARKLE_TEMPLATE ((u8*)0x8004CFB0)
@@ -89,7 +113,6 @@ void* particle_spawn(void* particle);
 s32 get_rand(s32 n);
 extern u16 gBattleState;
 
-static int tinting = 0;
 static u32 frame = 0;             // counts Brian's draws: one per frame wherever he is
 static u8 flame_frames[MAX_ENEMIES];
 static u8 was_broken[MAX_ENEMIES];
@@ -105,31 +128,70 @@ static int enemy_slot_of(u8* object) {
     return -1;
 }
 
-static u8 toward(u8 from, u8 to, int percent) {
-    return (u8)(from + ((int)to - from) * percent / 100);
-}
-
 // A smooth-ish triangle pulse, 0..100.
 static int pulse(void) {
     int phase = (int)(frame % PULSE_PERIOD);
     return phase < PULSE_PERIOD / 2 ? phase * 200 / PULSE_PERIOD : (PULSE_PERIOD - phase) * 200 / PULSE_PERIOD;
 }
 
+static int lighting = 0;
+static int fogging = 0;
+static u32 game_fog_color;
+static u32 game_fog_factor;
+
+// The fog color and range the game last set in this frame's display list.
+static int find_game_fog(void) {
+    u32* g = gMasterGfxPos;
+    int have_color = 0;
+    int have_factor = 0;
+    for (int i = 1; i <= FOG_SCAN && !(have_color && have_factor); i++) {
+        u32* c = g - 2 * i;
+        if (!have_color && (c[0] >> 24) == GFX_FOG_COLOR) {
+            game_fog_color = c[1];
+            have_color = 1;
+        }
+        if (!have_factor && c[0] == GFX_FOG_FACTOR) {
+            game_fog_factor = c[1];
+            have_factor = 1;
+        }
+    }
+    return have_color && have_factor;
+}
+
+// The color of a fighter's status, if it has one. One status at a time (status.c), so there's only one to show.
+static const Rgb* status_color(u16 bits, int burn, int poison, int broken) {
+    if (burn) {
+        return &burn_color;
+    }
+    if (poison) {
+        return &poison_color;
+    }
+    if (broken) {
+        bits &= (u16)~STATUS_RESTRICTION;   // that's the Break, shown as the dark pulse
+    }
+    for (int i = 0; i < 12; i++) {
+        if (bits & (1 << i)) {
+            return &status_colors[i];
+        }
+    }
+    return 0;
+}
+
 RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* animation, void* gfx) {
-    int burn = 0;
+    const Rgb* color = 0;
     int broken = 0;
-    int poison = 0;
     int flicker = 0;   // a dark frame of the Break flicker
     if (object == BRIAN_OBJECT) {
         frame++;
-        poison = eo_status_poisoned();
+        color = status_color((gBattleState & 0x1) ? BRIAN_STATUS : 0, 0, eo_status_poisoned(), 0);
     } else {
         int slot = enemy_slot_of(object);
         if (slot < 0 || ENEMY_HP(slot) == 0 || !(gBattleState & 0x1)) {
             return;
         }
-        burn = eo_status_burn_stacks(slot) > 0;
         broken = eo_combat_broken(slot);
+        u8* stats = *(u8**)(object + BATTLE_DATA_STATS);
+        color = status_color(stats != 0 ? *(u16*)stats : 0, eo_status_burn_stacks(slot) > 0, 0, broken);
         flicker = flash_frames[slot] > 0 && (flash_frames[slot] & 2) != 0;
         // A Broken enemy's animation is held back: its frame only moves on every BROKEN_ANIM_STEP draws (the
         // game advances it by one after each draw).
@@ -140,48 +202,46 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
         held_frame[slot] = *anim_frame;
         was_broken[slot] = (u8)broken;
     }
-    if (!burn && !broken && !poison && !flicker) {
-        return;
-    }
     int p = pulse();
-    for (int i = 0; i < LIGHT_COUNT; i++) {
-        u8* game = (u8*)game_light[i];
-        u8* light = TINT_LIGHTS + i * 16;
-        for (int k = 0; k < 16; k++) {
-            light[k] = game[k];
-        }
-        for (int k = 0; k < 8; k += 4) {   // the color and its copy
-            u8* c = light + k;
-            if (broken) {
+
+    // Broken and the Break flicker: darker lights.
+    if (broken || flicker) {
+        int keep = flicker ? FLICKER_LIGHT : 100 - BROKEN_DARK * p / 100;
+        for (int i = 0; i < LIGHT_COUNT; i++) {
+            u8* game = (u8*)game_light[i];
+            u8* light = TINT_LIGHTS + i * 16;
+            for (int k = 0; k < 16; k++) {
+                light[k] = game[k];
+            }
+            for (int k = 0; k < 8; k += 4) {   // the color and its copy
                 for (int ch = 0; ch < 3; ch++) {
-                    c[ch] = (u8)(c[ch] * BROKEN_LIGHT / 100);
+                    light[k + ch] = (u8)(light[k + ch] * keep / 100);
                 }
             }
-            if (burn) {
-                c[0] = toward(c[0], 255, BURN_RED * p / 100);
-                c[1] = toward(c[1], 0, BURN_DIM * p / 100);
-                c[2] = toward(c[2], 0, BURN_DIM * p / 100);
-            }
-            if (poison) {
-                for (int ch = 0; ch < 3; ch++) {
-                    c[ch] = toward(c[ch], (u8)(c[ch] * poison_keep[ch] / 100), p);
-                }
-            }
-            for (int ch = 0; ch < 3 && flicker; ch++) {
-                c[ch] = (u8)(c[ch] * FLICKER_LIGHT / 100);
-            }
+            eo_gfx(light_load[i], (u32)light);
         }
-        eo_gfx(light_load[i], (u32)light);
+        lighting = 1;
     }
-    tinting = 1;
+
+    // A status: its color as fog, pulsing.
+    if (color != 0 && find_game_fog()) {
+        eo_gfx(GFX_FOG_COLOR << 24, ((u32)color->r << 24) | ((u32)color->g << 16) | ((u32)color->b << 8) | 0xFF);
+        eo_gfx(GFX_FOG_FACTOR, (u32)(FOG_PEAK * p / 100) & 0xFFFF);
+        fogging = 1;
+    }
 }
 
 RECOMP_HOOK_RETURN("model_draw") void eo_fx_after_model(void) {
-    if (tinting) {
+    if (lighting) {
         for (int i = 0; i < LIGHT_COUNT; i++) {
             eo_gfx(light_load[i], game_light[i]);
         }
-        tinting = 0;
+        lighting = 0;
+    }
+    if (fogging) {
+        eo_gfx(GFX_FOG_COLOR << 24, game_fog_color);
+        eo_gfx(GFX_FOG_FACTOR, game_fog_factor);
+        fogging = 0;
     }
 }
 

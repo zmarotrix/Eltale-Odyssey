@@ -12,6 +12,11 @@
 // of his turns for POISON_TURNS turns, never going below 1 HP; outside battle it ticks every few seconds.
 // Water's healing spells and a night at an inn cure it.
 //
+// One status at a time (playtest, 2026-10-21): a fighter with a status can't get another until it wears off,
+// whether it's one of the game's statuses (from a spell roll), Burn, Freeze or Poison. Burn on a burning foe is the
+// same status, so it still stacks. Break isn't a status (its turn skip uses the Restriction bit, which a Broken foe's
+// check ignores). Wind's Shifting Winds talent lets Brian's statuses through.
+//
 // Brian's turn is the clock because he gets a turn between every enemy turn: "3 turns" means the same thing
 // with one enemy or three. Research: research/battle/README.md (turns, damage) and research/enemies.
 
@@ -34,7 +39,9 @@
 #define ENEMY_SLOTS 0x8007C998
 #define ENEMY_SLOT_SIZE 0x128
 #define ENEMY_HP(slot) (*(u16*)(ENEMY_SLOTS + (slot) * ENEMY_SLOT_SIZE + 0x0A))
+#define ENEMY_BATTLE_DATA(slot) ((void*)(ENEMY_SLOTS + (slot) * ENEMY_SLOT_SIZE + 0x24))
 #define BRIAN_BATTLE_DATA ((void*)0x8007BACC)
+#define BRIAN_STATUS_BITS (*(u16*)0x8007BB38)
 #define BRIAN_HP     (((u16*)gPlayerMainData)[2])
 #define BRIAN_MAX_HP (((u16*)gPlayerMainData)[3])
 
@@ -91,7 +98,7 @@ static void burn_add_stack(int slot, u16 amount) {
     if (amount > b->stacks[weakest]) {
         b->stacks[weakest] = amount;
     }
-    b->turns_left = BURN_TURNS;
+    b->turns_left = (u8)(BURN_TURNS + (eo_talent(TALENT_SMOULDER) ? 1 : 0));
     b->fresh = 1;
 }
 
@@ -176,8 +183,8 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_enemy_damage(void) 
     if ((brian_spell == SPELL_FIRE_BOMB || boost >= 3) && burns[slot].turns_left > 0) {
         burn_ignite(slot);
     }
-    if (hit > 0 && ENEMY_HP(slot) > 0) {
-        u32 amount = (u32)hit * BURN_PERCENT / 100;
+    if (hit > 0 && ENEMY_HP(slot) > 0 && !eo_status_blocks(ENEMY_BATTLE_DATA(slot), 1, 1)) {
+        u32 amount = (u32)hit * (u32)eo_status_burn_percent() / 100;
         for (int i = 0; i <= boost; i++) {
             burn_add_stack(slot, (u16)(amount < 1 ? 1 : amount));
         }
@@ -219,14 +226,14 @@ RECOMP_HOOK("player_take_damage") void eo_status_before_brian_damage(u16 power, 
 
 RECOMP_HOOK_RETURN("player_take_damage") void eo_status_after_brian_damage(void) {
     if (poison_pending && BRIAN_HP > 0 && BRIAN_HP < poison_hp_before && !eo_equip_poison_immune() &&
-        get_rand(100) < POISON_CHANCE) {
+        !eo_status_blocks(BRIAN_BATTLE_DATA, 0, 0) && get_rand(100) < POISON_CHANCE) {
         poison_turns = POISON_TURNS;
     }
     poison_pending = 0;
 }
 
 void eo_status_add_burn(int slot, u16 amount) {
-    if (slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0) {
+    if (slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0 && !eo_status_blocks(ENEMY_BATTLE_DATA(slot), 1, 1)) {
         burn_add_stack(slot, amount);
     }
 }
@@ -254,7 +261,7 @@ void eo_status_flare(int slot) {
         f32* to = (f32*)(ENEMY_SLOTS + i * ENEMY_SLOT_SIZE + 0x24);
         f32 dx = to[0] - from[0];
         f32 dz = to[2] - from[2];
-        if (dx * dx + dz * dz <= FLARE_RADIUS * FLARE_RADIUS) {
+        if (dx * dx + dz * dz <= FLARE_RADIUS * FLARE_RADIUS && !eo_status_blocks(to, 1, 1)) {
             burn_add_stack(i, strongest);
             eo_fx_burn_hit(i);
         }
@@ -305,10 +312,20 @@ void eo_status_cure_poison(void) {
     poison_turns = 0;
 }
 
-// Water's healing spells cure poison when Brian casts them (not on an enemy's turn).
+// Water's healing spells cure poison when Brian casts them (not on an enemy's turn). With Undertow they also end
+// his other status: its countdown is set to run out at the next tick, which undoes its effect the game's way.
+#define BRIAN_STATUS_COUNTDOWNS ((u8*)0x8007BB3A)   // one per status bit
+
 RECOMP_HOOK("spell_type_heal") void eo_status_on_heal(void) {
     if (!(gBattleState & BATTLE_ACTIVE) || !(gBattleState & BATTLE_ENEMY_TURN)) {
         eo_status_cure_poison();
+        if (eo_talent(TALENT_UNDERTOW)) {
+            for (int i = 0; i < 12; i++) {
+                if ((BRIAN_STATUS_BITS & (1 << i)) && BRIAN_STATUS_COUNTDOWNS[i] > 1) {
+                    BRIAN_STATUS_COUNTDOWNS[i] = 1;
+                }
+            }
+        }
     }
 }
 
@@ -336,6 +353,92 @@ RECOMP_HOOK_RETURN("frame_build") void eo_status_frame(void) {
         poison_field_timer = 0;
         poison_tick(0);
     }
+}
+
+// ---- One status at a time ----
+
+#define STATUS_RESTRICTION 0x008
+#define BATTLE_DATA_STATS 0x68     // pointer to the fighter's stats; +0x00 is its u16 status bits
+#define STATUS_CHANCE ((u8*)0x8004CDF0)   // spell_status_roll's chance per status bit
+#define PROJECTILE_FLAGS 0x0A      // u16; 0x4 = always lands (self-cast)
+#define PROJECTILE_SPELL 0x2C      // the spell's stat record
+#define SPELL_STATUS_MODE 0x18     // u16; 2 = always lands
+#define ALWAYS_LANDS_FLAG 0x4
+#define ALWAYS_LANDS_MODE 2
+
+int eo_status_burn_percent(void) {
+    return eo_talent(TALENT_FANNED_FLAMES) ? BURN_PERCENT * 3 / 2 : BURN_PERCENT;
+}
+
+int eo_status_blocks(void* fighter, int by_brian, int except_burn) {
+    if (fighter == 0 || (by_brian && eo_talent(TALENT_SHIFTING_WINDS))) {
+        return 0;
+    }
+    if (fighter == BRIAN_BATTLE_DATA) {
+        return BRIAN_STATUS_BITS != 0 || poison_turns > 0;
+    }
+    if (!is_enemy_battle_data(fighter)) {
+        return 0;
+    }
+    int slot = (int)(((u32)fighter - ENEMY_SLOTS) / ENEMY_SLOT_SIZE);
+    u8* stats = *(u8**)((u8*)fighter + BATTLE_DATA_STATS);
+    u16 bits = stats != 0 ? *(u16*)stats : 0;
+    if (eo_combat_broken(slot)) {
+        bits &= (u16)~STATUS_RESTRICTION;
+    }
+    return bits != 0 || (!except_burn && burns[slot].turns_left > 0);
+}
+
+// The game's statuses come from spell_update_all: after the spell type's handler (projectile, target) runs, each
+// status the spell carries is rolled (spell_status_roll(projectile, caster, status)) and applied on success. The
+// roll doesn't see the target, so the handlers note it; when the target already has a status, the roll is made to
+// fail by turning off its three ways to succeed (self-cast flag, always-lands mode, chance) until it returns.
+static void* roll_target = 0;
+static int roll_blocked = 0;
+static u8* roll_projectile;
+static u8* roll_spell;
+static s32 roll_status;
+static u16 saved_flags;
+static u16 saved_mode;
+static u8 saved_chance;
+
+#define NOTE_TARGET(handler) \
+    RECOMP_HOOK(#handler) void eo_status_target_##handler(void* projectile, void* target) { roll_target = target; }
+NOTE_TARGET(spell_type_default)
+NOTE_TARGET(spell_type_heal)
+NOTE_TARGET(spell_type_drain_magic)
+NOTE_TARGET(spell_type_status_only)
+NOTE_TARGET(spell_type_extinction)
+NOTE_TARGET(spell_type_dispel)
+NOTE_TARGET(spell_type_dispel_damage)
+
+RECOMP_HOOK("spell_status_roll") void eo_status_before_roll(u8* projectile, void* caster, s32 status) {
+    roll_blocked = status >= 0 && status < 12 && (gBattleState & BATTLE_ACTIVE) &&
+                   eo_status_blocks(roll_target, caster == BRIAN_BATTLE_DATA, 0);
+    if (!roll_blocked) {
+        return;
+    }
+    roll_projectile = projectile;
+    roll_spell = *(u8**)(projectile + PROJECTILE_SPELL);
+    roll_status = status;
+    saved_flags = *(u16*)(projectile + PROJECTILE_FLAGS);
+    saved_mode = *(u16*)(roll_spell + SPELL_STATUS_MODE);
+    saved_chance = STATUS_CHANCE[status];
+    *(u16*)(projectile + PROJECTILE_FLAGS) = (u16)(saved_flags & ~ALWAYS_LANDS_FLAG);
+    if (saved_mode == ALWAYS_LANDS_MODE) {
+        *(u16*)(roll_spell + SPELL_STATUS_MODE) = 0;
+    }
+    STATUS_CHANCE[status] = 0;
+}
+
+RECOMP_HOOK_RETURN("spell_status_roll") void eo_status_after_roll(void) {
+    if (!roll_blocked) {
+        return;
+    }
+    *(u16*)(roll_projectile + PROJECTILE_FLAGS) = saved_flags;
+    *(u16*)(roll_spell + SPELL_STATUS_MODE) = saved_mode;
+    STATUS_CHANCE[roll_status] = saved_chance;
+    roll_blocked = 0;
 }
 
 // ---- Display ----
