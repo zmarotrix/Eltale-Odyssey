@@ -52,10 +52,9 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
       Volley (checked by Claude: Ember). Stoking spells don't burn but deal 70% to a foe that isn't burning and
       140% to one that is: Scald, Pyre, Magma, Searing Steam (not checked in battle yet). Detonate sets off the
       Burn already there.
-- [ ] **Damage numbers**: one number per hit (bonuses included), colored: orange when a mechanic boosted it
+- [x] **Damage numbers**: one number per hit (bonuses included), colored: orange when a mechanic boosted it
       (weakness hit, Broken, burning or frozen bonus, stoking a burning foe), blue when one weakened it (the foe
-      resists the element, a stoke on a foe that isn't burning), white otherwise. (Checked by Claude: orange on a
-      weakness hit.)
+      resists the element, a stoke on a foe that isn't burning), white otherwise. (Checked by you: blue and orange.)
 - [ ] **Fire Bomb** on a burning enemy sets off all its remaining Burn at once.
 - [ ] **Poison**: Man Eaters and Bumbershoots can poison you (about 1 hit in 3). Brian pulses purple, 5% max HP per turn for 4 turns, also ticks outside battle, never below 1 HP. Water healing or an inn
       night cures it.
