@@ -3,7 +3,7 @@ param([int]$Fire = 8, [int]$Earth = 34, [int]$Water = 8, [int]$Wind = 8, [int]$H
 # Zelse difficulty test (RAM only; never save afterwards). Gives Brian a typical end-of-beat-2 build (pacing plan:
 # 44 spirits plus about 10 battle levels, focused on Earth, Zelse's weakness), the gear he could own by then, Earth
 # attuned to tier 4 and Water to tier 2 with 22 Spirit Points left for talents, marks Solvaring beaten (charm slot),
-# then warps to Zelse's map and puts Brian just outside the boss's trigger range, facing it.
+# then warps to Zelse's map and puts Brian inside the boss's trigger range, so the fight starts.
 # Back up the save first (dev panel Saves, or POST /api/saves/backup).
 $h = @{ "X-Q64-Dev" = "1" }
 function m($a, $n) { ((Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:43064/api/mem?addr=0x$a&len=$n" -Headers $h -TimeoutSec 2).Content | ConvertFrom-Json).hex }
@@ -38,13 +38,17 @@ wr '8007B2EC' '0000001e'
 $gs = [Convert]::ToUInt32((m "8007B2E4" 4), 16) -bor 0x80
 wr '8007B2E4' ($gs.ToString("x8"))
 Start-Sleep 6
-"map now " + (m "80084EE4" 2) + " (Zelse's is {0:x4})" -f $zmap
-# Brian 170 units from Zelse (trigger radius 130), on the side he arrived from, facing the boss.
+"map now " + (m "80084EE4" 4) + " (Zelse's is {0:x4})" -f $zmap
+# Brian 80 units from Zelse, inside the trigger radius (130), so the intro and fight start on their own. Spots just
+# outside the radius are on ledges walled off from the clearing (playtest, 2026-10-21: an invisible wall), so the
+# script doesn't leave Brian there. Zelse's field actor (0x8007D1A8) holds the boss's real position and height.
+$za = m "8007D1A8" 48
+$zx = f $za.Substring(72, 8); $zy = f $za.Substring(80, 8); $zz = f $za.Substring(88, 8)
 $b = m "8007BACC" 12; $bx = f $b.Substring(0, 8); $bz = f $b.Substring(16, 8)
 $dx = $bx - $zx; $dz = $bz - $zz; $len = [math]::Sqrt($dx * $dx + $dz * $dz)
 if ($len -lt 1) { $dx = 0; $dz = 1; $len = 1 }
-$px = $zx + 170 * $dx / $len; $pz = $zz + 170 * $dz / $len
-wr "8007BACC" (fh $px); wr "8007BAD4" (fh $pz)
+$px = $zx + 80 * $dx / $len; $pz = $zz + 80 * $dz / $len
+wr "8007BACC" ((fh $px) + (fh ($zy + 5)) + (fh $pz))
 wr "8007BADC" (fh ([math]::Atan2($zx - $px, $zz - $pz)))
-"Brian at ({0:n0}, {1:n0}), Zelse at ({2:n0}, {3:n0}); walk forward to start the fight" -f $px, $pz, $zx, $zz
+"Brian at ({0:n0}, {1:n0}), Zelse at ({2:n0}, {3:n0}); the fight starts on its own" -f $px, $pz, $zx, $zz
 (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:43064/api/brian" -Headers $h).Content
