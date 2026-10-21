@@ -24,6 +24,7 @@ static const EquipmentInfo catalog[EQUIPMENT_COUNT] = {
     [EQ_MIRROR_SHARD]   = { "Mirror Shard",      SLOT_CHARM, 0,    "First hit each fight reflects." },
     [EQ_TIDAL_ECHO]     = { "Tidal Echo",        SLOT_SIGIL, 0,    "Water spells cast twice, 0.75x." },
     [EQ_LEECH_PILLAR]   = { "Leech Pillar",      SLOT_SIGIL, 0,    "Water Pillar drains a quarter." },
+    [EQ_WOOL_CLOAK]     = { "Wool Cloak",        SLOT_ROBE,  0,    "Defense 2 more, Wind 1.1x." },
 };
 
 const EquipmentInfo* eo_equipment_info(int piece) {
@@ -64,13 +65,18 @@ int eo_equip_element_percent(int element) {
     int staff = worn_in(SLOT_STAFF);
     int favoured = staff == EQ_EMBER_STAFF ? 0 : staff == EQ_STONE_STAFF ? 1 : staff == EQ_TIDE_STAFF ? 2 :
                    staff == EQ_GALE_STAFF ? 3 : -1;
-    return favoured == element ? 10 : 0;
+    int percent = favoured == element ? 10 : 0;
+    if (element == 3 && worn_in(SLOT_ROBE) == EQ_WOOL_CLOAK) {
+        percent += 10;   // Wool Cloak: Wind 1.1x
+    }
+    return percent;
 }
 
 int eo_equip_defense(void) {
     switch (worn_in(SLOT_ROBE)) {
         case EQ_TRAVELERS_ROBE: return 4;
         case EQ_TIDECLOTH_ROBE: return 8;
+        case EQ_WOOL_CLOAK: return 2;
         default: return 0;
     }
 }

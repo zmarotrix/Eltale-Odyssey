@@ -31,6 +31,7 @@ static u32 cape_color_for(int robe) {
     switch (robe) {
         case EQ_TRAVELERS_ROBE: return 0x8A5A2AFF;   // brown
         case EQ_TIDECLOTH_ROBE: return 0x1878C0FF;   // deep blue
+        case EQ_WOOL_CLOAK: return 0xE8DCC0FF;       // undyed wool
     }
     return CAPE_RED;
 }
@@ -176,6 +177,9 @@ RECOMP_HOOK_RETURN("frame_build") void eo_appearance_frame(void) {
         applied_robe = applied_staff = -2;
     }
     int robe = worn(EQ_TRAVELERS_ROBE, EQ_TIDECLOTH_ROBE);
+    if (eo_equipment_worn(EQ_WOOL_CLOAK)) {
+        robe = EQ_WOOL_CLOAK;
+    }
     int staff = worn(EQ_EMBER_STAFF, EQ_GALE_STAFF);
     if (robe != applied_robe) {
         u32 color = cape_color_for(robe);

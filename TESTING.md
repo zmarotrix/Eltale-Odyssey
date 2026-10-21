@@ -178,6 +178,9 @@ sparkle floats over the target. Z doesn't swing or cast while the talent is lear
 blue) and his staff its staff's (starting staff: wood, Ember: red-orange, Heavy: iron grey, Stone: amber, Tide:
 blue, Gale: green). Checked by Claude: Tide Staff + Tidecloth Robe. Swap gear at an inn to see the others.
 
+- [ ] **Wool Cloak** from the shepherd's hut chest ("Brian found a Wool Cloak!"; checked by Claude). Saves that
+      already opened that chest get the cloak on load.
+
 Only Brian's starting staff (no staff equipped) gives MP back on staff hits; every other staff doesn't.
 
 **D-pad down** in the field opens the **Equipment** window: staff, robe, charm and sigil slots. You can look
@@ -195,6 +198,7 @@ anywhere but change equipment only at an inn. The charm slot opens after Solvari
 | Mirror Shard | Charm | The first hit you take each fight is reflected | Guilty |
 | Leech Pillar | Sigil | Water Pillar heals you a quarter of its damage | Zelse |
 | Tidal Echo | Sigil | Water spells cast twice at 0.75x | Nepty |
+| Wool Cloak | Robe | Defense 2 more, Wind 1.1x, cream cape | Chest in Melrode's shepherd's hut (was Fresh Bread) |
 
 - Checked by Claude: the Equipment window opens and shows the slots (charm and sigil locked on your save).
 - [ ] Not checked yet: equipping, each effect in battle, buying pieces in shops, boss rewards ("Found ...").

@@ -252,6 +252,7 @@ enum {
     EQ_TRAVELERS_ROBE, EQ_TIDECLOTH_ROBE,
     EQ_PILGRIMS_SOUL, EQ_GAMBLERS_COIN, EQ_MIRROR_SHARD,
     EQ_TIDAL_ECHO, EQ_LEECH_PILLAR,
+    EQ_WOOL_CLOAK,   // a robe; added last so saved bits keep their meaning
     EQUIPMENT_COUNT
 };
 typedef struct {
@@ -271,6 +272,9 @@ int eo_equip_defense(void);
 int eo_equip_poison_immune(void);
 int eo_spirits_window_open(void);
 int eo_inn_here(void);  // standing in one of the 17 inn/save rooms
+
+// ---- Chests (chests.c) ----
+void eo_chests_on_load(void);   // equipment for chests opened before the overhaul
 
 // ---- Shops (shop.c) ----
 int eo_shop_is_open(void);
