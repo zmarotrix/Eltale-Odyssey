@@ -169,12 +169,16 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_enemy_damage(void) 
     pending_slot = -1;
     u16 hp = ENEMY_HP(slot);
     u16 hit = hp < pending_hp ? (u16)(pending_hp - hp) : 0;  // this hit only, before any ignition
-    if (brian_spell == SPELL_FIRE_BOMB && burns[slot].turns_left > 0) {
+    // Spirit Charge on a Fire spell (combat.c): +1 stack per charge, and at 3 the hit ignites first.
+    int boost = eo_combat_active_school() == ELEMENT_FIRE ? eo_combat_active_boost() : 0;
+    if ((brian_spell == SPELL_FIRE_BOMB || boost >= 3) && burns[slot].turns_left > 0) {
         burn_ignite(slot);
     }
     if (hit > 0 && ENEMY_HP(slot) > 0) {
         u32 amount = (u32)hit * BURN_PERCENT / 100;
-        burn_add_stack(slot, (u16)(amount < 1 ? 1 : amount));
+        for (int i = 0; i <= boost; i++) {
+            burn_add_stack(slot, (u16)(amount < 1 ? 1 : amount));
+        }
     }
 }
 
@@ -281,6 +285,7 @@ RECOMP_HOOK_RETURN("frame_build") void eo_status_frame(void) {
 
 #define STATUS_WIN_X 54   // under the HUD's HP/MP box
 #define STATUS_WIN_Y 56
+#define STATUS_WIN_Y_BATTLE 98  // below the charge panel
 #define STATUS_WIN_W (8 * 8 + 20)
 #define STATUS_WIN_H 22
 
@@ -288,8 +293,9 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_status_draw(void) {
     if (poison_turns == 0) {
         return;
     }
-    eo_ui_window(STATUS_WIN_X, STATUS_WIN_Y, STATUS_WIN_W, STATUS_WIN_H);
-    eo_ui_text(STATUS_WIN_X + 10, STATUS_WIN_Y + 7, "Poisoned");
+    s32 y = (gBattleState & BATTLE_ACTIVE) ? STATUS_WIN_Y_BATTLE : STATUS_WIN_Y;
+    eo_ui_window(STATUS_WIN_X, y, STATUS_WIN_W, STATUS_WIN_H);
+    eo_ui_text(STATUS_WIN_X + 10, y + 7, "Poisoned");
 }
 
 // Set up the stand-in burn attacker once (from main.c).

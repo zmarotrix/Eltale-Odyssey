@@ -40,6 +40,24 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
       bar, 5% max HP per turn for 4 turns, also ticks outside battle, never below 1 HP. Water healing or an inn
       night cures it.
 
+## Spirit Charge, shields and Break (new)
+
+In battle there are two new panels: **Charge / Boost** under your HP bar, and an **enemy list** (top right) with
+each enemy's shields and weakness ("?" until you hit it with the right element; for now the weakness is always the
+element opposite the monster's own).
+
+- [ ] Charge starts at 1 and goes up by 1 each of your turns (max 5), but not on the turn after you spend some.
+      Your first weakness hit in a turn gives +1. (Checked by Claude.)
+- [ ] **D-pad up/down** sets Boost (0-3, no more than your charge) before you cast; it's spent when the spell fires.
+      Earth: +40% damage per charge. Wind: +2 shots per charge. Water: +30% healing, or Freezes the target for
+      1 turn per charge. Fire: +1 Burn stack per charge; at 3 it also sets off the Burn already on the target.
+- [ ] Each weakness hit removes a shield and reveals the weakness. At 0 the enemy is **Broken**: it skips its next
+      turn and takes 50% more damage until then; then its shields come back (bosses get one more each time).
+      (Checked by Claude: shields, reveal, charge bonus, Break and the skipped-turn status.)
+- [ ] Does Boost feel worth saving charge for? Are shield counts (2-4, bosses 6-10) right?
+
+Note: Holy Plains enemies die before they can be Broken; Break matters from tougher areas on.
+
 ## Known rough edges
 
 - Enemies show no Burn icon yet (damage numbers only); icons come with the battle UI work.

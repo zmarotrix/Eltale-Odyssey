@@ -99,6 +99,10 @@ void eo_enemy_spells_init(void);
 void eo_balance_apply(void);
 void eo_status_init(void);
 
+// ---- Combat (combat.c) ----
+int eo_combat_active_boost(void);   // Spirit Charge spent on the spell being cast, 0 if none
+int eo_combat_active_school(void);  // its element (0 Fire .. 3 Wind), -1 if none
+
 // ---- Status effects (status.c) ----
 void eo_status_cure_poison(void);
 
