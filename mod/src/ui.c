@@ -39,6 +39,9 @@ static void load_window_palette(void) {
 
 // Same pieces as the game's ui_draw_window: background, 3 px drop shadow, 1 px border.
 void eo_ui_window(s32 x, s32 y, s32 w, s32 h) {
+    if (!eo_gfx_fits(0x200)) {
+        return;
+    }
     load_window_palette();
     ui_draw_rect(0, x, y, w, h);
     ui_draw_rect(3, x + w, y + 3, 3, h);
@@ -104,6 +107,9 @@ void eo_text_encode_full(u8* out, const char* text) {
 
 // Draws plain text in the menu/dialogue font.
 void eo_ui_text(s32 x, s32 y, const char* text) {
+    if (!eo_gfx_fits(0x80 + eo_strlen(text) * 0x30)) {
+        return;
+    }
     u8 encoded[64];
     eo_text_encode_full(encoded, text);
     ui_draw_text(x, y, encoded);
@@ -189,6 +195,9 @@ void eo_format_amount(char* out, const char* label, u32 amount, int columns, con
 // mapped: lowercase to uppercase, ! and , to ., & to -; anything else becomes a space.
 
 void eo_ui_small(s32 x, s32 y, int palette, const char* text) {
+    if (!eo_gfx_fits(0x80 + eo_strlen(text) * 0x30)) {   // font setup, then a few commands a letter
+        return;
+    }
     char buf[64];
     int n = 0;
     for (; *text != '\0' && n < 63; text++) {

@@ -202,6 +202,9 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
         held_frame[slot] = *anim_frame;
         was_broken[slot] = (u8)broken;
     }
+    if (!eo_gfx_fits(0x100)) {
+        return;   // no room to tint and restore this model
+    }
     int p = pulse();
 
     // Broken and the Break flicker: darker lights.

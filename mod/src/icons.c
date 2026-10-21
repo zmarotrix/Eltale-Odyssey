@@ -342,6 +342,9 @@ void hud_draw_tex_region(void* texture, s32 x, s32 y, s32 w, s32 h, s32 s, s32 t
 
 // Loads our palette; call once before a batch of eo_icon_draw.
 void eo_icons_begin(void) {
+    if (!eo_gfx_fits(0x60)) {
+        return;
+    }
     eo_gfx(0xE7000000, 0x00000000);                // pipe sync
     eo_gfx(0xBA000E02, 0x00008000);                // texture LUT: RGBA16
     eo_gfx(0xE7000000, 0x00000000);
@@ -354,6 +357,9 @@ void eo_icons_begin(void) {
 }
 
 void eo_icon_draw(int icon, s32 x, s32 y) {
+    if (!eo_gfx_fits(0x80)) {
+        return;
+    }
     hud_draw_tex_region(descriptor, x, y, CELL, CELL, 0, icon * CELL, 0x400, 0x400);
 }
 

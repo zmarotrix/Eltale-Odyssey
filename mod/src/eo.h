@@ -35,8 +35,34 @@ extern s32 gMsgChoiceResult;    // -1 pending, 0 = first option (Yes), 1 = No
 
 extern u32* gMasterGfxPos;      // next free command in the frame's display list
 
-// Appends one raw display-list command to the frame.
+// The frame's display list sits in one of two frame contexts (0x80301000 + n * 0xD150; the list runs from +0x8148 to
+// the context's end, 0x5008 bytes). Writing past it overwrites the other context's task header and the game exits
+// with "Unknown task" (it did on the Water talent page in a busy room, playtest 2026-10-21). Everything the mod draws
+// checks the room left first and skips drawing rather than overflow.
+#define GFX_CONTEXT_BASE 0x80301000
+#define GFX_CONTEXT_SIZE 0xD150
+#define GFX_RESERVE 0x400   // left for the rest of the game's frame
+
+// Bytes left in the frame's display list (a large number when it isn't one of the two known lists).
+static inline s32 eo_gfx_room(void) {
+    u32 pos = (u32)gMasterGfxPos;
+    u32 n = (pos - GFX_CONTEXT_BASE) / GFX_CONTEXT_SIZE;
+    if (pos < GFX_CONTEXT_BASE || n > 1) {
+        return 0x7FFFFFFF;
+    }
+    return (s32)(GFX_CONTEXT_BASE + (n + 1) * GFX_CONTEXT_SIZE - pos);
+}
+
+// 1 if `bytes` more commands fit with the reserve to spare.
+static inline int eo_gfx_fits(s32 bytes) {
+    return eo_gfx_room() >= bytes + GFX_RESERVE;
+}
+
+// Appends one raw display-list command to the frame (dropped if the list is full).
 static inline void eo_gfx(u32 w0, u32 w1) {
+    if (eo_gfx_room() < 0x40) {
+        return;
+    }
     u32* g = gMasterGfxPos;
     g[0] = w0;
     g[1] = w1;
