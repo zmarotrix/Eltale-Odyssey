@@ -190,6 +190,38 @@ static void build_stock(int shop) {
 #define MSG_WINDOW_POSITION (*(s32*)0x8008C644)
 #define TEXT_END 0xFF
 
+// Each shopkeeper's own voice (playtest, 2026-10-20: "make the dialogue more natural"): two greetings that
+// alternate by day, and a line for when the shop is shut. Within 26 characters a line, two lines.
+typedef struct {
+    const char* greetings[2];
+    const char* closed;
+} Shopkeeper;
+
+static const Shopkeeper keepers[] = {
+    { { "Welcome! Small town, but\nI keep good stock.",                       // Ingram, Melrode
+        "Ah, Brian! Off on another\nadventure? Stock up first." },
+      "Brian? It's the middle of\nthe night. Come back later." },
+    { { "Welcome to Dondoran! Have\na look around.",                         // Thom, Dondoran
+        "Back from the Flats? You\nlook like you need bread." },
+      "Shop's shut. Dondoran\nsleeps early, friend." },
+    { { "Welcome to Larapool. Take\nyour time looking.",                     // Jiryo, Larapool
+        "Ah, a customer! Not many\ncome by the lake lately." },
+      "We're closed. Come back\nwhen the sun's up." },
+    { { "Oh, hello! Everything here\nis good for the road.",                 // Anette, Normoon
+        "Welcome! I've got a few\nnew things in today." },
+      "Sorry, dear, I've closed\nup for the night." },
+    { { "Welcome. You'll want good\nsupplies past this town.",               // Ring, Limelin
+        "Back again? Have a look,\nI've got what you need." },
+      "Closed. Try me again in\nthe morning." },
+    { { "Hm. A customer. Look,\nbut don't drop anything.",                   // Bronze, Greenoch
+        "Greenoch doesn't see many\nvisitors. Buying?" },
+      "It's late. Go to bed and\ncome back tomorrow." },
+    { { "Welcome to Brannoch. Have\na look around.",                         // Tom, Brannoch
+        "The road ahead is rough.\nBest stock up now." },
+      "We're closed, traveler.\nCome back at dawn." },
+};
+_Static_assert(sizeof(keepers) / sizeof(keepers[0]) == SHOP_COUNT, "one shopkeeper per shop");
+
 static int shop_pending = -1;  // shop to open once the greeting closes
 static int shop_open = -1;     // shop whose window is open
 
@@ -199,12 +231,13 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_shop_on_greeting(void) {
     if (shop < 0) {
         return;
     }
+    const Shopkeeper* keeper = &keepers[shop];
     if (eo_is_night()) {
         // Old-school shop hours: closed at night, open again at dawn.
-        eo_text_encode_full(gMessageBuffer, "We're closed for the night.\nCome back in the morning.");
+        eo_text_encode_full(gMessageBuffer, keeper->closed);
         return;
     }
-    eo_text_encode_full(gMessageBuffer, "Welcome, traveler. Have a\nlook at what I have today.");
+    eo_text_encode_full(gMessageBuffer, keeper->greetings[gCurrentDay % 2]);
     shop_pending = shop;
 }
 
@@ -228,6 +261,7 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_shop_on_greeting(void) {
 #define MESSAGE_FRAMES 60
 
 static int cursor = 0;
+static int closing = 0;   // frames left of the goodbye before the window closes
 static u16 menu_pressed = 0;
 static int stick_held = 0;
 static int message_timer = 0;
@@ -243,6 +277,7 @@ static void open_shop(int shop) {
     cursor = 0;
     message_timer = 0;
     menu_pressed = 0;
+    closing = 0;
 }
 
 // While the window is open the game sees no input (Brian can't walk or open menus).
@@ -267,9 +302,18 @@ RECOMP_HOOK_RETURN("pad_read") void eo_shop_read_input(void) {
 }
 
 static int message_palette = TEXT_WARN;
+static char message_text[40];
+static u32 sales = 0;     // picks the thank-you line
+
+// The shopkeeper's lines inside the window (the small font: uppercase, no commas or !).
+static const char* const thanks_lines[] = { "THANK YOU.", "A FINE CHOICE.", "ANYTHING ELSE?", "MUCH OBLIGED." };
+static const char* const goodbye_lines[] = { "COME AGAIN SOON.", "SAFE TRAVELS." };
+#define GOODBYE_FRAMES 40
 
 static void say_message(const char* text, int palette) {
-    message = text;
+    message_text[0] = '\0';
+    eo_append(message_text, text);
+    message = message_text;
     message_palette = palette;
     message_timer = MESSAGE_FRAMES;
 }
@@ -277,9 +321,16 @@ static void say_message(const char* text, int palette) {
 static void handle_input(void) {
     u16 pressed = menu_pressed;
     menu_pressed = 0;
+    if (closing > 0) {
+        if (--closing == 0) {
+            shop_open = -1;
+        }
+        return;
+    }
     if (pressed & BTN_B) {
         sfx_play(SFX_CANCEL, 0xFF, 0x40);
-        shop_open = -1;
+        say_message(goodbye_lines[gCurrentDay % 2], TEXT_GOOD);
+        closing = GOODBYE_FRAMES;
         return;
     }
     if (pressed & BTN_DUP) {
@@ -292,13 +343,14 @@ static void handle_input(void) {
         u8 good = stock[cursor];
         if (is_equipment(good) && eo_equipment_owned(good - EQ_BASE)) {
             sfx_play(SFX_CANCEL, 0xFF, 0x40);
-            say_message("You already have one.", TEXT_WARN);
+            say_message("YOU ALREADY HAVE ONE OF THOSE.", TEXT_WARN);
         } else if (GOLD < good_price(good)) {
             sfx_play(SFX_CANCEL, 0xFF, 0x40);
-            say_message("Not enough gold.", TEXT_WARN);
+            char line[40];
+            say_message(eo_text_fill(line, "YOU'RE %a GOLD SHORT.", 0, good_price(good) - GOLD, 0), TEXT_WARN);
         } else if (!is_equipment(good) && inventory_count_item(INVENTORY_EMPTY) == 0) {
             sfx_play(SFX_CANCEL, 0xFF, 0x40);
-            say_message("You can't carry any more.", TEXT_WARN);
+            say_message("YOUR BAG'S FULL.", TEXT_WARN);
         } else {
             GOLD -= good_price(good);
             if (is_equipment(good)) {
@@ -308,7 +360,7 @@ static void handle_input(void) {
             }
             eo_gold_resync();  // the shop shows the gold itself
             sfx_play(SFX_CONFIRM, 0xFF, 0x40);
-            say_message("Thank you.", TEXT_GOOD);
+            say_message(thanks_lines[sales++ % (sizeof(thanks_lines) / sizeof(thanks_lines[0]))], TEXT_GOOD);
         }
     }
 }

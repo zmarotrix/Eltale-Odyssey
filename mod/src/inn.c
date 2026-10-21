@@ -18,7 +18,7 @@
 // Dialogue text (research/npcs): the message buffer, control bytes, and where the window opens. The game
 // opens it at the top or bottom depending on a screen value (player_update, before msgwin_open).
 #define MESSAGE_BUFFER_SIZE 0x400
-#define PRICE_PAGE_MAX 96
+#define PRICE_PAGE_MAX 128
 #define TEXT_CHOICE_BOX 0xF2
 #define TEXT_PAGE_BREAK 0xF0
 #define TEXT_END        0xFF
@@ -122,6 +122,28 @@ static u32 tonight_price(void) {
     return night_price(inn, nights_in_row(inn));
 }
 
+// The innkeeper's lines (playtest, 2026-10-20: "make the dialogue more natural"). A line is picked by day and
+// inn, so talking twice the same day gives the same answer. Lines stay within 26 characters, up to four a page.
+// %w is the weekday, %a the price, %b Brian's gold or how much he is short.
+static const char* const price_lines[] = {
+    "Happy %w! A room's\n%a gold. Will you stay?",
+    "A room's %a gold tonight.\nShall I make one up?",
+    "It's been a quiet %w.\nCare for a room? It's\n%a gold for the night.",
+};
+#define PRICE_LINE_COUNT (sizeof(price_lines) / sizeof(price_lines[0]))
+// Another night in a row: the price went up, so say why.
+static const char* const again_line =
+    "Another night? Long stays\ncost more, I'm afraid.\nThat's %a gold tonight.\nShall I keep your room?";
+static const char* const short_lines[] = {
+    "Oh dear. It's %a gold, and\nyou're %b short. Sorry.",
+    "Sorry, a room's %a gold.\nYou're %b gold short.",
+};
+static const char* const broke_line = "No gold at all? Sorry, I\ncan't give rooms away.";
+
+static int line_pick(int count) {
+    return (int)((gCurrentDay + (u32)(current_inn() + 1)) % (u32)count);
+}
+
 // The innkeeper's greeting is loaded into gMessageBuffer by npc_talk_begin, and the window opens right after
 // it returns. Add a last page with the price, just before the Yes/No box (control byte F2).
 RECOMP_HOOK_RETURN("npc_talk_begin") void eo_inn_on_greeting(void) {
@@ -133,14 +155,9 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_inn_on_greeting(void) {
             return;  // no Yes/No box in this text: leave it alone
         }
         if (gMessageBuffer[i] == TEXT_CHOICE_BOX) {
-            char page[64];
-            char* end = page;
-            eo_format_u32(page, "That will be ", tonight_price(), " gold.\nToday is ");
-            while (*end) {
-                end++;
-            }
-            end = eo_append(end, eo_weekday_name(gCurrentDay));
-            eo_append(end, ".");
+            char page[PRICE_PAGE_MAX];
+            const char* line = nights_in_row(current_inn()) > 0 ? again_line : price_lines[line_pick(PRICE_LINE_COUNT)];
+            eo_text_fill(page, line, eo_weekday_name(gCurrentDay), tonight_price(), 0);
             u8* out = &gMessageBuffer[i];
             *out++ = TEXT_PAGE_BREAK;
             out = eo_text_encode(out, page);
@@ -172,12 +189,9 @@ RECOMP_HOOK("player_state_talking") void eo_inn_on_answer(void) {
         // The game now treats it as No: no rest, no heal, no save. The innkeeper says why first: with a
         // window open again, player_state_talking waits, and ends the conversation once it closes.
         gMsgChoiceResult = 1;
-        char line1[32];
-        char line2[32];
         char text[96];
-        eo_format_u32(line1, "costs ", price, " gold, and you\n");
-        eo_format_u32(line2, "only have ", GOLD, ".");
-        eo_append(eo_append(eo_append(text, "I'm sorry, but a night\n"), line1), line2);
+        const char* line = GOLD == 0 ? broke_line : short_lines[line_pick(2)];
+        eo_text_fill(text, line, 0, price, price - GOLD);
         say(text);
         return;
     }

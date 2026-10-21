@@ -130,6 +130,28 @@ char* eo_append(char* out, const char* text) {
     return out;
 }
 
+// Fills a line: %w becomes word, %a and %b the numbers a and b; everything else is copied. Returns out.
+char* eo_text_fill(char* out, const char* line, const char* word, u32 a, u32 b) {
+    char* o = out;
+    for (; *line != '\0'; line++) {
+        if (line[0] == '%' && (line[1] == 'w' || line[1] == 'a' || line[1] == 'b')) {
+            line++;
+            if (*line == 'w') {
+                o = eo_append(o, word != 0 ? word : "");
+            } else {
+                eo_format_u32(o, "", *line == 'a' ? a : b, "");
+                while (*o != '\0') {
+                    o++;
+                }
+            }
+        } else {
+            *o++ = *line;
+        }
+    }
+    *o = '\0';
+    return out;
+}
+
 void eo_format_amount(char* out, const char* label, u32 amount, int columns, const char* unit) {
     char number[12];
     eo_format_u32(number, "", amount, "");

@@ -103,6 +103,9 @@ void eo_text_encode_full(u8* out, const char* text);
 // fixed-width dialogue font.
 void eo_format_amount(char* out, const char* label, u32 amount, int columns, const char* unit);
 
+// Fills a line: %w becomes word, %a and %b the numbers a and b. Returns out.
+char* eo_text_fill(char* out, const char* line, const char* word, u32 a, u32 b);
+
 // Copies text to out and returns the new end (out stays zero-terminated).
 char* eo_append(char* out, const char* text);
 // "WERE HARE" -> "Were Hare" (the game's names are uppercase ASCII), cut to max_chars.
