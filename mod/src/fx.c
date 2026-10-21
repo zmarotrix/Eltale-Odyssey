@@ -59,7 +59,8 @@ static const u32 game_light[LIGHT_COUNT] = { 0x80085770, 0x80085780, 0x80085790,
 #define COLOR_ORANGE 15
 
 #define FLAME_FRAMES 24           // how long a burst lasts
-#define FLAME_SCALE 3.0f
+#define FLAME_SCALE 1.2f          // the game's sparkles are 1.3; it shrinks them to 1.0 near the end
+#define FLAME_HEIGHT 0.2f         // spawn this far up the body (0 = feet, 1 = top)
 
 void* particle_spawn(void* particle);
 s32 get_rand(s32 n);
@@ -144,11 +145,12 @@ static void spawn_flame(int slot) {
     f32 z = *(f32*)(bd + 0x8);
     f32 width = 4.0f;
     if (record != 0) {
-        // Middle of the body, the way the game's death effect finds it.
+        // Low on the body. Fliers: down from the top of the body, as the game's death effect finds it.
+        f32 height = *(f32*)(record + RECORD_HEIGHT) * scale;
         if (*(u16*)(record + RECORD_TYPE) == 1) {
-            y = *(f32*)(*(u8**)(bd + 0x68) + 0x94);
+            y = *(f32*)(*(u8**)(bd + 0x68) + 0x94) - height * (1.0f - FLAME_HEIGHT);
         } else {
-            y += *(f32*)(record + RECORD_HEIGHT) * scale * 0.5f;
+            y += height * FLAME_HEIGHT;
         }
         width = *(f32*)(record + RECORD_WIDTH) * scale * 0.5f;
     }
@@ -160,7 +162,7 @@ static void spawn_flame(int slot) {
     *(u16*)(p + P_LIFE) = (u16)(18 + get_rand(12));
     *(u32**)(p + P_GFX) = flame_gfx();
     *(f32*)(p + P_POS + 0) = x + rand_unit() * width;
-    *(f32*)(p + P_POS + 4) = y + rand_unit() * width * 0.5f;
+    *(f32*)(p + P_POS + 4) = y + rand_unit() * width * 0.2f;
     *(f32*)(p + P_POS + 8) = z + rand_unit() * width;
     *(f32*)(p + P_SCALE + 0) = FLAME_SCALE;
     *(f32*)(p + P_SCALE + 4) = FLAME_SCALE;
