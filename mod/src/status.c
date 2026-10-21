@@ -53,7 +53,7 @@ static const u16 poisoners_by_set[] = {
 };
 
 s32 enemy_take_damage(s32 slot, u16 power, u16 element, u16 flags, void* attacker);
-void func_80018DF4(void* battle_data, s32 unk, s32 amount);  // shows a damage number over a fighter
+void damage_popup_spawn(void* battle_data, s32 unk, s32 amount);  // shows a damage number over a fighter
 s32 get_rand(s32 n);  // 0..n-1
 extern u16 gBattleState;
 
@@ -205,7 +205,7 @@ static void poison_tick(int in_battle) {
     }
     BRIAN_HP = (u16)(hp - amount);
     if (in_battle) {
-        func_80018DF4(BRIAN_BATTLE_DATA, 0, (s32)amount);
+        damage_popup_spawn(BRIAN_BATTLE_DATA, 0, (s32)amount);
     }
 }
 
@@ -232,7 +232,7 @@ RECOMP_HOOK("battle_end_turn") void eo_status_on_turn_end(void) {
 }
 
 // Every frame: poison keeps ticking in the field, and a defeat clears it.
-RECOMP_HOOK_RETURN("func_800011DC") void eo_status_frame(void) {
+RECOMP_HOOK_RETURN("frame_build") void eo_status_frame(void) {
     if (BRIAN_HP == 0) {
         poison_turns = 0;
     }
