@@ -52,3 +52,10 @@ wr "8007BACC" ((fh $px) + (fh ($zy + 5)) + (fh $pz))
 wr "8007BADC" (fh ([math]::Atan2($zx - $px, $zz - $pz)))
 "Brian at ({0:n0}, {1:n0}), Zelse at ({2:n0}, {3:n0}); the fight starts on its own" -f $px, $pz, $zx, $zz
 (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:43064/api/brian" -Headers $h).Content
+# The fight puts Brian where he stood, which is inside a tree trunk; once it starts, move him to open ground in the
+# clearing between the trees (playtest, 2026-10-21), facing Zelse.
+for ($i = 0; $i -lt 40; $i++) { Start-Sleep -Milliseconds 500; if ((m "8008C592" 2) -ne "0000") { break } }
+Start-Sleep 1
+wr "8007BACC" ((fh ($zx - 25)) + (fh ($zy + 3)) + (fh ($zz + 55)))
+wr "8007BADC" (fh ([math]::Atan2(25, -55)))
+"battle " + (m "8008C592" 2) + ": Brian moved to open ground"
