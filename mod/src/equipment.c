@@ -125,7 +125,9 @@ extern u16 gBattleState;
 #define WIN_W (32 * SMALL_W + 2 * SMALL_PAD)
 #define WIN_X ((320 - WIN_W) / 2)
 #define WIN_Y 32
-#define ROW_H SMALL_LINE
+#define ROW_H 12   // room for the slot icons
+#define ICON_X (WIN_X + SMALL_PAD + ICON_W)
+#define TEXT_X (ICON_X + ICON_W + 1)
 
 static const char* const slot_names[SLOT_COUNT] = { "Staff", "Robe", "Charm", "Sigil" };
 
@@ -236,22 +238,23 @@ static void draw_window(void) {
     s32 list_y = WIN_Y + SMALL_PAD + SMALL_LINE + 3;
     s32 info_y = list_y + rows * ROW_H + 3;
     eo_ui_window(WIN_X, WIN_Y, WIN_W, info_y + SMALL_LINE + SMALL_PAD - 2 - WIN_Y);
-    s32 x = WIN_X + SMALL_PAD + 2 * SMALL_W;
+    // Rows: the slot's icon (a lock while it is closed), then the slot and the piece in it. Text sits 2 pixels
+    // down a 12-pixel row.
     if (!choosing) {
         eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, TEXT_NORMAL, "EQUIPMENT");
         for (int s = 0; s < SLOT_COUNT; s++) {
-            s32 y = list_y + s * ROW_H;
+            s32 y = list_y + s * ROW_H + 2;
             int open = slot_open(s);
             int palette = !open ? TEXT_DIM : s == cursor ? TEXT_GOOD : TEXT_NORMAL;
             int worn = worn_in(s);
-            eo_ui_small(x, y, palette, slot_names[s]);
-            eo_ui_small(x + 7 * SMALL_W, y, palette, !open ? "LOCKED" : worn >= 0 ? catalog[worn].name : "NOTHING");
+            eo_ui_small(TEXT_X, y, palette, slot_names[s]);
+            eo_ui_small(TEXT_X + 7 * SMALL_W, y, palette, !open ? "LOCKED" : worn >= 0 ? catalog[worn].name : "-");
         }
     } else {
         eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, TEXT_NORMAL, slot_names[slot_cursor]);
         for (int i = 0; i < choice_count; i++) {
             int palette = i == cursor ? TEXT_GOOD : TEXT_NORMAL;
-            eo_ui_small(x, list_y + i * ROW_H, palette, choices[i] < 0 ? "NOTHING" : catalog[choices[i]].name);
+            eo_ui_small(TEXT_X, list_y + i * ROW_H + 2, palette, choices[i] < 0 ? "NOTHING" : catalog[choices[i]].name);
         }
     }
 
@@ -263,7 +266,15 @@ static void draw_window(void) {
         eo_ui_small(WIN_X + SMALL_PAD, info_y, TEXT_NORMAL, piece >= 0 ? catalog[piece].effect : "");
     }
     eo_icons_begin();
-    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, list_y + cursor * ROW_H - 2);
+    for (int i = 0; i < rows; i++) {
+        s32 y = list_y + i * ROW_H + 2 + ICON_TEXT_DY;
+        if (!choosing) {
+            eo_icon_draw(slot_open(i) ? ICON_STAFF + i : ICON_LOCK, ICON_X, y);
+        } else if (choices[i] >= 0) {
+            eo_icon_draw(ICON_STAFF + slot_cursor, ICON_X, y);
+        }
+    }
+    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, list_y + cursor * ROW_H + 2 + ICON_TEXT_DY);
 }
 
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_equipment_draw(void) {

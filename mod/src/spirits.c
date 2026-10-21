@@ -175,11 +175,16 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
 
 // ---- The Spirits window ----
 
-// Small font layout, 30 characters wide.
+// Small font layout, 30 characters wide. Rows are taller than text lines to fit the element gems.
 #define WIN_W (30 * SMALL_W + 2 * SMALL_PAD)
 #define WIN_X ((320 - WIN_W) / 2)
 #define WIN_Y 40
-#define ROW_H SMALL_LINE
+#define ROW_H 13
+#define GEM_X (WIN_X + SMALL_PAD + ICON_W)
+#define NAME_X (GEM_X + ICON_W + 2)
+#define LEVEL_X (NAME_X + 7 * SMALL_W)
+#define PIPS_X (LEVEL_X + 6 * SMALL_W + 4)
+#define PIP_STEP 8
 #define LIST_Y (WIN_Y + SMALL_PAD + SMALL_LINE + 3)
 #define INFO_Y (LIST_Y + SCHOOLS * ROW_H + 3)
 #define WIN_H (INFO_Y + SMALL_LINE + SMALL_PAD - 2 - WIN_Y)
@@ -262,44 +267,56 @@ static void handle_input(void) {
     }
 }
 
+// Text y of a row: centered on the 13-pixel row.
+static s32 row_text_y(int s) {
+    return LIST_Y + s * ROW_H + 3;
+}
+
 static void draw_window(void) {
     char line[40];
     eo_ui_window(WIN_X, WIN_Y, WIN_W, WIN_H);
     eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, TEXT_NORMAL, "SPIRITS");
-    eo_format_amount(line, "POINTS", gEo.spirit_points, 10, "");
-    eo_ui_small(WIN_X + WIN_W - SMALL_PAD - 10 * SMALL_W, WIN_Y + SMALL_PAD, TEXT_NORMAL, line);
-    s32 x = WIN_X + SMALL_PAD + 2 * SMALL_W;
+    // Unspent points, top right: a purple pip and the count.
+    eo_format_u32(line, "", gEo.spirit_points, "");
+    s32 points_x = WIN_X + WIN_W - SMALL_PAD - hud_strlen(line) * SMALL_W;
+    eo_ui_small(points_x, WIN_Y + SMALL_PAD, TEXT_NORMAL, line);
+
     for (int s = 0; s < SCHOOLS; s++) {
-        s32 y = LIST_Y + s * ROW_H;
+        s32 y = row_text_y(s);
         int palette = s == cursor ? TEXT_GOOD : TEXT_NORMAL;
-        eo_ui_small(x, y, palette, element_names[s]);
-        eo_format_amount(line, "LV", ELEMENT_LEVELS[s], 5, "");
-        eo_ui_small(x + 7 * SMALL_W, y, palette, line);
-        eo_format_amount(line, "TIER", gEo.tiers[s], 6, "");
-        eo_ui_small(x + 14 * SMALL_W, y, palette, line);
+        eo_ui_small(NAME_X, y, palette, element_names[s]);
+        eo_format_u32(line, "LV ", ELEMENT_LEVELS[s], "");
+        eo_ui_small(LEVEL_X, y, palette, line);
     }
 
-    // What the next tier of the selected element needs.
+    // The next tier of the selected element: its level gate and point cost, each green once met, red if not.
     int next = gEo.tiers[cursor] + 1;
+    s32 cost_x = 0;
     if (next > TIERS) {
         eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, TEXT_DIM, "FULLY ATTUNED.");
     } else {
-        char num[8];
-        char* out = eo_append(line, "TIER ");
-        eo_format_u32(num, "", (u32)next, "");
-        out = eo_append(out, num);
-        out = eo_append(out, ": LV ");
-        eo_format_u32(num, "", tier_min_level[next], "");
-        out = eo_append(out, num);
-        out = eo_append(out, " AND ");
-        eo_format_u32(num, "", tier_cost[next], "");
-        out = eo_append(out, num);
-        eo_append(out, " POINTS");
-        int ready = ELEMENT_LEVELS[cursor] >= tier_min_level[next] && gEo.spirit_points >= tier_cost[next];
-        eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, ready ? TEXT_GOOD : TEXT_NORMAL, line);
+        eo_format_u32(line, "NEXT TIER: LV ", tier_min_level[next], "");
+        int level_ok = ELEMENT_LEVELS[cursor] >= tier_min_level[next];
+        eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, level_ok ? TEXT_GOOD : TEXT_WARN, line);
+        cost_x = WIN_X + SMALL_PAD + (hud_strlen(line) + 1) * SMALL_W;
+        eo_format_u32(line, "", tier_cost[next], "");
+        int points_ok = gEo.spirit_points >= tier_cost[next];
+        eo_ui_small(cost_x + ICON_W, INFO_Y, points_ok ? TEXT_GOOD : TEXT_WARN, line);
     }
+
     eo_icons_begin();
-    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, LIST_Y + cursor * ROW_H - 2);
+    eo_icon_draw(ICON_PIP_FULL, points_x - ICON_W, WIN_Y + SMALL_PAD + ICON_TEXT_DY);
+    for (int s = 0; s < SCHOOLS; s++) {
+        s32 y = row_text_y(s) + ICON_TEXT_DY;
+        eo_icon_draw(ICON_FIRE + s, GEM_X, y);
+        for (int t = 1; t <= TIERS; t++) {   // attuned tiers filled
+            eo_icon_draw(t <= gEo.tiers[s] ? ICON_PIP_FULL : ICON_PIP_EMPTY, PIPS_X + (t - 1) * PIP_STEP, y);
+        }
+    }
+    if (cost_x != 0) {
+        eo_icon_draw(ICON_PIP_FULL, cost_x, INFO_Y + ICON_TEXT_DY);
+    }
+    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, row_text_y(cursor) + ICON_TEXT_DY);
 }
 
 #define NOTICE_Y 182

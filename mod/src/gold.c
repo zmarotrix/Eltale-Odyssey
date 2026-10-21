@@ -14,6 +14,8 @@ static int synced = 0;
 static int notice_timer = 0;
 static char notice_line1[24];
 static char notice_line2[24];
+static int notice_coins = 0;  // a gold notice: a coin before the total
+static int notice_spent = 0;  // ...and the change in red
 
 void eo_format_u32(char* out, const char* prefix, u32 value, const char* suffix) {
     char digits[11];
@@ -53,6 +55,7 @@ void eo_gold_notice(const char* line1, const char* line2) {
     copy_text(notice_line1, line1);
     copy_text(notice_line2, line2);
     notice_timer = NOTICE_FRAMES;
+    notice_coins = 0;
 }
 
 static void watch_gold(void) {
@@ -67,14 +70,13 @@ static void watch_gold(void) {
     }
     char line1[24];
     char line2[24];
-    eo_format_amount(line1, "Gold", gold, NOTICE_COLUMNS, "");
-    if (gold > shown_gold) {
-        eo_format_amount(line2, "Won", gold - shown_gold, NOTICE_COLUMNS, "");
-    } else {
-        eo_format_amount(line2, "Paid", shown_gold - gold, NOTICE_COLUMNS, "");
-    }
+    // A coin and the total on top, the change below it: green for winnings, red with "-" for spending.
+    eo_format_u32(line1, "", gold, "");
+    eo_format_u32(line2, gold > shown_gold ? "" : "-", gold > shown_gold ? gold - shown_gold : shown_gold - gold, "");
+    notice_spent = gold < shown_gold;
     shown_gold = gold;
     eo_gold_notice(line1, line2);
+    notice_coins = 1;
 }
 
 // hud_draw_main draws the field and battle HUD when no menu or dialogue is open.
@@ -84,10 +86,23 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_gold_draw(void) {
         return;
     }
     notice_timer--;
-    // The game's parchment window, with the HUD's small font.
-    eo_ui_window(NOTICE_X, NOTICE_Y, NOTICE_W, NOTICE_H);
-    eo_ui_small(NOTICE_X + SMALL_PAD, NOTICE_Y + SMALL_PAD, TEXT_NORMAL, notice_line1);
-    eo_ui_small(NOTICE_X + SMALL_PAD, NOTICE_Y + SMALL_PAD + SMALL_LINE, TEXT_GOOD, notice_line2);
+    // The game's parchment window, with the HUD's small font; a gold notice is just wide enough for its
+    // numbers and coin. Both lines right-aligned, against the screen's top right.
+    s32 w = NOTICE_W;
+    if (notice_coins) {
+        s32 len = hud_strlen(notice_line1) > hud_strlen(notice_line2) ? hud_strlen(notice_line1) : hud_strlen(notice_line2);
+        w = len * SMALL_W + ICON_W + 2 * SMALL_PAD;
+    }
+    s32 right = NOTICE_X + NOTICE_W - SMALL_PAD;
+    eo_ui_window(right + SMALL_PAD - w, NOTICE_Y, w, NOTICE_H);
+    s32 x1 = right - hud_strlen(notice_line1) * SMALL_W;
+    eo_ui_small(x1, NOTICE_Y + SMALL_PAD, TEXT_NORMAL, notice_line1);
+    eo_ui_small(right - hud_strlen(notice_line2) * SMALL_W, NOTICE_Y + SMALL_PAD + SMALL_LINE,
+                notice_coins && notice_spent ? TEXT_WARN : TEXT_GOOD, notice_line2);
+    if (notice_coins) {
+        eo_icons_begin();
+        eo_icon_draw(ICON_COIN, x1 - ICON_W, NOTICE_Y + SMALL_PAD + ICON_TEXT_DY);
+    }
 }
 
 // Boss gold (pacing plan, "Gold and shops"). Only Solvaring carries gold in the ROM (200, paid through the

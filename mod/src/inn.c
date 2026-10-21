@@ -32,9 +32,9 @@ void msgwin_open(s32 position);
 
 // The price window, centered at the top or bottom of the screen, whichever the game's windows leave free
 // (the dialogue box moves between them depending on where Brian stands).
-#define PRICE_COLUMNS 15  // label + right-aligned amount; " gold" follows
+#define PRICE_COLUMNS 15  // label + right-aligned amount; a coin follows
 #define HUD_SETUP_DL 0x803A6FC0  // hud_draw_main's render setup (copy mode, TLUT, texture-only combine)
-#define PRICE_WIN_W (20 * SMALL_W + 2 * SMALL_PAD)  // small font
+#define PRICE_WIN_W (PRICE_COLUMNS * SMALL_W + ICON_W + 2 * SMALL_PAD)  // small font, then a coin
 #define PRICE_WIN_H (2 * SMALL_LINE + 2 * SMALL_PAD - 2)
 #define PRICE_WIN_X ((320 - PRICE_WIN_W) / 2)
 #define PRICE_WIN_TOP_Y    16
@@ -126,7 +126,7 @@ static u32 tonight_price(void) {
 // inn, so talking twice the same day gives the same answer. Lines stay within 26 characters, up to four a page.
 // %w is the weekday, %a the price, %b Brian's gold or how much he is short.
 static const char* const price_lines[] = {
-    "Happy %w! A room's\n%a gold. Will you stay?",
+    "Happy %w! It's %a\ngold a night. Want a room?",   // the greeting before already asks "Will you stay?"
     "A room's %a gold tonight.\nShall I make one up?",
     "It's been a quiet %w.\nCare for a room? It's\n%a gold for the night.",
 };
@@ -232,8 +232,8 @@ RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
     u32 price = night_price(inn, nights_in_row(inn));
     char line1[24];
     char line2[24];
-    eo_format_amount(line1, "One night", price, PRICE_COLUMNS, " gold");
-    eo_format_amount(line2, "You have", GOLD, PRICE_COLUMNS, " gold");
+    eo_format_amount(line1, "One night", price, PRICE_COLUMNS, "");
+    eo_format_amount(line2, "You have", GOLD, PRICE_COLUMNS, "");
     // A small window in the dialogue box's own style and font, drawn right after the game's windows.
     s32 y = overlaps_game_window(PRICE_WIN_TOP_Y) ? PRICE_WIN_BOTTOM_Y : PRICE_WIN_TOP_Y;
     eo_ui_window(PRICE_WIN_X, y, PRICE_WIN_W, PRICE_WIN_H);
@@ -241,6 +241,11 @@ RECOMP_HOOK_RETURN("msgwin_update_all") void eo_inn_draw_price(void) {
     eo_gfx(0x06000000, HUD_SETUP_DL);
     eo_ui_small(PRICE_WIN_X + SMALL_PAD, y + SMALL_PAD, TEXT_NORMAL, line1);
     eo_ui_small(PRICE_WIN_X + SMALL_PAD, y + SMALL_PAD + SMALL_LINE, GOLD < price ? TEXT_WARN : TEXT_NORMAL, line2);
+    // A coin after each amount.
+    s32 coin_x = PRICE_WIN_X + SMALL_PAD + PRICE_COLUMNS * SMALL_W;
+    eo_icons_begin();
+    eo_icon_draw(ICON_COIN, coin_x, y + SMALL_PAD + ICON_TEXT_DY);
+    eo_icon_draw(ICON_COIN, coin_x, y + SMALL_PAD + SMALL_LINE + ICON_TEXT_DY);
 }
 
 int eo_inn_here(void) {

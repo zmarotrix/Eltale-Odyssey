@@ -12,6 +12,7 @@ enum {
     C_CLEAR, C_OUTLINE, C_SHINE,
     C_EMPTY, C_PURPLE, C_GOLD, C_RED, C_AMBER, C_BLUE, C_GREEN,
     C_FLAME_OUT, C_FLAME_IN, C_CRACK, C_POISON, C_POISON_DARK,
+    C_GOLD_DARK, C_WOOD, C_STEEL,
     C_COUNT
 };
 
@@ -157,6 +158,133 @@ static void make_pointer(int icon) {
     }
 }
 
+// Paints pixel art into a cell: each character of `keys` stands for the color at the same place in `colors`;
+// anything else is clear. Art is drawn from the cell's top left plus (dx, dy).
+static void paint(int icon, const char* const* art, int rows, int dx, int dy, const char* keys, const u8* colors) {
+    for (int y = 0; y < rows; y++) {
+        for (int x = 0; art[y][x] != '\0'; x++) {
+            for (int k = 0; keys[k] != '\0'; k++) {
+                if (art[y][x] == keys[k]) {
+                    put(icon, x + dx, y + dy, colors[k]);
+                }
+            }
+        }
+    }
+}
+
+// The menu icons are 8-10 pixels, so they sit on a 10-pixel text row (drawn 2 pixels above the text).
+
+static void make_coin(int icon) {
+    static const char* const art[] = {
+        "  ####  ",
+        " #yyyy# ",
+        "#y*yyyd#",
+        "#yyyyyd#",
+        "#yyyyyd#",
+        "#yyyydd#",
+        " #dddd# ",
+        "  ####  ",
+    };
+    static const u8 colors[] = { C_GOLD_DARK, C_GOLD, C_SHINE, C_AMBER };
+    paint(icon, art, 8, 2, 2, "#y*d", colors);
+}
+
+// A small diamond: tier pips and Spirit Points.
+static void make_pip(int icon, u8 fill) {
+    static const char* const art[] = {
+        "   #   ",
+        "  #.#  ",
+        " #...# ",
+        "#.....#",
+        " #...# ",
+        "  #.#  ",
+        "   #   ",
+    };
+    const u8 colors[] = { C_OUTLINE, fill };
+    paint(icon, art, 7, 2, 3, "#.", colors);
+}
+
+static void make_lock(int icon) {
+    static const char* const art[] = {
+        "  ####  ",
+        " #    # ",
+        " #    # ",
+        "########",
+        "#ssssss#",
+        "#sss#ss#",
+        "#sss#ss#",
+        "#ssssss#",
+        "########",
+    };
+    static const u8 colors[] = { C_OUTLINE, C_STEEL };
+    paint(icon, art, 9, 2, 2, "#s", colors);
+}
+
+static void make_staff(int icon) {
+    static const char* const art[] = {
+        "       ## ",
+        "      #oo#",
+        "      #o*#",
+        "     #w## ",
+        "    #w#   ",
+        "   #w#    ",
+        "  #w#     ",
+        " #w#      ",
+        "#w#       ",
+        "##        ",
+    };
+    static const u8 colors[] = { C_OUTLINE, C_BLUE, C_SHINE, C_WOOD };
+    paint(icon, art, 10, 1, 1, "#o*w", colors);
+}
+
+static void make_robe(int icon) {
+    static const char* const art[] = {
+        "  ##  ##  ",
+        " #bb##bb# ",
+        "#bbbbbbbb#",
+        "#b#bbbb#b#",
+        "## #bb# ##",
+        "   #bb#   ",
+        "  #bbbb#  ",
+        "  #bbbb#  ",
+        " #bbbbbb# ",
+        " ######## ",
+    };
+    static const u8 colors[] = { C_OUTLINE, C_RED };
+    paint(icon, art, 10, 1, 1, "#b", colors);
+}
+
+static void make_charm(int icon) {
+    static const char* const art[] = {
+        "#      #",
+        " #    # ",
+        "  #  #  ",
+        "   ##   ",
+        "  #gg#  ",
+        " #g*gg# ",
+        " #gggg# ",
+        "  #gg#  ",
+        "   ##   ",
+    };
+    static const u8 colors[] = { C_GOLD_DARK, C_GREEN, C_SHINE };
+    paint(icon, art, 9, 2, 1, "#g*", colors);
+}
+
+static void make_sigil(int icon) {
+    static const char* const art[] = {
+        "  ####  ",
+        " #pppp# ",
+        "#pp..pp#",
+        "#p.pp.p#",
+        "#p.pp.p#",
+        "#pp..pp#",
+        " #pppp# ",
+        "  ####  ",
+    };
+    static const u8 colors[] = { C_OUTLINE, C_PURPLE, C_GOLD };
+    paint(icon, art, 8, 2, 2, "#p.", colors);
+}
+
 void eo_icons_init(void) {
     for (u32 i = 0; i < ATLAS_SIZE; i++) {
         atlas[i] = C_CLEAR;
@@ -179,6 +307,9 @@ void eo_icons_init(void) {
     palette[C_CRACK] = rgba5551(250, 250, 240);
     palette[C_POISON] = rgba5551(150, 70, 190);
     palette[C_POISON_DARK] = rgba5551(60, 20, 80);
+    palette[C_GOLD_DARK] = rgba5551(120, 80, 10);
+    palette[C_WOOD] = rgba5551(150, 95, 45);
+    palette[C_STEEL] = rgba5551(150, 150, 165);
 
     make_diamond(ICON_CHARGE_EMPTY, C_EMPTY);
     make_diamond(ICON_CHARGE_FULL, C_PURPLE);
@@ -191,6 +322,14 @@ void eo_icons_init(void) {
     make_broken(ICON_BROKEN);
     make_poison(ICON_POISON);
     make_pointer(ICON_POINTER);
+    make_coin(ICON_COIN);
+    make_pip(ICON_PIP_EMPTY, C_EMPTY);
+    make_pip(ICON_PIP_FULL, C_PURPLE);
+    make_lock(ICON_LOCK);
+    make_staff(ICON_STAFF);
+    make_robe(ICON_ROBE);
+    make_charm(ICON_CHARM);
+    make_sigil(ICON_SIGIL);
 
     descriptor[0] = (u32)atlas;
     descriptor[1] = 0;

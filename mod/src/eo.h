@@ -135,8 +135,12 @@ enum {
     ICON_CHARGE_EMPTY, ICON_CHARGE_FULL, ICON_CHARGE_SPEND,
     ICON_FIRE, ICON_EARTH, ICON_WATER, ICON_WIND,   // element diamonds, in element order
     ICON_BURN, ICON_BROKEN, ICON_POISON, ICON_POINTER,
+    ICON_COIN, ICON_PIP_EMPTY, ICON_PIP_FULL, ICON_LOCK,
+    ICON_STAFF, ICON_ROBE, ICON_CHARM, ICON_SIGIL,   // equipment slots, in slot order
     ICON_COUNT
 };
+#define ICON_TEXT_DY (-2)   // draw an icon at a small-text line's y + ICON_TEXT_DY to line them up
+#define ICON_W 12
 void eo_icons_init(void);
 void eo_icons_begin(void);                 // loads the icon palette; call before drawing icons
 void eo_icon_draw(int icon, s32 x, s32 y);  // 12 x 12

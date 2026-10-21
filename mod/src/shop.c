@@ -243,7 +243,8 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_shop_on_greeting(void) {
 
 // ---- The shop window ----
 
-// Small font layout: pointer, name (16), price (5), owned ("x 2"); the bottom line holds up to 31 characters.
+// Small font layout: pointer, name (16), price (5) and a coin, owned ("x 2"); the bottom line holds up to 31
+// characters.
 #define WIN_W (31 * SMALL_W + 2 * SMALL_PAD)
 #define WIN_X ((320 - WIN_W) / 2)
 #define WIN_Y 24
@@ -252,7 +253,8 @@ RECOMP_HOOK_RETURN("npc_talk_begin") void eo_shop_on_greeting(void) {
 #define LIST_Y (TITLE_Y + SMALL_LINE + 3)
 #define NAME_X (WIN_X + SMALL_PAD + 2 * SMALL_W)
 #define PRICE_X (NAME_X + 17 * SMALL_W)
-#define OWNED_X (PRICE_X + 6 * SMALL_W)
+#define COIN_X (PRICE_X + 5 * SMALL_W - 1)   // a coin after each price
+#define OWNED_X (COIN_X + ICON_W + 1)
 #define BTN_A 0x8000
 #define BTN_B 0x4000
 #define BTN_DUP 0x0800
@@ -370,8 +372,9 @@ static void draw_shop(void) {
     char line[32];
     eo_ui_window(WIN_X, WIN_Y, WIN_W, h);
     eo_ui_small(WIN_X + SMALL_PAD, TITLE_Y, TEXT_NORMAL, "SHOP");
-    eo_format_amount(line, "GOLD", GOLD, 12, "");
-    eo_ui_small(WIN_X + WIN_W - SMALL_PAD - 12 * SMALL_W, TITLE_Y, TEXT_NORMAL, line);
+    eo_format_u32(line, "", GOLD, "");
+    s32 gold_x = WIN_X + WIN_W - SMALL_PAD - hud_strlen(line) * SMALL_W;
+    eo_ui_small(gold_x, TITLE_Y, TEXT_NORMAL, line);
     for (int i = 0; i < stock_count; i++) {
         u8 good = stock[i];
         s32 y = LIST_Y + i * ROW_H;
@@ -390,7 +393,11 @@ static void draw_shop(void) {
         eo_ui_small(WIN_X + SMALL_PAD, info_y, TEXT_NORMAL, good_effect(stock[cursor]));
     }
     eo_icons_begin();
-    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, LIST_Y + cursor * ROW_H - 2);
+    eo_icon_draw(ICON_COIN, gold_x - ICON_W, TITLE_Y + ICON_TEXT_DY);
+    for (int i = 0; i < stock_count; i++) {
+        eo_icon_draw(ICON_COIN, COIN_X, LIST_Y + i * ROW_H + ICON_TEXT_DY);
+    }
+    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, LIST_Y + cursor * ROW_H + ICON_TEXT_DY);
 }
 
 // The shop window draws over the field HUD; the greeting closes first, then the window opens.
