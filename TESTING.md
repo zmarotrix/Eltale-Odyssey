@@ -176,7 +176,11 @@ every tree, on top of 92 for full attunement, out of 98 in the game.
 **Lock-On** (Wind, Lv 3): in battle, hold **Z** and Brian locks onto an enemy (the one most straight ahead) and
 keeps facing it while you move, which aims your spells. Tap Z again to switch to the next enemy. A pale-gold
 sparkle floats over the target. Z doesn't swing or cast while the talent is learned (A and R still do).
-- [ ] Facing and the marker checked by Claude; moving while locked and switching targets not checked yet.
+While locked, the stick moves Brian any way it would normally (strafing no longer pulls him toward the target), and
+the camera swings round behind him to look at the target.
+- [x] Camera turn and strafing: checked by you (2026-10-21). Since then the camera turns a little faster, and
+      standing still keeps him facing the target for casts (loads on the next launch).
+- [ ] Switching targets with a second tap: not checked yet.
 
 - [ ] Pages draw (checked by Claude). Learning ranks and every effect: not checked yet (needs points and levels;
       the dev panel's Brian tab can raise element levels, and Spirit Points can be set from the Memory tab).
