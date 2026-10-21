@@ -1,9 +1,11 @@
 param([int]$Fire = 8, [int]$Earth = 34, [int]$Water = 8, [int]$Wind = 8, [int]$Hp = 160, [int]$Mp = 50,
-      [int]$Defense = 18, [int]$Agility = 35, [switch]$SetupOnly, [switch]$FightOnly)
+      [int]$Defense = 18, [int]$Agility = 35, [switch]$SetupOnly, [switch]$FightOnly,
+      [int]$Boss = 1)
 # Zelse difficulty test (RAM only; never save afterwards). Gives Brian a typical end-of-beat-2 build (pacing plan:
 # 44 spirits plus about 10 battle levels, focused on Earth, Zelse's weakness), the gear he could own by then, Earth
 # attuned to tier 4 and Water to tier 2 with 22 Spirit Points left for talents, marks Solvaring beaten (charm slot),
 # then warps to Zelse's map and puts Brian inside the boss's trigger range, so the fight starts.
+# -Boss picks another boss's fight (0 Solvaring ... 6 Beigis, 7 Mammon); the build stays Zelse's.
 # Back up the save first (dev panel Saves, or POST /api/saves/backup).
 # -SetupOnly: stats, gear and items only, so talents can be bought (D-pad up) before the fight; then -FightOnly.
 # Agility 35 gives about 82% to hit Zelse (agility 60): 100 x a / (a + 60 / 8). 18 gave 71% and felt like constant
@@ -46,7 +48,7 @@ Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://127.0.0.1:43064/api
 if ($SetupOnly) { "Set up. Buy talents (D-pad up), then run again with -FightOnly."; return }
 
 # Zelse's field location (boss table 0x803A9AD0, record 1): map, submap, x, z.
-$loc = m "803A9AE8" 24
+$loc = m ((0x803A9AD0 + 0x18 * $Boss).ToString("x8")) 24
 $zmap = [Convert]::ToInt32($loc.Substring(0, 4), 16); $zsub = [Convert]::ToInt32($loc.Substring(4, 4), 16)
 $zx = f $loc.Substring(24, 8); $zz = f $loc.Substring(32, 8)
 wr '80085368' (('{0:x8}{1:x8}00000000') -f $zmap, $zsub)

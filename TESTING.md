@@ -271,14 +271,18 @@ Epicentre no longer makes a Broken boss lose two turns (bosses lose one, like Fr
 From the design rule that every boss uses at least three tricks (game design document, "Keeping 1v1 boss fights
 from becoming a rotation"):
 - **Growing shields** (already in): a boss gets one more shield each time it comes back from a Break.
-- **Weakness re-roll (Beigis only)**: each time Beigis comes back from a Break there's a 50% chance he rolls a new
-  weakness (never Fire, his own), hidden again until you hit it. Every other boss keeps its weakness all fight.
-  Guilty and Mammon have none: Break them with the Titan Staff, Cyclone or Glacier, or win without Breaking.
+- **Beigis changes element**: he starts every fight as Fire (weak to Water). Each time he comes back from a Break
+  he takes one of the four elements at random, 25% each (the same one can come up again). His weakness becomes the
+  opposite element (Fire/Water, Earth/Wind), hidden until hit, and damage follows his new element too. His model
+  glows steadily in his element's color: orange Fire, tan Earth, blue Water, green Wind (statuses pulse over it).
+  Every other boss keeps its element and weakness all fight. Guilty and Mammon have no weakness: Break them with
+  the Titan Staff, Cyclone or Glacier, or win without Breaking.
 - **Adaptation**: casting the same element 4 or more times in a row, the boss takes 40% less from it (blue number)
   until you cast a different element. Three in a row is free, so Stone Memory still reaches +30%.
 - **Random attacks** (the game's own boss AI).
-- Checked by Claude on Zelse (when every boss re-rolled): five Breaks, the weakness changed four times, never to
-  his own element; shields 7 to 12. Beigis himself not checked yet.
+- Checked by Claude with a test build that gave Zelse Beigis's mechanic: he started as Fire with the orange glow;
+  six Breaks rolled Earth, Wind, Earth, Fire, Wind, Fire, each with the right opposite weakness and glow. Not
+  checked in Beigis's own fight (warping a fresh save straight to Brannoch crashes the game).
 - [ ] Adaptation: not checked yet (needs real spell casts). Watch for blue numbers on the 4th same-element cast.
 
 ## Element staves (changed)

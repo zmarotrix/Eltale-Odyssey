@@ -64,6 +64,9 @@ static const u32 game_light[LIGHT_COUNT] = { 0x80085770, 0x80085780, 0x80085790,
 
 typedef struct { u8 r, g, b; } Rgb;
 static const Rgb burn_color = { 255, 50, 0 };
+// Beigis's element, a steady glow (statuses pulse over it): Fire, Earth, Water, Wind.
+static const Rgb element_colors[4] = { { 255, 110, 20 }, { 190, 140, 50 }, { 40, 110, 255 }, { 70, 230, 120 } };
+#define ELEMENT_GLOW 0x0070       // fog offset of the element glow
 static const Rgb poison_color = { 160, 40, 230 };
 // The game's status bits, lowest first (research/battle, "Status effects").
 static const Rgb status_colors[12] = {
@@ -181,6 +184,7 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
     const Rgb* color = 0;
     int broken = 0;
     int flicker = 0;   // a dark frame of the Break flicker
+    int element = -1;  // a steady element glow instead of a status
     if (object == BRIAN_OBJECT) {
         frame++;
         color = status_color((gBattleState & 0x1) ? BRIAN_STATUS : 0, 0, eo_status_poisoned(), 0);
@@ -193,6 +197,7 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
         u8* stats = *(u8**)(object + BATTLE_DATA_STATS);
         color = status_color(stats != 0 ? *(u16*)stats : 0, eo_status_burn_stacks(slot) > 0, 0, broken);
         flicker = flash_frames[slot] > 0 && (flash_frames[slot] & 2) != 0;
+        element = color == 0 ? eo_combat_shifting_element(slot) : -1;
         // A Broken enemy's animation is held back: its frame only moves on every BROKEN_ANIM_STEP draws (the
         // game advances it by one after each draw).
         u16* anim_frame = (u16*)(object + BATTLE_DATA_ANIM_FRAME);
@@ -230,6 +235,11 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
     if (color != 0 && find_game_fog()) {
         eo_gfx(GFX_FOG_COLOR << 24, ((u32)color->r << 24) | ((u32)color->g << 16) | ((u32)color->b << 8) | 0xFF);
         eo_gfx(GFX_FOG_FACTOR, (u32)(FOG_PEAK * p / 100) & 0xFFFF);
+        fogging = 1;
+    } else if (element >= 0 && find_game_fog()) {
+        const Rgb* glow = &element_colors[element];
+        eo_gfx(GFX_FOG_COLOR << 24, ((u32)glow->r << 24) | ((u32)glow->g << 16) | ((u32)glow->b << 8) | 0xFF);
+        eo_gfx(GFX_FOG_FACTOR, ELEMENT_GLOW);
         fogging = 1;
     }
 }

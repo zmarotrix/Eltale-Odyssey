@@ -30,12 +30,13 @@
 #define STONE_MEMORY_PERCENT 15
 // Bosses (game design document, "Keeping 1v1 boss fights from becoming a rotation"): besides growing shields and
 // the game's random attack choice, every boss adapts to an element Brian keeps casting: from the ADAPT_AFTER + 1th
-// spell of one element in a row it takes ADAPT_PERCENT less from it, until he casts another. Beigis alone has a
-// REROLL_CHANCE in 100 of rolling a new weakness each time he comes back from a Break (playtest, 2026-10-21: one
-// boss's mechanic, not every boss's); his reward, the Prism Sigil, pays off switching elements.
+// spell of one element in a row it takes ADAPT_PERCENT less from it, until he casts another. Beigis alone changes
+// element (playtest, 2026-10-21: one boss's mechanic, not every boss's): he starts each fight as Fire, and each
+// time he comes back from a Break he takes one of the four elements at random, 25% each (his current one
+// included); his weakness becomes its opposite and his model glows in its color (fx.c). His reward, the Prism
+// Sigil, pays off switching elements.
 #define ADAPT_AFTER 3
 #define ADAPT_PERCENT 40
-#define REROLL_CHANCE 50
 #define SHIFTING_BOSS 7   // Beigis (CURRENT_BOSS counts from 1, Solvaring)
 #define STONE_GUARD_STEP 3
 #define STONE_GUARD_MAX 12
@@ -154,6 +155,8 @@ int eo_combat_active_school(void) {
 
 // ---- Battle start ----
 
+static u8 opposite_element(u16 element);
+
 static u8 shields_for(u8* record, int boss) {
     if (boss) {
         return (u8)(6 + (CURRENT_BOSS >= 0 && CURRENT_BOSS < 8 ? CURRENT_BOSS / 2 : 0));
@@ -171,9 +174,11 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
         if (record == 0 || ENEMY_HP(i) == 0) {
             continue;
         }
+        if (boss && CURRENT_BOSS == SHIFTING_BOSS) {
+            *(u16*)(record + RECORD_ELEMENT) = FIRE;   // Beigis starts every fight as Fire
+        }
         u16 element = *(u16*)(record + RECORD_ELEMENT);
-        g->weakness = element == FIRE ? WATER : element == WATER ? FIRE : element == EARTH ? WIND :
-                      element == WIND ? EARTH : NO_WEAKNESS;
+        g->weakness = opposite_element(element);
         g->max_shields = g->shields = shields_for(record, boss);
     }
     charge = 0;
@@ -202,6 +207,16 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
 #define BREAK_SOUND_GAP 4   // frames between them
 static int break_sounds_left = 0;
 static int break_sound_timer = 0;
+
+// For fx.c: the element of a foe that changes element (Beigis), or -1.
+int eo_combat_shifting_element(int slot) {
+    if (!(gBattleState & BATTLE_BOSS) || CURRENT_BOSS != SHIFTING_BOSS || slot < 0 || slot >= MAX_ENEMIES ||
+        ENEMY_RECORD(slot) == 0) {
+        return -1;
+    }
+    u16 element = *(u16*)(ENEMY_RECORD(slot) + RECORD_ELEMENT);
+    return element < 4 ? element : -1;
+}
 
 static void play_break_sounds(void) {
     if (break_sounds_left > 0 && --break_sound_timer <= 0) {
@@ -235,20 +250,23 @@ static void break_enemy(int i) {
 // sound (0x18, from enemy_take_damage, which this runs inside).
 #define SFX_SHIELD_HIT 0x27
 
-// A boss's new weakness: a random element other than its own and the one it had, hidden again until hit. Guilty and
-// Mammon have no element and never get a weakness (playtest, 2026-10-21): their shields only fall to other means
-// (Titan Staff, Cyclone, Glacier), or the fight is won without Breaking them.
-static void reroll_weakness(int i) {
+static u8 opposite_element(u16 element) {
+    return element == FIRE ? WATER : element == WATER ? FIRE : element == EARTH ? WIND : element == WIND ? EARTH :
+           NO_WEAKNESS;
+}
+
+// Beigis's element change: a new element at random (the game's own x1.25 / x0.5 rule follows it, since it reads
+// the record), the weakness its opposite, hidden again until hit. Guilty and Mammon have no element and never get a
+// weakness (playtest, 2026-10-21): their shields only fall to the Titan Staff, Cyclone or Glacier.
+static void shift_element(int i) {
     Guard* g = &guards[i];
-    u16 own = ENEMY_RECORD(i) != 0 ? *(u16*)(ENEMY_RECORD(i) + RECORD_ELEMENT) : 0xFF;
-    if (g->weakness == NO_WEAKNESS || own >= 4) {
+    u8* record = ENEMY_RECORD(i);
+    if (record == 0) {
         return;
     }
-    int next;
-    do {
-        next = get_rand(4);
-    } while (next == own || next == g->weakness);
-    g->weakness = (u8)next;
+    u16 element = (u16)get_rand(4);
+    *(u16*)(record + RECORD_ELEMENT) = element;
+    g->weakness = opposite_element(element);
     g->revealed = 0;
     eo_fx_shield_hit(i, 0);   // a glint as it changes form
 }
@@ -584,8 +602,8 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
             g->broken = 0;
             if (gBattleState & BATTLE_BOSS) {
                 g->max_shields++;
-                if (CURRENT_BOSS == SHIFTING_BOSS && get_rand(100) < REROLL_CHANCE) {
-                    reroll_weakness(i);
+                if (CURRENT_BOSS == SHIFTING_BOSS) {
+                    shift_element(i);
                 }
             }
             g->shields = g->max_shields;

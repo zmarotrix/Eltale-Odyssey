@@ -205,6 +205,7 @@ void eo_fx_shield_hit(int enemy_slot, int broke);  // glints fly off the enemy (
 void eo_fx_flare(int enemy_slot);     // a ring of embers bursting out from the enemy
 void eo_status_flare(int enemy_slot); // Ember Staff: spread the enemy's Burn to those around it
 int eo_combat_broken(int enemy_slot);
+int eo_combat_shifting_element(int slot);   // Beigis's current element, else -1
 int eo_status_poisoned(void);
 void eo_fx_update(void);              // every frame in battle
 
