@@ -3,12 +3,11 @@
 [manifest]
 
 id = "eltale_odyssey"
-version = "0.1.0"
+version = "0.2.0"
 display_name = "Eltale Odyssey"
 description = """
-A mechanics overhaul of Quest 64. This early build adds gold (earned from battles, kept in your save) \
-and inns that charge for a night, more for each night in a row at the same inn."""
-short_description = "Quest 64 mechanics overhaul (early build: gold and paid inns)."
+A mechanics overhaul of Quest 64: Spirit Charge and shield Break, Burn and status effects, talents, attunement tiers and spell discovery, equipment with build-defining pieces, gold, shops and paid inns, rebalanced spells and enemies. Playtest build."""
+short_description = "Quest 64 mechanics overhaul (playtest build)."
 authors = [ "zmarotrix" ]
 game_id = "qs64"
 minimum_recomp_version = "1.0.2"

@@ -11,3 +11,8 @@ __pycache__/
 
 # Test screenshots show game graphics: never commit them
 tools/test/*.png
+
+# ROM-derived research files and the community's spreadsheet exports: local only, never published
+research/menus/*.png
+research/spells/spells_raw.csv
+research/modding-notes-text/
