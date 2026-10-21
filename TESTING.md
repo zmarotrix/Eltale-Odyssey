@@ -11,7 +11,8 @@ Your save is backed up in the dev panel slots (`before-eltale-0-1`, from before 
 ## Gold and inns
 
 - [x] Inn price window and dialogue, refusal line (checked by you)
-- [ ] **Innkeeper's last page** now says "That will be N gold. Today is Waterday." (checked by Claude)
+- [ ] **Innkeeper's lines** vary by day ("Happy Waterday! A room's 40 gold..."); a second night in a row
+      explains the higher price; short of gold, she says by how much. Natural enough?
 - [ ] **Resting wakes you at dawn** of the next morning (checked by Claude: day 2 morning → day 3 dawn)
 - [ ] **Boss gold**: Zelse 2,000, Nepty 1,500, Shilf 3,000, Fargo 3,000, Guilty 4,500, Beigis 5,000 (on top of the
       normal reward). Not tested; needs a boss fight.
@@ -26,6 +27,8 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
 - [ ] D-pad or stick moves the hand cursor; A buys; B leaves. Gold, owned count and the effect line update.
 - [ ] Three of the items rotate each day: rest at the inn and visit again.
 - [ ] At night (after evening turns dark) the shopkeeper says they're closed.
+- [ ] Each shopkeeper has their own greetings (alternating by day) and closed line; buying gives varied
+      thank-yous, "YOU'RE N GOLD SHORT", and leaving says goodbye before the window closes.
 - [ ] Bought items show up in your item panel and work as usual.
 
 ## Combat slice
