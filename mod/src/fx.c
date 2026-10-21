@@ -36,8 +36,8 @@ static const u32 game_light[LIGHT_COUNT] = { 0x80085770, 0x80085780, 0x80085790,
 #define FLAME_GFX ((u32*)(FX_RAM + 0x40))      // the sparkle's draw commands, recolored
 
 #define FLASH_PERIOD 48           // frames per pulse
-#define FLASH_RED 55              // percent of the way to full red at the peak
-#define FLASH_DIM 70              // percent green and blue drop at the peak
+#define FLASH_RED 75              // percent of the way to full red at the peak
+#define FLASH_DIM 90              // percent green and blue drop at the peak
 
 // Particles: the sparkle template the emitters use, and its fields.
 #define SPARKLE_TEMPLATE ((u8*)0x8004CFB0)
@@ -159,15 +159,24 @@ static void spawn_flame(int slot) {
     for (int k = 0; k < PARTICLE_SIZE; k++) {
         p[k] = SPARKLE_TEMPLATE[k];
     }
-    *(u16*)(p + P_LIFE) = (u16)(12 + get_rand(8));
+    *(u16*)(p + P_LIFE) = (u16)(14 + get_rand(8));
     *(u32**)(p + P_GFX) = flame_gfx();
-    *(f32*)(p + P_POS + 0) = x + rand_unit() * width;
+    // On the outside of the body (the game slows particles by 10% a frame, so they only rise about 10 x their
+    // speed and would stay hidden inside it): a random point on a ring around the enemy.
+    f32 dx = rand_unit();
+    f32 dz = rand_unit();
+    f32 len = __builtin_sqrtf(dx * dx + dz * dz);
+    if (len < 0.01f) {
+        dx = 1.0f;
+        len = 1.0f;
+    }
+    *(f32*)(p + P_POS + 0) = x + dx / len * width;
     *(f32*)(p + P_POS + 4) = y + rand_unit() * width * 0.2f;
-    *(f32*)(p + P_POS + 8) = z + rand_unit() * width;
+    *(f32*)(p + P_POS + 8) = z + dz / len * width;
     *(f32*)(p + P_SCALE + 0) = FLAME_SCALE;
     *(f32*)(p + P_SCALE + 4) = FLAME_SCALE;
     *(f32*)(p + P_VEL + 0) = rand_unit() * 0.3f;
-    *(f32*)(p + P_VEL + 4) = 0.4f + (f32)get_rand(40) / 100.0f;
+    *(f32*)(p + P_VEL + 4) = 0.6f + (f32)get_rand(40) / 100.0f;
     *(f32*)(p + P_VEL + 8) = rand_unit() * 0.3f;
     int pick = get_rand(6);
     p[P_COLOR] = pick < 2 ? COLOR_RED : pick < 4 ? COLOR_SCARLET : pick < 5 ? COLOR_ORANGE : COLOR_YELLOW;
