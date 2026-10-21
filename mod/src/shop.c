@@ -373,7 +373,7 @@ static void draw_shop(void) {
     eo_ui_window(WIN_X, WIN_Y, WIN_W, h);
     eo_ui_small(WIN_X + SMALL_PAD, TITLE_Y, TEXT_NORMAL, "SHOP");
     eo_format_u32(line, "", GOLD, "");
-    s32 gold_x = WIN_X + WIN_W - SMALL_PAD - hud_strlen(line) * SMALL_W;
+    s32 gold_x = WIN_X + WIN_W - SMALL_PAD - eo_strlen(line) * SMALL_W;
     eo_ui_small(gold_x, TITLE_Y, TEXT_NORMAL, line);
     for (int i = 0; i < stock_count; i++) {
         u8 good = stock[i];

@@ -385,16 +385,25 @@ RECOMP_HOOK_RETURN("pad_read") void eo_combat_read_input(void) {
 }
 
 // ---- Battle display ----
-// No lists or counters (playtest, 2026-10-20): Brian's charge is a row of diamonds next to the HUD, statuses sit
-// on the enemies themselves without turn counts, and the selected spell gets a one-line description.
+// No lists or counters (playtest, 2026-10-20): Brian's charge is a row of diamonds next to the HUD; each enemy
+// has a small plate above it with its statuses (no turn counts) and its shields as pips; the selected spell
+// gets a window with its element, description, MP cost and what the chosen Boost will do.
 
 #define CHARGE_X 112      // right of the HUD's HP/MP box
 #define CHARGE_Y 24
 #define CHARGE_STEP 11
-#define MARKER_STEP 13
-#define MARKER_RISE 16    // above the top of the enemy
+#define MARKER_STEP 13    // status icons on an enemy's plate
+#define PIP_STEP 7        // shield pips
+#define PLATE_PAD 2
+#define MARKER_RISE 0     // plate bottom above the top of the enemy (the record's height already leaves a gap)
 #define DESC_X 52         // under the game's selected-spell bar
 #define DESC_Y 77
+#define DESC_ROW 12       // a line of the spell window (fits the 12-pixel icons)
+#define SPELL_BAR_TOP 60  // the game's selected-spell bar, above the spell window
+
+// Bottom of the spell window this frame (0 when hidden). Enemy plates that would cover it or the spell bar
+// are left out while Brian picks a spell.
+static s32 desc_bottom = 0;
 
 #define BATTLE_DATA_POS_X 0x00
 #define BATTLE_DATA_POS_Y 0x04
@@ -448,38 +457,134 @@ static void draw_enemy_markers(void) {
             icons[n++] = ICON_FIRE + g->weakness;
         }
         s32 sx, sy;
-        if (n == 0 || !marker_origin(i, &sx, &sy)) {
+        if (!marker_origin(i, &sx, &sy)) {
             continue;
         }
-        s32 x = sx - (n * MARKER_STEP) / 2;
+        // The plate: a row of status icons (if any) over a row of shield pips (none while Broken; lost
+        // shields show dark).
+        int pips = g->broken ? 0 : g->max_shields;
+        s32 icons_w = n * MARKER_STEP;
+        s32 pips_w = pips * PIP_STEP + 3;
+        s32 w = (icons_w > pips_w ? icons_w : pips_w) + 2 * PLATE_PAD;
+        s32 h = (n > 0 ? 12 : 0) + (pips > 0 ? 9 : 0) + 2 * PLATE_PAD;
+        if (n == 0 && pips == 0) {
+            continue;
+        }
+        s32 x = sx - w / 2;
+        s32 y = sy - MARKER_RISE - h;
+        if (desc_bottom != 0 && y < desc_bottom && y + h > SPELL_BAR_TOP) {
+            continue;
+        }
+        eo_ui_window(x, y, w, h);
+        eo_icons_begin();
+        s32 row_y = y + PLATE_PAD;
         for (int k = 0; k < n; k++) {
-            eo_icon_draw(icons[k], x + k * MARKER_STEP, sy - MARKER_RISE);
+            eo_icon_draw(icons[k], sx - icons_w / 2 + k * MARKER_STEP, row_y);
+        }
+        if (pips > 0) {
+            row_y += n > 0 ? 12 : 0;
+            for (int k = 0; k < pips; k++) {   // pip art sits 3 pixels down its cell
+                eo_icon_draw(k < g->shields ? ICON_PIP_STEEL : ICON_PIP_EMPTY, sx - pips_w / 2 + k * PIP_STEP - 2,
+                             row_y - 2);
+            }
         }
     }
 }
 
 // The spell Brian has selected so far (on his turn, while choosing), as the game's spell wheel finds it.
+// "BOOST 2: DAMAGE X1.8" and the like, in the HUD font (no + or %). Matches eo_combat_on_projectile and
+// status.c's Burn.
+static void boost_text(char* out, int school, u16 type, int b) {
+    char head[12];
+    eo_format_u32(head, "BOOST ", (u32)b, ": ");
+    char* o = eo_append(out, head);
+    if (school == EARTH && type == SPELL_TYPE_DAMAGE) {
+        u32 pct = 100 + 40 * (u32)b;
+        eo_text_fill(o, "DAMAGE X%a.%b", 0, pct / 100, pct / 10 % 10);
+    } else if (school == WATER && type == SPELL_TYPE_HEAL) {
+        u32 pct = 100 + 30 * (u32)b;
+        eo_text_fill(o, "HEALING X%a.%b", 0, pct / 100, pct / 10 % 10);
+    } else if (school == WATER && type == SPELL_TYPE_DAMAGE) {
+        eo_text_fill(o, b == 1 ? "FREEZES FOR 1 TURN" : "FREEZES FOR %a TURNS", 0, (u32)b, 0);
+    } else if (school == WIND && type == SPELL_TYPE_DAMAGE) {
+        eo_text_fill(o, "%a MORE SHOTS", 0, 2 * (u32)b, 0);
+    } else if (school == FIRE && type == SPELL_TYPE_DAMAGE) {
+        eo_text_fill(o, b == 3 ? "IGNITES - THEN 3 BURN STACKS" : b == 1 ? "1 MORE BURN STACK" : "%a MORE BURN STACKS",
+                     0, (u32)b, 0);
+    } else {
+        eo_append(o, "NO EFFECT ON THIS SPELL");
+    }
+}
+
 static void draw_spell_description(void) {
+    desc_bottom = 0;
     if (!brians_turn() || active_spell != 0 || BRIAN_SPELL_COUNT == 0 || BRIAN_SPELL_COUNT > 3) {
         return;
     }
     s32 spell = spell_find_by_inputs(BRIAN_SPELL_COUNT, BRIAN_SPELL_PRESSES);
     int school = (spell >> 8) & 0xF;
     int index = spell & 0xFF;
+    int valid = spell >= 0 && school <= WIND && index < 15;
     const char* text;
-    if (spell < 0 || school > WIND || index >= 15) {
+    if (!valid) {
         text = "NO SPELL";
     } else if (!eo_spirits_known(school, index)) {
-        text = "UNKNOWN - CAST IT TO LEARN IT.";
+        text = "??? - CAST IT TO LEARN IT.";
     } else {
         text = eo_spell_description(school, index);
     }
     if (text == 0) {
         return;
     }
-    s32 w = hud_strlen(text) * 6 + 10;
-    eo_ui_window(DESC_X, DESC_Y, w, 13);
-    hud_draw_text(DESC_X + 5, DESC_Y + 3, 0, text);
+
+    // MP: one per element press (research/battle, "MP cost"); Pilgrim's Soul halves it, Gambler's Coin
+    // makes it a gamble. Red when Brian can't pay.
+    char mp[8];
+    u32 cost = BRIAN_SPELL_COUNT;
+    if (eo_equipment_worn(EQ_PILGRIMS_SOUL)) {
+        cost = (cost + 1) / 2;
+    }
+    if (eo_equipment_worn(EQ_GAMBLERS_COIN)) {
+        eo_append(mp, "MP ?");
+    } else {
+        eo_format_u32(mp, "MP ", cost, "");
+    }
+    int mp_short = ((u16*)gPlayerMainData)[4] < cost;
+
+    // What the chosen Boost will do to this spell.
+    char boost_line[48];
+    boost_line[0] = '\0';
+    if (valid && boost > 0) {
+        u8* stats = SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE;
+        boost_text(boost_line, school, *(u16*)(stats + SPELL_TYPE), boost);
+    }
+
+    // Line 1: element gem and description. Line 2: MP cost, then the Boost's effect. (The HUD's text routine
+    // stops drawing past the right of the safe area, so nothing goes after the longest descriptions.)
+    s32 text_x = DESC_X + SMALL_PAD + ICON_W + 2;
+    s32 boost_icon_x = text_x + (eo_strlen(mp) + 2) * SMALL_W;
+    s32 boost_x = boost_icon_x + ICON_W + 1;
+    s32 line1_end = text_x + eo_strlen(text) * SMALL_W;
+    s32 line2_end = boost_line[0] != '\0' ? boost_x + eo_strlen(boost_line) * SMALL_W : boost_icon_x;
+    s32 w = (line1_end > line2_end ? line1_end : line2_end) + SMALL_PAD - DESC_X;
+    s32 h = DESC_ROW * (valid ? 2 : 1) + 4;
+    eo_ui_window(DESC_X, DESC_Y, w, h);
+    s32 y = DESC_Y + 4;
+    eo_ui_small(text_x, y, TEXT_NORMAL, text);
+    if (valid) {
+        eo_ui_small(text_x, y + DESC_ROW, mp_short ? TEXT_WARN : TEXT_NORMAL, mp);
+    }
+    if (boost_line[0] != '\0') {
+        eo_ui_small(boost_x, y + DESC_ROW, TEXT_GOOD, boost_line);
+    }
+    eo_icons_begin();
+    if (valid) {
+        eo_icon_draw(ICON_FIRE + school, DESC_X + SMALL_PAD, y + ICON_TEXT_DY);
+    }
+    if (boost_line[0] != '\0') {
+        eo_icon_draw(ICON_CHARGE_SPEND, boost_icon_x, y + DESC_ROW + ICON_TEXT_DY);
+    }
+    desc_bottom = DESC_Y + h + 3;
 }
 
 RECOMP_HOOK_RETURN("hud_draw_main") void eo_combat_draw(void) {

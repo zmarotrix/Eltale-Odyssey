@@ -78,6 +78,15 @@ Note: Holy Plains enemies die before they can be Broken; Break matters from toug
       amounts. (Checked by Claude.)
 - [ ] Shop window: a coin after each price and before your gold (not checked yet).
 
+## Battle display, second pass (new)
+
+- [ ] **Spell window**: element gem and description; below it the MP cost (red if you can't pay) and, once you
+      pick a Boost (press D-pad up before choosing elements), what it does: "BOOST 2: DAMAGE X1.8",
+      "4 MORE SHOTS", "FREEZES FOR 2 TURNS", "NO EFFECT ON THIS SPELL"... (Checked by Claude.)
+- [ ] **Enemy plates**: a small plate over each enemy with its statuses and its shields as pips (bright = still
+      up, dark = knocked off). Plates that would cover the spell bar hide while you pick a spell. Is showing
+      the shield count OK, or should shields stay hidden too? (Checked by Claude.)
+
 ## Smaller windows
 
 - [ ] Shop, Spirits, Equipment, the inn's price window and the gold notice now use the HUD's small font, so they

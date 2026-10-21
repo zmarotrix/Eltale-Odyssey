@@ -309,7 +309,7 @@ void eo_icons_init(void) {
     palette[C_POISON_DARK] = rgba5551(60, 20, 80);
     palette[C_GOLD_DARK] = rgba5551(120, 80, 10);
     palette[C_WOOD] = rgba5551(150, 95, 45);
-    palette[C_STEEL] = rgba5551(150, 150, 165);
+    palette[C_STEEL] = rgba5551(205, 210, 225);
 
     make_diamond(ICON_CHARGE_EMPTY, C_EMPTY);
     make_diamond(ICON_CHARGE_FULL, C_PURPLE);
@@ -325,6 +325,7 @@ void eo_icons_init(void) {
     make_coin(ICON_COIN);
     make_pip(ICON_PIP_EMPTY, C_EMPTY);
     make_pip(ICON_PIP_FULL, C_PURPLE);
+    make_pip(ICON_PIP_STEEL, C_STEEL);
     make_lock(ICON_LOCK);
     make_staff(ICON_STAFF);
     make_robe(ICON_ROBE);

@@ -90,14 +90,14 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_gold_draw(void) {
     // numbers and coin. Both lines right-aligned, against the screen's top right.
     s32 w = NOTICE_W;
     if (notice_coins) {
-        s32 len = hud_strlen(notice_line1) > hud_strlen(notice_line2) ? hud_strlen(notice_line1) : hud_strlen(notice_line2);
+        s32 len = eo_strlen(notice_line1) > eo_strlen(notice_line2) ? eo_strlen(notice_line1) : eo_strlen(notice_line2);
         w = len * SMALL_W + ICON_W + 2 * SMALL_PAD;
     }
     s32 right = NOTICE_X + NOTICE_W - SMALL_PAD;
     eo_ui_window(right + SMALL_PAD - w, NOTICE_Y, w, NOTICE_H);
-    s32 x1 = right - hud_strlen(notice_line1) * SMALL_W;
+    s32 x1 = right - eo_strlen(notice_line1) * SMALL_W;
     eo_ui_small(x1, NOTICE_Y + SMALL_PAD, TEXT_NORMAL, notice_line1);
-    eo_ui_small(right - hud_strlen(notice_line2) * SMALL_W, NOTICE_Y + SMALL_PAD + SMALL_LINE,
+    eo_ui_small(right - eo_strlen(notice_line2) * SMALL_W, NOTICE_Y + SMALL_PAD + SMALL_LINE,
                 notice_coins && notice_spent ? TEXT_WARN : TEXT_GOOD, notice_line2);
     if (notice_coins) {
         eo_icons_begin();

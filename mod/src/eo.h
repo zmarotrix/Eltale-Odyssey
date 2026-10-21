@@ -137,6 +137,7 @@ enum {
     ICON_BURN, ICON_BROKEN, ICON_POISON, ICON_POINTER,
     ICON_COIN, ICON_PIP_EMPTY, ICON_PIP_FULL, ICON_LOCK,
     ICON_STAFF, ICON_ROBE, ICON_CHARM, ICON_SIGIL,   // equipment slots, in slot order
+    ICON_PIP_STEEL,                                  // an enemy's shield
     ICON_COUNT
 };
 #define ICON_TEXT_DY (-2)   // draw an icon at a small-text line's y + ICON_TEXT_DY to line them up
@@ -147,7 +148,7 @@ void eo_icon_draw(int icon, s32 x, s32 y);  // 12 x 12
 int eo_screen_pos(f32 x, f32 y, f32 z, s32* sx, s32* sy);  // scene point to screen; 0 if off screen
 const char* eo_spell_description(int school, int index);
 int eo_spirits_known(int school, int index);
-s32 hud_strlen(const char* text);
+s32 eo_strlen(const char* text);  // characters (the game's hud_strlen gave short counts for some strings)
 
 // ---- Burn visuals (fx.c) ----
 void eo_fx_burn_hit(int enemy_slot);  // flames rise from the enemy for a moment

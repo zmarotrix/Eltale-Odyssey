@@ -131,6 +131,14 @@ char* eo_append(char* out, const char* text) {
 }
 
 // Fills a line: %w becomes word, %a and %b the numbers a and b; everything else is copied. Returns out.
+s32 eo_strlen(const char* text) {
+    s32 n = 0;
+    while (text[n] != '\0') {
+        n++;
+    }
+    return n;
+}
+
 char* eo_text_fill(char* out, const char* line, const char* word, u32 a, u32 b) {
     char* o = out;
     for (; *line != '\0'; line++) {

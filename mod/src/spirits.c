@@ -278,7 +278,7 @@ static void draw_window(void) {
     eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, TEXT_NORMAL, "SPIRITS");
     // Unspent points, top right: a purple pip and the count.
     eo_format_u32(line, "", gEo.spirit_points, "");
-    s32 points_x = WIN_X + WIN_W - SMALL_PAD - hud_strlen(line) * SMALL_W;
+    s32 points_x = WIN_X + WIN_W - SMALL_PAD - eo_strlen(line) * SMALL_W;
     eo_ui_small(points_x, WIN_Y + SMALL_PAD, TEXT_NORMAL, line);
 
     for (int s = 0; s < SCHOOLS; s++) {
@@ -298,7 +298,7 @@ static void draw_window(void) {
         eo_format_u32(line, "NEXT TIER: LV ", tier_min_level[next], "");
         int level_ok = ELEMENT_LEVELS[cursor] >= tier_min_level[next];
         eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, level_ok ? TEXT_GOOD : TEXT_WARN, line);
-        cost_x = WIN_X + SMALL_PAD + (hud_strlen(line) + 1) * SMALL_W;
+        cost_x = WIN_X + SMALL_PAD + (eo_strlen(line) + 1) * SMALL_W;
         eo_format_u32(line, "", tier_cost[next], "");
         int points_ok = gEo.spirit_points >= tier_cost[next];
         eo_ui_small(cost_x + ICON_W, INFO_Y, points_ok ? TEXT_GOOD : TEXT_WARN, line);
@@ -330,7 +330,7 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_spirits_draw(void) {
     }
     if (notice_timer > 0) {
         notice_timer--;
-        s32 w = hud_strlen(notice) * SMALL_W + 2 * SMALL_PAD;
+        s32 w = eo_strlen(notice) * SMALL_W + 2 * SMALL_PAD;
         s32 x = (320 - w) / 2;
         eo_ui_window(x, NOTICE_Y, w, SMALL_LINE + 2 * SMALL_PAD - 2);
         eo_ui_small(x + SMALL_PAD, NOTICE_Y + SMALL_PAD, TEXT_GOOD, notice);
