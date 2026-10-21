@@ -2,7 +2,7 @@
 
 // The combat system (game design document, "Combat resource"): Spirit Charge, plus enemy shields and Break.
 //
-// Spirit Charge: Brian starts a battle with 1 charge and gains 1 at the start of each of his turns (max 5),
+// Spirit Charge: Brian starts a battle with 0 charge and gains 1 at the start of each of his turns (max 5),
 // except the turn after he spent some. His first weakness hit in a turn gives +1. Before casting, D-pad up/down
 // picks a Boost of 0-3 (no more than his charge); it's spent when the spell launches:
 //   Fire  +1 Burn stack per charge (status.c); at 3, the hit first ignites the target's existing Burn
@@ -18,7 +18,7 @@
 #define MAX_ENEMIES 6
 #define MAX_CHARGE 5
 #define MAX_BOOST 3
-#define START_CHARGE 1
+#define START_CHARGE 0   // every battle starts empty (playtest, 2026-10-21); Bedrock adds
 #define BROKEN_BONUS_PERCENT 50
 // Talents (talents.c) bending these rules, per rank.
 #define SCHOOL_TALENT_PERCENT 4    // Kindling, Weight, Tidal Force, Gale Force
@@ -588,6 +588,9 @@ RECOMP_HOOK_RETURN("pad_read") void eo_combat_read_input(void) {
 #define CHARGE_X 40       // centered under the element gems, bottom left (playtest, 2026-10-21)
 #define CHARGE_Y 216      // clear of the gems' level numbers
 #define CHARGE_STEP 11
+// The element gems slide in and out with battles: the HUD draws them at x 28 minus this (0 when shown); the
+// diamonds under them follow.
+#define HUD_GEM_SLIDE (*(s32*)0x8008C664)
 #define DESC_X 52         // under the game's selected-spell bar
 #define DESC_Y 77
 #define DESC_ROW 12       // a line of the spell window (fits the 12-pixel icons)
@@ -599,7 +602,7 @@ s32 spell_find_by_inputs(u16 count, u8* inputs);
 static void draw_charge(void) {
     for (int i = 0; i < max_charge(); i++) {
         int icon = i < charge - boost ? ICON_CHARGE_FULL : i < charge ? ICON_CHARGE_SPEND : ICON_CHARGE_EMPTY;
-        eo_icon_draw(icon, CHARGE_X + i * CHARGE_STEP, CHARGE_Y);
+        eo_icon_draw(icon, CHARGE_X - HUD_GEM_SLIDE + i * CHARGE_STEP, CHARGE_Y);
     }
 }
 
@@ -663,10 +666,25 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_combat_draw(void) {
     eo_ui_end();
 }
 
+// After a battle the diamonds stay until the gems have slid away (the battle flag clears first).
+#define SLIDE_GONE 100   // gems this far left are off screen
+#define LINGER_FRAMES 90 // give up if they never slide
+
 static void eo_combat_draw_body(void) {
+    static int linger = 0;
     if (!in_battle()) {
+        if (linger > 0) {
+            linger--;
+            if (HUD_GEM_SLIDE >= SLIDE_GONE) {
+                linger = 0;
+            } else {
+                eo_icons_begin();
+                draw_charge();
+            }
+        }
         return;
     }
+    linger = LINGER_FRAMES;
     eo_fx_update();
     play_break_sounds();
     draw_spell_description();

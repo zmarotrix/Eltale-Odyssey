@@ -70,7 +70,7 @@ them yourself. For now the weakness is always the element opposite the monster's
       ("UNKNOWN - CAST IT TO LEARN IT." for "???" spells). (Checked by Claude: diamonds, gold spend colour,
       markers, description.)
 
-- [ ] Charge starts at 1 and goes up by 1 each of your turns (max 5), but not on the turn after you spend some.
+- [ ] Charge starts at 0 every battle and goes up by 1 each of your turns (max 5), but not on the turn after you spend some.
       Your first weakness hit in a turn gives +1. (Checked by Claude.)
 - [ ] **D-pad up/down** sets Boost (0-3, no more than your charge) before you cast; it's spent when the spell fires.
       Earth: +40% damage per charge. Wind: +2 shots per charge. Water: +30% healing, or Freezes the target for
@@ -134,6 +134,8 @@ No floating icons or plates over enemies, and no explanation of what Boost does:
 - [ ] Do the tier costs and level gates feel right? Decisions for you: should Brian be able to master everything
       by the end (current numbers allow it only near the end), and can points be refunded?
 - [ ] Existing saves get points for spirits already found and keep the spells their levels already allowed.
+
+- [ ] The charge diamonds slide in and out with the element gems (battle start and end, and around enemy turns).
 
 ## Spell names (new)
 
