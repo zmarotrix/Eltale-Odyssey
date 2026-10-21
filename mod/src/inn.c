@@ -15,6 +15,21 @@
 #define NPC_RECORD_PTRS 0x8007BDB0
 #define NPC_SLOT_SIZE   0x84
 
+// Dialogue text (research/npcs): the message buffer, control bytes, and where the window opens. The game
+// opens it at the top or bottom depending on a screen value (player_update, before msgwin_open).
+#define MESSAGE_BUFFER_SIZE 0x400
+#define PRICE_PAGE_MAX 40
+#define TEXT_CHOICE_BOX 0xF2
+#define TEXT_PAGE_BREAK 0xF0
+#define TEXT_END        0xFF
+#define MSG_WINDOW_POSITION (*(s32*)0x8008C644)
+#define MSG_WINDOW_TOP_THRESHOLD 0x46
+#define GAME_STATE_DIALOGUE 0x2
+
+extern u8 gMessageBuffer[];
+extern s32 gMsgChoiceCount;
+void msgwin_open(s32 position);
+
 // The price window, centered at the top or bottom of the screen, whichever the game's windows leave free
 // (the dialogue box moves between them depending on where Brian stands).
 #define PRICE_COLUMNS 15  // label + right-aligned amount; " gold" follows
@@ -101,6 +116,42 @@ static int inn_choice_active(void) {
     return record != 0 && *(u16*)(record + 2) == INN_TEXT_CONDITION;
 }
 
+static u32 tonight_price(void) {
+    int inn = current_inn();
+    return night_price(inn, nights_in_row(inn));
+}
+
+// The innkeeper's greeting is loaded into gMessageBuffer by npc_talk_begin, and the window opens right after
+// it returns. Add a last page with the price, just before the Yes/No box (control byte F2).
+RECOMP_HOOK_RETURN("npc_talk_begin") void eo_inn_on_greeting(void) {
+    if (!inn_choice_active()) {
+        return;
+    }
+    for (int i = 0; i < MESSAGE_BUFFER_SIZE - PRICE_PAGE_MAX; i++) {
+        if (gMessageBuffer[i] == TEXT_END) {
+            return;  // no Yes/No box in this text: leave it alone
+        }
+        if (gMessageBuffer[i] == TEXT_CHOICE_BOX) {
+            char page[32];
+            eo_format_u32(page, "That will be ", tonight_price(), " gold.");
+            u8* out = &gMessageBuffer[i];
+            *out++ = TEXT_PAGE_BREAK;
+            out = eo_text_encode(out, page);
+            *out++ = TEXT_CHOICE_BOX;
+            *out = TEXT_END;
+            return;
+        }
+    }
+}
+
+// Opens a new message window with our own text, as the game does when a conversation starts.
+static void say(const char* text) {
+    eo_text_encode_full(gMessageBuffer, text);
+    gMsgChoiceCount = 0;
+    msgwin_open(MSG_WINDOW_POSITION < MSG_WINDOW_TOP_THRESHOLD ? 0 : 1);
+    gGameState |= GAME_STATE_DIALOGUE;
+}
+
 RECOMP_HOOK("player_state_talking") void eo_inn_on_answer(void) {
     // Same test the game makes next: all windows closed, inn choice pending, answered Yes.
     if (gMsgWinOpenCount != 0 || !inn_choice_active() || gMsgChoiceResult != 0) {
@@ -109,15 +160,22 @@ RECOMP_HOOK("player_state_talking") void eo_inn_on_answer(void) {
     int inn = current_inn();
     u32 extra = nights_in_row(inn);
     u32 price = night_price(inn, extra);
-    char line1[24];
-    char line2[24];
 
     if (GOLD < price) {
-        gMsgChoiceResult = 1;  // the game now treats it as No: no rest, no heal, no save
-        sfx_play(SFX_CANCEL, 0xFF, 0x40);
-        eo_format_amount(line1, "Gold", GOLD, NOTICE_COLUMNS, "");
-        eo_format_amount(line2, "Need", price, NOTICE_COLUMNS, "");
-        eo_gold_notice(line1, line2);
+        // The game now treats it as No: no rest, no heal, no save. The innkeeper says why first: with a
+        // window open again, player_state_talking waits, and ends the conversation once it closes.
+        gMsgChoiceResult = 1;
+        char line1[32];
+        char line2[32];
+        char text[96];
+        eo_format_u32(line1, "costs ", price, " gold, and you\n");
+        eo_format_u32(line2, "only have ", GOLD, ".");
+        char* out = text;
+        for (const char* s = "I'm sorry, but a night\n"; *s; s++) *out++ = *s;
+        for (const char* s = line1; *s; s++) *out++ = *s;
+        for (const char* s = line2; *s; s++) *out++ = *s;
+        *out = '\0';
+        say(text);
         return;
     }
 

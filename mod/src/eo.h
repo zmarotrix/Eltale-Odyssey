@@ -77,7 +77,10 @@ u32 eo_now(void);
 
 // ---- Native UI pieces (ui.c) ----
 void eo_ui_window(s32 x, s32 y, s32 w, s32 h);
-void eo_ui_text(s32 x, s32 y, const char* text);  // letters, digits and spaces
+void eo_ui_text(s32 x, s32 y, const char* text);  // letters, digits, spaces and . , ? '
+// Plain text to the game's encoding ('\n' line break, '\f' page break). _full adds the prefix and end byte.
+u8* eo_text_encode(u8* out, const char* text);
+void eo_text_encode_full(u8* out, const char* text);
 // "<label><amount right-aligned so the two fill `columns` characters><unit>": amounts line up in the
 // fixed-width dialogue font.
 void eo_format_amount(char* out, const char* label, u32 amount, int columns, const char* unit);
