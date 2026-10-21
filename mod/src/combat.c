@@ -29,13 +29,14 @@
 #define CYCLONE_CHANCE 5
 #define STONE_MEMORY_PERCENT 15
 // Bosses (game design document, "Keeping 1v1 boss fights from becoming a rotation"): besides growing shields and
-// the game's random attack choice, a boss starts with its usual weakness and has a REROLL_CHANCE in 100 of rolling
-// a new one each time it comes back from a Break (playtest, 2026-10-21); and it adapts to an element Brian keeps
-// casting: from the ADAPT_AFTER + 1th spell of one element in a row it takes ADAPT_PERCENT less from it, until he
-// casts another.
+// the game's random attack choice, every boss adapts to an element Brian keeps casting: from the ADAPT_AFTER + 1th
+// spell of one element in a row it takes ADAPT_PERCENT less from it, until he casts another. Beigis alone has a
+// REROLL_CHANCE in 100 of rolling a new weakness each time he comes back from a Break (playtest, 2026-10-21: one
+// boss's mechanic, not every boss's); his reward, the Prism Sigil, pays off switching elements.
 #define ADAPT_AFTER 3
 #define ADAPT_PERCENT 40
 #define REROLL_CHANCE 50
+#define SHIFTING_BOSS 7   // Beigis (CURRENT_BOSS counts from 1, Solvaring)
 #define STONE_GUARD_STEP 3
 #define STONE_GUARD_MAX 12
 #define BRIAN_DEFENSE_NOW (*(u16*)0x8007BBC0)   // in-battle defense
@@ -583,7 +584,7 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
             g->broken = 0;
             if (gBattleState & BATTLE_BOSS) {
                 g->max_shields++;
-                if (get_rand(100) < REROLL_CHANCE) {
+                if (CURRENT_BOSS == SHIFTING_BOSS && get_rand(100) < REROLL_CHANCE) {
                     reroll_weakness(i);
                 }
             }

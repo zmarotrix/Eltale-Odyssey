@@ -271,14 +271,14 @@ Epicentre no longer makes a Broken boss lose two turns (bosses lose one, like Fr
 From the design rule that every boss uses at least three tricks (game design document, "Keeping 1v1 boss fights
 from becoming a rotation"):
 - **Growing shields** (already in): a boss gets one more shield each time it comes back from a Break.
-- **Weakness re-roll**: every boss starts with its usual weakness; each time it comes back from a Break there's a
-  50% chance it rolls a new one (never its own element), hidden again until you hit it. Guilty and Mammon have no
-  weakness and never get one: Break them with the Titan Staff, Cyclone or Glacier, or win without Breaking.
+- **Weakness re-roll (Beigis only)**: each time Beigis comes back from a Break there's a 50% chance he rolls a new
+  weakness (never Fire, his own), hidden again until you hit it. Every other boss keeps its weakness all fight.
+  Guilty and Mammon have none: Break them with the Titan Staff, Cyclone or Glacier, or win without Breaking.
 - **Adaptation**: casting the same element 4 or more times in a row, the boss takes 40% less from it (blue number)
   until you cast a different element. Three in a row is free, so Stone Memory still reaches +30%.
 - **Random attacks** (the game's own boss AI).
-- Checked by Claude on Zelse: five Breaks, the weakness changed four times (Earth, Water, Earth, Earth, Water,
-  Earth), never to Wind; shields 7 to 12.
+- Checked by Claude on Zelse (when every boss re-rolled): five Breaks, the weakness changed four times, never to
+  his own element; shields 7 to 12. Beigis himself not checked yet.
 - [ ] Adaptation: not checked yet (needs real spell casts). Watch for blue numbers on the 4th same-element cast.
 
 ## Element staves (changed)
