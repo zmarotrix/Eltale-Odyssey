@@ -71,7 +71,12 @@ wr "8007BADC" (fh ([math]::Atan2($zx - $px, $zz - $pz)))
 (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:43064/api/brian" -Headers $h).Content
 # The fight puts Brian where he stood, which is inside a tree trunk; once it starts, move him to open ground in the
 # clearing between the trees (playtest, 2026-10-21), facing Zelse.
-for ($i = 0; $i -lt 40; $i++) { Start-Sleep -Milliseconds 500; if ((m "8008C592" 2) -ne "0000") { break } }
+# Zelse's intro dialogue holds the fight until A is pressed.
+for ($i = 0; $i -lt 40; $i++) {
+    if ((m "8008C592" 2) -ne "0000") { break }
+    & "$PSScriptRoot\inp.ps1" "A@100" | Out-Null
+    Start-Sleep -Milliseconds 400
+}
 Start-Sleep 1
 wr "8007BACC" ((fh ($zx - 25)) + (fh ($zy + 3)) + (fh ($zz + 55)))
 wr "8007BADC" (fh ([math]::Atan2(25, -55)))

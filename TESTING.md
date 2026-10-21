@@ -266,6 +266,21 @@ Tier gates now match the level vanilla needed for each tier's first spell: Lv 7 
 the game has 98 and talents share them. Tiers you already attuned stay attuned.
 Epicentre no longer makes a Broken boss lose two turns (bosses lose one, like Freeze).
 
+## Boss fights (new)
+
+From the design rule that every boss uses at least three tricks (game design document, "Keeping 1v1 boss fights
+from becoming a rotation"):
+- **Growing shields** (already in): a boss gets one more shield each time it comes back from a Break.
+- **Weakness re-roll**: every boss starts with its usual weakness; each time it comes back from a Break there's a
+  50% chance it rolls a new one (never its own element), hidden again until you hit it. Guilty and Mammon start
+  with none and can gain one this way.
+- **Adaptation**: casting the same element 4 or more times in a row, the boss takes 40% less from it (blue number)
+  until you cast a different element. Three in a row is free, so Stone Memory still reaches +30%.
+- **Random attacks** (the game's own boss AI).
+- Checked by Claude on Zelse: five Breaks, the weakness changed four times (Earth, Water, Earth, Earth, Water,
+  Earth), never to Wind; shields 7 to 12.
+- [ ] Adaptation: not checked yet (needs real spell casts). Watch for blue numbers on the 4th same-element cast.
+
 ## Element staves (changed)
 
 The Ember Staff was far ahead of the other three, so all four now give swings +6 and their element 1.1x, plus a

@@ -28,6 +28,14 @@
 #define AFTERSHOCK_PERCENT 10      // on top of Earth Boost's 40 per charge
 #define CYCLONE_CHANCE 5
 #define STONE_MEMORY_PERCENT 15
+// Bosses (game design document, "Keeping 1v1 boss fights from becoming a rotation"): besides growing shields and
+// the game's random attack choice, a boss starts with its usual weakness and has a REROLL_CHANCE in 100 of rolling
+// a new one each time it comes back from a Break (playtest, 2026-10-21); and it adapts to an element Brian keeps
+// casting: from the ADAPT_AFTER + 1th spell of one element in a row it takes ADAPT_PERCENT less from it, until he
+// casts another.
+#define ADAPT_AFTER 3
+#define ADAPT_PERCENT 40
+#define REROLL_CHANCE 50
 #define STONE_GUARD_STEP 3
 #define STONE_GUARD_MAX 12
 #define BRIAN_DEFENSE_NOW (*(u16*)0x8007BBC0)   // in-battle defense
@@ -95,7 +103,8 @@ static u32 turn_swing_used = 0;       // turns_taken + 1 when Brian last swung (
 static u8 earth_streak = 0;           // Earth spells cast in a row (Stone Memory)
 static u8 last_cast_school = 0xFF;    // element of Brian's last spell (Prism Sigil)
 static u8 element_changed = 0;
-static u8 stone_guard = 0;            // defense the Stone Staff has added this fight
+static u8 stone_guard = 0;
+static u8 element_streak = 0;         // spells of the same element cast in a row (boss adaptation)            // defense the Stone Staff has added this fight
 
 // The boost of the spell being cast right now (0 when none), and what was changed for it.
 static u8 active_boost = 0;
@@ -175,6 +184,7 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
     last_cast_school = 0xFF;
     element_changed = 0;
     stone_guard = 0;
+    element_streak = 0;
     boost = 0;
     spent_last_turn = spent_this_turn = 0;
     weakness_bonus_given = 0;
@@ -223,6 +233,20 @@ static void break_enemy(int i) {
 // Sound for a shield knocked off without a Break (playtest pick, 2026-10-21). It plays alongside the game's own hit
 // sound (0x18, from enemy_take_damage, which this runs inside).
 #define SFX_SHIELD_HIT 0x27
+
+// A boss's new weakness: a random element other than its own and the one it had, hidden again until hit. Guilty and
+// Mammon (no element, so no weakness at first) can gain one this way.
+static void reroll_weakness(int i) {
+    Guard* g = &guards[i];
+    u16 own = ENEMY_RECORD(i) != 0 ? *(u16*)(ENEMY_RECORD(i) + RECORD_ELEMENT) : 0xFF;
+    int next;
+    do {
+        next = get_rand(4);
+    } while (next == own || next == g->weakness);
+    g->weakness = (u8)next;
+    g->revealed = 0;
+    eo_fx_shield_hit(i, 0);   // a glint as it changes form
+}
 
 // Knocks shields off a foe (a weakness hit, Cyclone, Glacier); at 0 it Breaks.
 static void crack_shields(int i, int count) {
@@ -417,6 +441,16 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
             }
         }
     }
+    // A boss adapted to the element Brian keeps casting gives back part of the hit.
+    if (hit_kind == HIT_SPELL && (gBattleState & BATTLE_BOSS) && element_streak > ADAPT_AFTER &&
+        hit_element == last_cast_school && hp > 0) {
+        weakened = 1;
+        u32 back = hit * ADAPT_PERCENT / 100;
+        u16 max_hp = *(u16*)(ENEMY_RECORD(slot) + RECORD_MAX_HP);
+        hp = (u16)(hp + back > max_hp ? max_hp : hp + back);
+        ENEMY_HP(slot) = hp;
+        shown = shown > back ? shown - back : 0;
+    }
     extra += hit * percent / 100;
     if (extra > 0 && hp > 0) {
         u32 dealt = extra >= hp ? hp : extra;
@@ -545,6 +579,9 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
             g->broken = 0;
             if (gBattleState & BATTLE_BOSS) {
                 g->max_shields++;
+                if (get_rand(100) < REROLL_CHANCE) {
+                    reroll_weakness(i);
+                }
             }
             g->shields = g->max_shields;
         }
@@ -582,6 +619,7 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     if (cast_turn != turns_taken + 1) {
         cast_turn = turns_taken + 1;
         earth_streak = school == EARTH ? earth_streak + 1 : 0;
+        element_streak = school == last_cast_school ? (u8)(element_streak + 1) : 1;
         element_changed = last_cast_school != 0xFF && school != last_cast_school;
         last_cast_school = (u8)school;
     }
