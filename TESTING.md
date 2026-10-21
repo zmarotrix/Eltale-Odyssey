@@ -198,7 +198,7 @@ green, Gambler's Coin gold, Mirror Shard violet; no charm keeps the game's). Che
 
 Only Brian's starting staff (no staff equipped) gives MP back on staff hits; every other staff doesn't.
 
-**D-pad down** in the field opens the **Equipment** window: staff, robe, charm and sigil slots. You can look
+**D-pad down** in the field opens the **Equipment** window: staff, robe, charm and sigil slots. Brian starts with **Brian's Staff** (the only staff whose hits restore MP) and **Brian's Robe** (no bonuses). You can look
 anywhere but change equipment only at an inn. The charm slot opens after Solvaring, the sigil slot after Zelse.
 
 | Piece | Slot | Effect | Where |

@@ -183,6 +183,19 @@ extern u16 gBattleState;
 
 static const char* const slot_names[SLOT_COUNT] = { "Staff", "Robe", "Charm", "Sigil" };
 
+// An empty staff or robe slot is Brian's own (playtest, 2026-10-21): his starting staff is the only one that gives
+// MP back on hits, so the window says so, and swapping it out shows what's lost. Charms and sigils are just empty.
+static const char* const own_names[SLOT_COUNT] = { "Brian's Staff", "Brian's Robe", "-", "-" };
+static const char* const own_effects[SLOT_COUNT] = { "Staff hits restore MP.", "His old robe. No bonuses.", "", "" };
+
+static const char* choice_name(int slot, int piece) {
+    return piece >= 0 ? catalog[piece].name : slot <= SLOT_ROBE ? own_names[slot] : "NOTHING";
+}
+
+static const char* piece_effect(int slot, int piece) {
+    return piece >= 0 ? catalog[piece].effect : own_effects[slot];
+}
+
 static int window_open = 0;
 static int choosing = 0;      // 0: picking a slot, 1: picking a piece for it
 static int cursor = 0;
@@ -232,7 +245,7 @@ RECOMP_HOOK_RETURN("pad_read") void eo_equipment_read_input(void) {
 
 static void list_choices(int slot) {
     choice_count = 0;
-    choices[choice_count++] = -1;  // "Nothing"
+    choices[choice_count++] = -1;  // Brian's own staff or robe, or nothing for a charm or sigil
     for (int p = 0; p < EQUIPMENT_COUNT; p++) {
         if (catalog[p].slot == slot && eo_equipment_owned(p)) {
             choices[choice_count++] = p;
@@ -300,13 +313,13 @@ static void draw_window(void) {
             int palette = !open ? TEXT_DIM : s == cursor ? TEXT_GOOD : TEXT_NORMAL;
             int worn = worn_in(s);
             eo_ui_small(TEXT_X, y, palette, slot_names[s]);
-            eo_ui_small(TEXT_X + 7 * SMALL_W, y, palette, !open ? "LOCKED" : worn >= 0 ? catalog[worn].name : "-");
+            eo_ui_small(TEXT_X + 7 * SMALL_W, y, palette, !open ? "LOCKED" : worn >= 0 ? catalog[worn].name : own_names[s]);
         }
     } else {
         eo_ui_small(WIN_X + SMALL_PAD, WIN_Y + SMALL_PAD, TEXT_NORMAL, slot_names[slot_cursor]);
         for (int i = 0; i < choice_count; i++) {
             int palette = i == cursor ? TEXT_GOOD : TEXT_NORMAL;
-            eo_ui_small(TEXT_X, list_y + i * ROW_H + 2, palette, choices[i] < 0 ? "NOTHING" : catalog[choices[i]].name);
+            eo_ui_small(TEXT_X, list_y + i * ROW_H + 2, palette, choice_name(slot_cursor, choices[i]));
         }
     }
 
@@ -314,15 +327,16 @@ static void draw_window(void) {
     if (message != 0) {
         eo_ui_small(WIN_X + SMALL_PAD, info_y, TEXT_WARN, message);
     } else {
+        int slot = choosing ? slot_cursor : cursor;
         int piece = choosing ? choices[cursor] : worn_in(cursor);
-        eo_ui_small(WIN_X + SMALL_PAD, info_y, TEXT_NORMAL, piece >= 0 ? catalog[piece].effect : "");
+        eo_ui_small(WIN_X + SMALL_PAD, info_y, TEXT_NORMAL, slot_open(slot) ? piece_effect(slot, piece) : "");
     }
     eo_icons_begin();
     for (int i = 0; i < rows; i++) {
         s32 y = list_y + i * ROW_H + 2 + ICON_TEXT_DY;
         if (!choosing) {
             eo_icon_draw(slot_open(i) ? ICON_STAFF + i : ICON_LOCK, ICON_X, y);
-        } else if (choices[i] >= 0) {
+        } else if (choices[i] >= 0 || slot_cursor <= SLOT_ROBE) {
             eo_icon_draw(ICON_STAFF + slot_cursor, ICON_X, y);
         }
     }
