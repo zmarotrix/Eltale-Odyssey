@@ -517,7 +517,7 @@ RECOMP_HOOK_RETURN("pad_read") void eo_combat_read_input(void) {
 // the HUD, and the selected spell gets a window with its element, description and MP cost. What a Boost does is
 // left for the player to find out. Enemy statuses, shield hits and Break show on the enemies themselves (fx.c).
 
-#define CHARGE_X 32       // under the element gems, bottom left (playtest, 2026-10-21)
+#define CHARGE_X 40       // centered under the element gems, bottom left (playtest, 2026-10-21)
 #define CHARGE_Y 213
 #define CHARGE_STEP 11
 #define DESC_X 52         // under the game's selected-spell bar
