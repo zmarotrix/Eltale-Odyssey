@@ -227,7 +227,7 @@ anywhere but change equipment only at an inn. The charm slot opens after Solvari
 | Knight's Mantle | Robe | Defense 16 more | Baragoon Moor inn chest #6 (was Celine's Bell) |
 | Leviathan Staff | Staff | Staff 8 more, Water 1.25x, heals 25% more | Brannoch Castle cannon room chest #2 (was Heroes Drink) |
 | Titan Staff | Staff | Staff 30 more; first swing a turn cracks a shield | Brannoch Castle chest (was Golden Amulet) |
-| Skyreed Staff | Staff | Staff 8 more, Wind 1.25x, Wind Boost a little stronger | Leonardo section chest #2 (was Celine's Bell) |
+| Skyreed Staff | Staff | Staff 8 more, Wind 1.25x, Wind Boost +10% more shots per charge | Leonardo section chest #2 (was Celine's Bell) |
 | Dragon Robe | Robe | Defense 24 more, immune to Poison | Leonardo section chest #4 (was Silver Amulet) |
 | Prism Sigil | Sigil | A spell of a different element from the last: 20% more | Beigis |
 
