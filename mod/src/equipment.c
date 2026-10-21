@@ -25,6 +25,30 @@ static const EquipmentInfo catalog[EQUIPMENT_COUNT] = {
     [EQ_TIDAL_ECHO]     = { "Tidal Echo",        SLOT_SIGIL, 0,    "Water spells cast twice, 0.75x." },
     [EQ_LEECH_PILLAR]   = { "Leech Pillar",      SLOT_SIGIL, 0,    "Water Pillar drains a quarter." },
     [EQ_WOOL_CLOAK]     = { "Wool Cloak",        SLOT_ROBE,  0,    "Defense 2 more, Wind 1.1x." },
+    // Build pieces found in the world (chests.c) or given by bosses (gold.c). By style:
+    //   Pyromancer   Ember Staff > Ember Heart > Phoenix Staff     (talents: Smoulder, Inferno, Wildfire)
+    //   Stonewall    Lead Mantle > Stone Memory > Mountain Staff  (Bedrock, Fault Line, Shatter)
+    //   Tidecaller   Leech Pillar > Tidal Echo > Leviathan Staff (Wellspring, Undertow, Glacier)
+    //   Tempest      Gale Tether > Pilgrim's Soul > Skyreed Staff (Crosswind, Cyclone, Maelstrom)
+    //   Staff Brawler Heavy Staff > Spellstrike > Titan Staff    (Shatter, Firebrand, Tailwind)
+    //   Elementalist Wool Cloak, Prism Staff > Prism Sigil         (any spread of talents)
+    //   Wild cards   Gambler's Coin, Hunter's Charm, Glass Charm, Mirror Shard
+    [EQ_LEAD_MANTLE]    = { "Lead Mantle",       SLOT_ROBE,  0,    "Defense 10 more, Earth 1.1x." },
+    [EQ_GALE_TETHER]    = { "Gale Tether",       SLOT_SIGIL, 0,    "Wind spells fire one more shot." },
+    [EQ_EMBER_HEART]    = { "Ember Heart",       SLOT_SIGIL, 0,    "Kindling adds one more Burn." },
+    [EQ_STONE_MEMORY]   = { "Stone Memory",      SLOT_SIGIL, 0,    "Earth in a row: 15% more each." },
+    [EQ_SPELLSTRIKE]    = { "Spellstrike",       SLOT_CHARM, 0,    "First swing a turn: 1 charge." },
+    [EQ_TITAN_STAFF]    = { "Titan Staff",       SLOT_STAFF, 0,    "Swings 30 more, crack a shield." },
+    [EQ_PHOENIX_STAFF]  = { "Phoenix Staff",     SLOT_STAFF, 0,    "Fire 1.25x. Swings burn." },
+    [EQ_LEVIATHAN_STAFF]= { "Leviathan Staff",   SLOT_STAFF, 0,    "Water 1.25x, heals 25% more." },
+    [EQ_SKYREED_STAFF]  = { "Skyreed Staff",     SLOT_STAFF, 0,    "Wind 1.25x, Boost 1 more shot." },
+    [EQ_MOUNTAIN_STAFF] = { "Mountain Staff",    SLOT_STAFF, 0,    "Earth 1.25x, breaks 2 shields." },
+    [EQ_PRISM_STAFF]    = { "Prism Staff",       SLOT_STAFF, 0,    "Swings 6 more, all magic 1.1x." },
+    [EQ_KNIGHTS_MANTLE] = { "Knight's Mantle",   SLOT_ROBE,  0,    "Defense 16 more." },
+    [EQ_DRAGON_ROBE]    = { "Dragon Robe",       SLOT_ROBE,  0,    "Defense 24 more, no Poison." },
+    [EQ_HUNTERS_CHARM]  = { "Hunter's Charm",    SLOT_CHARM, 0,    "Battles pay half again in gold." },
+    [EQ_GLASS_CHARM]    = { "Glass Charm",       SLOT_CHARM, 0,    "Deal and take 25% more damage." },
+    [EQ_PRISM_SIGIL]    = { "Prism Sigil",       SLOT_SIGIL, 0,    "New element each cast: 20% more." },
 };
 
 const EquipmentInfo* eo_equipment_info(int piece) {
@@ -44,6 +68,10 @@ static int worn_in(int slot) {
     return gEo.equipped[slot] - 1;  // -1 = none
 }
 
+int eo_equipment_in_slot(int slot) {
+    return slot >= 0 && slot < SLOT_COUNT ? worn_in(slot) : -1;
+}
+
 void eo_equipment_give(int piece) {
     gEo.owned_equipment |= 1u << piece;
 }
@@ -57,6 +85,12 @@ int eo_equip_staff_bonus(void) {
         case EQ_STONE_STAFF:
         case EQ_TIDE_STAFF:
         case EQ_GALE_STAFF: return 3;
+        case EQ_TITAN_STAFF: return 30;
+        case EQ_PHOENIX_STAFF:
+        case EQ_LEVIATHAN_STAFF:
+        case EQ_SKYREED_STAFF:
+        case EQ_MOUNTAIN_STAFF: return 8;
+        case EQ_PRISM_STAFF: return 6;
         default: return 0;
     }
 }
@@ -66,8 +100,20 @@ int eo_equip_element_percent(int element) {
     int favoured = staff == EQ_EMBER_STAFF ? 0 : staff == EQ_STONE_STAFF ? 1 : staff == EQ_TIDE_STAFF ? 2 :
                    staff == EQ_GALE_STAFF ? 3 : -1;
     int percent = favoured == element ? 10 : 0;
+    // The top staves: 1.25x for their element.
+    int top = staff == EQ_PHOENIX_STAFF ? 0 : staff == EQ_MOUNTAIN_STAFF ? 1 : staff == EQ_LEVIATHAN_STAFF ? 2 :
+              staff == EQ_SKYREED_STAFF ? 3 : -1;
+    if (top == element) {
+        percent += 25;
+    }
+    if (staff == EQ_PRISM_STAFF) {
+        percent += 10;
+    }
     if (element == 3 && worn_in(SLOT_ROBE) == EQ_WOOL_CLOAK) {
         percent += 10;   // Wool Cloak: Wind 1.1x
+    }
+    if (element == 1 && worn_in(SLOT_ROBE) == EQ_LEAD_MANTLE) {
+        percent += 10;   // Lead Mantle: Earth 1.1x
     }
     return percent;
 }
@@ -77,12 +123,15 @@ int eo_equip_defense(void) {
         case EQ_TRAVELERS_ROBE: return 4;
         case EQ_TIDECLOTH_ROBE: return 8;
         case EQ_WOOL_CLOAK: return 2;
+        case EQ_LEAD_MANTLE: return 10;
+        case EQ_KNIGHTS_MANTLE: return 16;
+        case EQ_DRAGON_ROBE: return 24;
         default: return 0;
     }
 }
 
 int eo_equip_poison_immune(void) {
-    return worn_in(SLOT_ROBE) == EQ_TIDECLOTH_ROBE;
+    return worn_in(SLOT_ROBE) == EQ_TIDECLOTH_ROBE || worn_in(SLOT_ROBE) == EQ_DRAGON_ROBE;
 }
 
 // ---- Robe defense: added to Brian's battle copy of Defense when a battle starts ----

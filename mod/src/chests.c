@@ -25,7 +25,22 @@ typedef struct {
 } EquipmentChest;
 
 static const EquipmentChest chests[] = {
-    { 0x0E, 0x01, EQ_WOOL_CLOAK, "Brian found a Wool Cloak!" },   // Melrode, the shepherd's hut (was Fresh Bread)
+    { 0x0E, 0x01, EQ_WOOL_CLOAK, "Brian found a Wool Cloak!" },          // Melrode, the shepherd's hut (Fresh Bread)
+    { 0x55, 0x08, EQ_LEAD_MANTLE, "Brian found a Lead Mantle!" },        // Glencoe Forest cabin (Silent Flute)
+    { 0x32, 0x07, EQ_LEECH_PILLAR, "Brian found the Leech Pillar!" },    // Blue Cave #3 (Heroes Drink)
+    { 0x39, 0x08, EQ_GLASS_CHARM, "Brian found a Glass Charm!" },        // Cull Hazard #5 (Silent Flute)
+    { 0x2F, 0x04, EQ_STONE_MEMORY, "Brian found the Stone Memory!" },    // the Isle of Skye ship (Dragon's Potion)
+    { 0x1E, 0x0B, EQ_HUNTERS_CHARM, "Brian found a Hunter's Charm!" },   // Dindom Dries hut (Giant's Shoes)
+    { 0x18, 0x0C, EQ_SPELLSTRIKE, "Brian found the Spellstrike!" },      // Limelin Castle treasury #1 (Silver Amulet)
+    { 0x19, 0x09, EQ_PRISM_STAFF, "Brian found a Prism Staff!" },        // Limelin Castle treasury #2 (Celine's Bell)
+    { 0x25, 0x0D, EQ_EMBER_HEART, "Brian found the Ember Heart!" },      // Shamwood, Lavaar's room (Golden Amulet)
+    { 0x3F, 0x0C, EQ_MOUNTAIN_STAFF, "Brian found a Mountain Staff!" },  // Baragoon Tunnel #6 (Silver Amulet)
+    { 0x45, 0x04, EQ_PHOENIX_STAFF, "Brian found a Phoenix Staff!" },    // Boil Hole #5 (Dragon's Potion)
+    { 0x24, 0x09, EQ_KNIGHTS_MANTLE, "Brian found a Knight's Mantle!" }, // Baragoon Moor inn #6 (Celine's Bell)
+    { 0x49, 0x07, EQ_LEVIATHAN_STAFF, "Brian found a Leviathan Staff!" },// Brannoch Castle cannon room #2 (Heroes Drink)
+    { 0x4B, 0x0D, EQ_TITAN_STAFF, "Brian found a Titan Staff!" },        // Brannoch Castle, Hi Dad Bye Dad #2 (Golden Amulet)
+    { 0x4D, 0x09, EQ_SKYREED_STAFF, "Brian found a Skyreed Staff!" },    // Leonardo to the rescue #2 (Celine's Bell)
+    { 0x4F, 0x0C, EQ_DRAGON_ROBE, "Brian found a Dragon Robe!" },        // Leonardo to the rescue #4 (Silver Amulet)
 };
 #define CHEST_ENTRIES (sizeof(chests) / sizeof(chests[0]))
 

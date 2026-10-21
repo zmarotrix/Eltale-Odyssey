@@ -69,6 +69,11 @@ static void watch_gold(void) {
     if (gold == shown_gold) {
         return;
     }
+    // Hunter's Charm: battle winnings come half again (gold only rises from battles and boss rewards).
+    if (gold > shown_gold && eo_equipment_worn(EQ_HUNTERS_CHARM)) {
+        gold += (gold - shown_gold) / 2;
+        GOLD = gold;
+    }
     char line1[24];
     char line2[24];
     // A coin and the total on top, the change below it: green for winnings, red with "-" for spending.
@@ -136,12 +141,12 @@ static const u16 boss_gold[] = {
 // Charms and sigils are found, not bought: bosses carry them (pacing plan, "Build pieces"; first pass).
 static const s8 boss_piece[] = {
     EQ_GAMBLERS_COIN,  // 0 Solvaring (and the charm slot opens)
-    EQ_LEECH_PILLAR,   // 1 Zelse (and the sigil slot opens)
+    EQ_GALE_TETHER,    // 1 Zelse (and the sigil slot opens); the Leech Pillar is in a Blue Cave chest
     EQ_TIDAL_ECHO,     // 2 Nepty
     -1,                // 3 Shilf
     -1,                // 4 Fargo
     EQ_MIRROR_SHARD,   // 5 Guilty
-    -1,                // 6 Beigis
+    EQ_PRISM_SIGIL,    // 6 Beigis
     -1,                // 7 Mammon
 };
 

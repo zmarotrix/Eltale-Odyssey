@@ -256,7 +256,11 @@ enum {
     EQ_TRAVELERS_ROBE, EQ_TIDECLOTH_ROBE,
     EQ_PILGRIMS_SOUL, EQ_GAMBLERS_COIN, EQ_MIRROR_SHARD,
     EQ_TIDAL_ECHO, EQ_LEECH_PILLAR,
-    EQ_WOOL_CLOAK,   // a robe; added last so saved bits keep their meaning
+    EQ_WOOL_CLOAK,   // a robe; new pieces go last so saved bits keep their meaning
+    // Found in chests or given by bosses (2026-10-21; pacing plan, "Build pieces")
+    EQ_LEAD_MANTLE, EQ_GALE_TETHER, EQ_EMBER_HEART, EQ_STONE_MEMORY, EQ_SPELLSTRIKE,
+    EQ_TITAN_STAFF, EQ_PHOENIX_STAFF, EQ_LEVIATHAN_STAFF, EQ_SKYREED_STAFF, EQ_MOUNTAIN_STAFF, EQ_PRISM_STAFF,
+    EQ_KNIGHTS_MANTLE, EQ_DRAGON_ROBE, EQ_HUNTERS_CHARM, EQ_GLASS_CHARM, EQ_PRISM_SIGIL,
     EQUIPMENT_COUNT
 };
 typedef struct {
@@ -268,6 +272,7 @@ typedef struct {
 const EquipmentInfo* eo_equipment_info(int piece);
 int eo_equipment_owned(int piece);
 int eo_equipment_worn(int piece);
+int eo_equipment_in_slot(int slot);   // piece worn in slot 0 staff, 1 robe, 2 charm, 3 sigil; -1 if none
 void eo_equipment_give(int piece);
 int eo_equipment_window_open(void);
 int eo_equip_staff_bonus(void);

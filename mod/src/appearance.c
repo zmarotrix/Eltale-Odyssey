@@ -38,6 +38,9 @@ static u32 cape_color_for(int robe) {
         case EQ_TRAVELERS_ROBE: return 0x8A5A2AFF;   // brown
         case EQ_TIDECLOTH_ROBE: return 0x1878C0FF;   // deep blue
         case EQ_WOOL_CLOAK: return 0xE8DCC0FF;       // undyed wool
+        case EQ_LEAD_MANTLE: return 0x5A5C64FF;      // lead grey
+        case EQ_KNIGHTS_MANTLE: return 0x2A3C8CFF;   // royal blue
+        case EQ_DRAGON_ROBE: return 0x2E7A3AFF;      // dragon green
     }
     return CAPE_RED;
 }
@@ -56,6 +59,20 @@ static const Color* staff_color_for(int staff) {
         case EQ_TIDE_STAFF: return &tide;
         case EQ_GALE_STAFF: return &gale;
     }
+    static const Color titan = { 120, 110, 100 };
+    static const Color phoenix = { 255, 150, 40 };
+    static const Color leviathan = { 40, 120, 255 };
+    static const Color skyreed = { 170, 255, 210 };
+    static const Color mountain = { 200, 130, 60 };
+    static const Color prism = { 255, 200, 255 };
+    switch (staff) {
+        case EQ_TITAN_STAFF: return &titan;
+        case EQ_PHOENIX_STAFF: return &phoenix;
+        case EQ_LEVIATHAN_STAFF: return &leviathan;
+        case EQ_SKYREED_STAFF: return &skyreed;
+        case EQ_MOUNTAIN_STAFF: return &mountain;
+        case EQ_PRISM_STAFF: return &prism;
+    }
     return 0;
 }
 
@@ -69,6 +86,15 @@ static const Color* collar_color_for(int robe) {
         case EQ_TIDECLOTH_ROBE: return &tidecloth;
         case EQ_WOOL_CLOAK: return &wool;
     }
+    // Lighter trim for the darker robes, so the collar still reads against the cape.
+    static const Color lead = { 170, 175, 185 };
+    static const Color knight = { 230, 200, 90 };
+    static const Color dragon = { 200, 60, 40 };
+    switch (robe) {
+        case EQ_LEAD_MANTLE: return &lead;
+        case EQ_KNIGHTS_MANTLE: return &knight;
+        case EQ_DRAGON_ROBE: return &dragon;
+    }
     return 0;
 }
 
@@ -81,6 +107,14 @@ static const Color* gem_color_for(int charm) {
         case EQ_PILGRIMS_SOUL: return &pilgrim;
         case EQ_GAMBLERS_COIN: return &gambler;
         case EQ_MIRROR_SHARD: return &mirror;
+    }
+    static const Color spellstrike = { 255, 80, 80 };
+    static const Color hunter = { 160, 220, 90 };
+    static const Color glass = { 200, 245, 255 };
+    switch (charm) {
+        case EQ_SPELLSTRIKE: return &spellstrike;
+        case EQ_HUNTERS_CHARM: return &hunter;
+        case EQ_GLASS_CHARM: return &glass;
     }
     return 0;
 }
@@ -116,15 +150,6 @@ static u32 checksum(const u16* t, int n) {
         sum = sum * 31 + t[i];
     }
     return sum;
-}
-
-static int worn(int slot_first, int slot_last) {
-    for (int p = slot_first; p <= slot_last; p++) {
-        if (eo_equipment_worn(p)) {
-            return p;
-        }
-    }
-    return -1;
 }
 
 static int is_texture_load(const u32* w, u32 timg, u32 tile) {
@@ -249,12 +274,9 @@ RECOMP_HOOK_RETURN("frame_build") void eo_appearance_frame(void) {
         remember_parts();
         applied_robe = applied_staff = applied_charm = -2;
     }
-    int robe = worn(EQ_TRAVELERS_ROBE, EQ_TIDECLOTH_ROBE);
-    if (eo_equipment_worn(EQ_WOOL_CLOAK)) {
-        robe = EQ_WOOL_CLOAK;
-    }
-    int staff = worn(EQ_EMBER_STAFF, EQ_GALE_STAFF);
-    int charm = worn(EQ_PILGRIMS_SOUL, EQ_MIRROR_SHARD);
+    int robe = eo_equipment_in_slot(1);
+    int staff = eo_equipment_in_slot(0);
+    int charm = eo_equipment_in_slot(2);
     if (robe != applied_robe) {
         u32 color = cape_color_for(robe);
         for (int i = 0; i < CAPE_PIECES; i++) {

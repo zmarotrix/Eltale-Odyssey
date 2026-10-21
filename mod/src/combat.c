@@ -27,6 +27,9 @@
 #define SEARING_PERCENT 5
 #define AFTERSHOCK_PERCENT 10      // on top of Earth Boost's 40 per charge
 #define CYCLONE_CHANCE 5
+#define STONE_MEMORY_PERCENT 15
+#define PRISM_PERCENT 20
+#define GLASS_PERCENT 25
 #define STOKE_FRESH_PERCENT 70     // a stoking Fire spell on a foe that isn't burning
 #define STOKE_BURNING_PERCENT 140  // ... and on one that is
 #define NO_WEAKNESS 0xFF
@@ -84,6 +87,11 @@ static u8 weakness_bonus_given = 0;
 static u8 reflected_this_battle = 0;  // Mirror Shard
 static u8 bulwark_used = 0;           // Bulwark talent
 static u32 turns_taken = 0;           // Brian's turns this battle (Still Waters)
+static u32 cast_turn = 0;             // turns_taken + 1 when Brian last cast (one cast a turn)
+static u32 turn_swing_used = 0;       // turns_taken + 1 when Brian last swung (first swing a turn)
+static u8 earth_streak = 0;           // Earth spells cast in a row (Stone Memory)
+static u8 last_cast_school = 0xFF;    // element of Brian's last spell (Prism Sigil)
+static u8 element_changed = 0;
 
 // The boost of the spell being cast right now (0 when none), and what was changed for it.
 static u8 active_boost = 0;
@@ -158,6 +166,10 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
     gain_charge(START_CHARGE + eo_talent(TALENT_BEDROCK));
     bulwark_used = 0;
     turns_taken = 0;
+    cast_turn = turn_swing_used = 0;
+    earth_streak = 0;
+    last_cast_school = 0xFF;
+    element_changed = 0;
     boost = 0;
     spent_last_turn = spent_this_turn = 0;
     weakness_bonus_given = 0;
@@ -296,7 +308,8 @@ RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u1
         gain_charge(1);
         weakness_bonus_given++;
     }
-    crack_shields(slot, element == EARTH && eo_talent(TALENT_FAULT_LINE) ? 2 : 1);
+    int heavy = element == EARTH && (eo_talent(TALENT_FAULT_LINE) || eo_equipment_worn(EQ_MOUNTAIN_STAFF));
+    crack_shields(slot, heavy ? 2 : 1);
 }
 
 // Damage numbers: 9 slots of 0x1C bytes at 0x800873D0 (+0x00 the fighter's battle data, +0x04 digits, +0x0C timer,
@@ -361,6 +374,18 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     } else if (hit_element < 4) {
         percent += (u32)eo_equip_element_percent(hit_element) +
                    SCHOOL_TALENT_PERCENT * (u32)eo_talent(school_talent[hit_element]);
+        // Stone Memory: each Earth spell cast in a row hits 15% harder (to 45%).
+        if (hit_element == EARTH && eo_equipment_worn(EQ_STONE_MEMORY)) {
+            percent += STONE_MEMORY_PERCENT * (u32)(earth_streak > 1 ? (earth_streak - 1 > 3 ? 3 : earth_streak - 1) : 0);
+        }
+        // Prism Sigil: a spell of a different element from the last one hits 20% harder.
+        if (eo_equipment_worn(EQ_PRISM_SIGIL) && element_changed) {
+            percent += PRISM_PERCENT;
+        }
+    }
+    // Glass Charm: everything Brian deals is 25% more.
+    if (eo_equipment_worn(EQ_GLASS_CHARM)) {
+        percent += GLASS_PERCENT;
     }
     // Which way the mechanics pushed this hit, for the number's color: a weakness hit, a Broken, burning or frozen
     // bonus or a stoke on a burning foe buffs it; the foe resisting the element or a stoke on a foe that isn't
@@ -396,7 +421,17 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     // Ember Staff: a staff hit sets the foe burning; on a foe already burning it flares instead, spreading the
     // Burn to the enemies around it (status.c).
     // Firebrand: any staff sets foes burning (only the Ember Staff flares).
-    if (hit_kind == HIT_STAFF && (eo_equipment_worn(EQ_EMBER_STAFF) || eo_talent(TALENT_FIREBRAND))) {
+    if (hit_kind == HIT_STAFF && turn_swing_used != turns_taken + 1) {
+        turn_swing_used = turns_taken + 1;   // the first swing this turn
+        if (eo_equipment_worn(EQ_SPELLSTRIKE)) {
+            gain_charge(1);   // Spellstrike
+        }
+        if (eo_equipment_worn(EQ_TITAN_STAFF) && ENEMY_HP(slot) > 0) {
+            crack_shields(slot, 1);   // Titan Staff
+        }
+    }
+    if (hit_kind == HIT_STAFF && (eo_equipment_worn(EQ_EMBER_STAFF) || eo_equipment_worn(EQ_PHOENIX_STAFF) ||
+                                  eo_talent(TALENT_FIREBRAND))) {
         if (eo_status_burn_stacks(slot) > 0) {
             if (eo_equipment_worn(EQ_EMBER_STAFF)) {
                 eo_status_flare(slot);
@@ -438,6 +473,12 @@ RECOMP_HOOK("player_take_damage") void eo_combat_before_brian_damage(u16 power, 
 }
 
 RECOMP_HOOK_RETURN("player_take_damage") void eo_combat_after_brian_damage(void) {
+    // Glass Charm: what Brian takes is 25% more (never below 1 HP from the extra).
+    u16* hp_now = (u16*)gPlayerMainData + 2;
+    if (in_battle() && eo_equipment_worn(EQ_GLASS_CHARM) && *hp_now < bulwark_hp && *hp_now > 0) {
+        u16 more = (u16)((bulwark_hp - *hp_now) * GLASS_PERCENT / 100);
+        *hp_now = (u16)(*hp_now > more ? *hp_now - more : 1);
+    }
     // Bulwark: the first hit Brian takes each fight is halved.
     u16* hp = (u16*)gPlayerMainData + 2;
     if (in_battle() && !bulwark_used && eo_talent(TALENT_BULWARK) && *hp < bulwark_hp) {
@@ -521,11 +562,20 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     if (school > WIND || index >= 15) {
         return;
     }
+    // Once per cast (the first shot of the turn): Stone Memory's streak and Prism Sigil's element change.
+    if (cast_turn != turns_taken + 1) {
+        cast_turn = turns_taken + 1;
+        earth_streak = school == EARTH ? earth_streak + 1 : 0;
+        element_changed = last_cast_school != 0xFF && school != last_cast_school;
+        last_cast_school = (u8)school;
+    }
     u8* stats = SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE;
     u16 type = *(u16*)(stats + SPELL_TYPE);
     int echo = school == WATER && type == SPELL_TYPE_DAMAGE && eo_equipment_worn(EQ_TIDAL_ECHO);
     int wellspring = school == WATER && type == SPELL_TYPE_HEAL ? eo_talent(TALENT_WELLSPRING) : 0;
-    if (boost == 0 && !echo && !wellspring) {
+    int leviathan = school == WATER && type == SPELL_TYPE_HEAL && eo_equipment_worn(EQ_LEVIATHAN_STAFF);
+    int tether = school == WIND && type == SPELL_TYPE_DAMAGE && eo_equipment_worn(EQ_GALE_TETHER);
+    if (boost == 0 && !echo && !wellspring && !leviathan && !tether) {
         return;
     }
     active_spell = stats;
@@ -543,9 +593,10 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     if (school == EARTH && type == SPELL_TYPE_DAMAGE) {
         base = (u16)(base * (100 + (40 + AFTERSHOCK_PERCENT * eo_talent(TALENT_AFTERSHOCK)) * boost) / 100);
     } else if (school == WATER && type == SPELL_TYPE_HEAL) {
-        base = (u16)(base * (100 + 30 * boost + 10 * wellspring) / 100 + boost);
+        base = (u16)(base * (100 + 30 * boost + 10 * wellspring + (leviathan ? 25 : 0)) / 100 + boost);
     } else if (school == WIND && type == SPELL_TYPE_DAMAGE) {
-        shots = (u16)(shots + (2 + eo_talent(TALENT_CROSSWIND)) * boost);
+        int per_charge = 2 + eo_talent(TALENT_CROSSWIND) + (eo_equipment_worn(EQ_SKYREED_STAFF) ? 1 : 0);
+        shots = (u16)(shots + per_charge * boost + (tether ? 1 : 0));
     }
     *(u16*)(stats + SPELL_BASE) = base;
     *(u16*)(stats + SPELL_SHOTS) = shots;

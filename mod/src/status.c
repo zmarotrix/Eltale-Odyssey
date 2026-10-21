@@ -228,7 +228,8 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_enemy_damage(void) 
     int kindles = (brian_spell >> 8) == 0 && eo_fire_kind(brian_spell & 0xFF) == FIRE_KINDLE;
     if (kindles && hit > 0 && ENEMY_HP(slot) > 0 && !eo_status_blocks(ENEMY_BATTLE_DATA(slot), 1, 1)) {
         u32 amount = (u32)hit * (u32)eo_status_burn_percent() / 100;
-        for (int i = 0; i <= boost; i++) {
+        int stacks = boost + 1 + (eo_equipment_worn(EQ_EMBER_HEART) ? 1 : 0);   // Ember Heart: one more
+        for (int i = 0; i < stacks; i++) {
             burn_add_stack(slot, (u16)(amount < 1 ? 1 : amount));
         }
     }
