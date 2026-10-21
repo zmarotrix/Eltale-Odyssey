@@ -6,6 +6,7 @@
 // that hit's damage (up to 3; a 4th replaces the weakest). Stacks tick at the end of each of Brian's turns,
 // from the turn after they were applied, through the game's own enemy damage routine (damage number, hurt
 // animation, death) and ignore defense. They fade after BURN_TURNS ticks without a new Fire hit.
+// Fire Bomb ignites a burning foe: all the Burn damage still to come (stacks x turns left) lands at once.
 //
 // Poison: poison-themed monsters may poison Brian when they hurt him. He loses 5% of max HP at the end of each
 // of his turns for POISON_TURNS turns, never going below 1 HP; outside battle it ticks every few seconds.
@@ -121,6 +122,31 @@ static void burn_tick_all(void) {
     }
 }
 
+#define SPELL_FIRE_BOMB 0x000A   // Fire school, index 10
+
+// The spell Brian launched last (projectile_init runs for every shot, Brian's and enemies').
+static u16 brian_spell = 0xFFFF;
+
+RECOMP_HOOK("projectile_init") void eo_status_on_projectile(void* caster, u16 spell) {
+    if (!is_enemy_battle_data(caster)) {
+        brian_spell = spell & 0x0FFF;
+    }
+}
+
+// Deals all of a burning foe's remaining Burn damage at once and clears it.
+static void burn_ignite(int slot) {
+    Burn* b = &burns[slot];
+    u32 total = 0;
+    for (int i = 0; i < BURN_STACKS; i++) {
+        total += b->stacks[i];
+    }
+    total *= b->turns_left;
+    *b = (Burn){ 0 };
+    if (total > 0 && ENEMY_HP(slot) > 0) {
+        enemy_take_damage(slot, (u16)(total > 0xFFFF ? 0xFFFF : total), ELEMENT_FIRE, DAMAGE_NO_ELEMENT, burn_attacker);
+    }
+}
+
 // Remember who a Fire spell from Brian is about to hit; the stack is added once the damage is known.
 static int pending_slot = -1;
 static u16 pending_hp;
@@ -139,12 +165,17 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_enemy_damage(void) 
     if (pending_slot < 0) {
         return;
     }
-    u16 hp = ENEMY_HP(pending_slot);
-    if (hp > 0 && hp < pending_hp) {
-        u32 amount = (u32)(pending_hp - hp) * BURN_PERCENT / 100;
-        burn_add_stack(pending_slot, (u16)(amount < 1 ? 1 : amount));
-    }
+    int slot = pending_slot;
     pending_slot = -1;
+    u16 hp = ENEMY_HP(slot);
+    u16 hit = hp < pending_hp ? (u16)(pending_hp - hp) : 0;  // this hit only, before any ignition
+    if (brian_spell == SPELL_FIRE_BOMB && burns[slot].turns_left > 0) {
+        burn_ignite(slot);
+    }
+    if (hit > 0 && ENEMY_HP(slot) > 0) {
+        u32 amount = (u32)hit * BURN_PERCENT / 100;
+        burn_add_stack(slot, (u16)(amount < 1 ? 1 : amount));
+    }
 }
 
 // A new battle: nothing burns yet.
