@@ -5,8 +5,10 @@
 // - Collecting a spirit still raises an element level, and now also gives 1 Spirit Point (counted from the
 //   game's own spirit flags, so saves from before this get points for the spirits they already found).
 // - Each element's 15 spells sit in 5 tiers by their vanilla level requirement. Tier 1 is open; attuning the
-//   next tier costs Spirit Points and needs a minimum element level. All four elements to tier 5 cost 92 points
-//   and the game has 98 spirits: specialise through the mid-game, master everything only at the very end.
+//   next tier costs Spirit Points and needs the element level vanilla asked for the tier's first spell, so no
+//   spell comes earlier than its tier would in vanilla (balance pass, 2026-10-21: gates of 6/14/22/30 handed a
+//   focused Brian level-36 spells at 30). One element to tier 5 costs 34 points, all four 136; the game has 98
+//   spirits and talents spend the same points: master one or two elements, never everything.
 // - Tier 1 spells are known as soon as Brian's element level reaches their vanilla requirement (playtest,
 //   2026-10-21: "only new tiers need discovering"). Spells in tiers attuned later can be cast, but show as "???"
 //   in the spell wheel until their combination is cast once.
@@ -30,8 +32,8 @@
 #define SPIRIT_FLAG_BYTES 16
 #define ELEMENT_LEVELS ((u8*)gPlayerMainData + 0x24)  // Fire, Earth, Water, Wind
 
-static const u8 tier_min_level[TIERS + 1] = { 0, 1, 6, 14, 22, 30 };
-static const u8 tier_cost[TIERS + 1] = { 0, 0, 2, 4, 7, 10 };
+static const u8 tier_min_level[TIERS + 1] = { 0, 1, 7, 16, 25, 36 };   // matches tier_for_level
+static const u8 tier_cost[TIERS + 1] = { 0, 0, 3, 6, 10, 15 };
 static const char* const element_names[SCHOOLS] = { "Fire", "Earth", "Water", "Wind" };
 static const char unknown_name[] = "???";
 

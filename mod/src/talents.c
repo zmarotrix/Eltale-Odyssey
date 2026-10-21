@@ -3,7 +3,7 @@
 // Talents (playtests, 2026-10-21: "a full page of talents for each magic", "you should NOT be able to even come close
 // to affording all of them", ranks "like 1/3 so it gets stronger like in WoW"). Each element has a tree of nine
 // talents on its own page of the Spirits window, deeper rows gated by that element's level, bought one rank at a
-// time with Spirit Points. Every tree filled costs about 150 points on top of the 92 for full attunement, against the
+// time with Spirit Points. Every tree filled costs about 150 points on top of the 136 for full attunement, against the
 // 98 the game's spirits give: a build picks a lane.
 //
 // Effects live where the rule they bend lives (status.c, combat.c, equipment.c); eo_talent() is how they ask.
@@ -33,7 +33,7 @@ static const TalentInfo talents[TALENT_COUNT] = {
     [TALENT_AFTERSHOCK]     = { "Aftershock",     1, 16, 2, RANK_COST, "EARTH BOOST HITS HARDER A RANK." },
     [TALENT_BULWARK]        = { "Bulwark",        1, 20, 1, RANK_COST, "FIRST HIT ON YOU EACH FIGHT HALVED." },
     [TALENT_LANDSLIDE]      = { "Landslide",      1, 25, 1, RANK_COST, "A BREAK CRACKS EVERY OTHER FOE." },
-    [TALENT_EPICENTRE]      = { "Epicentre",      1, 30, 1, CAPSTONE_COST, "BROKEN FOES STAY BROKEN LONGER." },
+    [TALENT_EPICENTRE]      = { "Epicentre",      1, 30, 1, CAPSTONE_COST, "BREAK LASTS 2 TURNS. BOSSES: 1." },
     // Water: healing, Freeze and sustain
     [TALENT_DEEP_FREEZE]    = { "Deep Freeze",    2, 1,  2, RANK_COST, "FREEZE LASTS 1 MORE TURN A RANK." },
     [TALENT_WELLSPRING]     = { "Wellspring",     2, 3,  3, RANK_COST, "WATER HEALS 10 PCT MORE A RANK." },

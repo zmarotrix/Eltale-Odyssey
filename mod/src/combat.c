@@ -200,7 +200,8 @@ static void break_enemy(int i) {
     g->broken = 1;
     u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
     *(u16*)status |= STATUS_RESTRICTION_BIT;   // its next turn is skipped by the game itself
-    status[STATUS_RESTRICTION_DURATION] = (u8)(1 + eo_talent(TALENT_EPICENTRE));
+    // Epicentre: two lost turns, but bosses resist control effects (as with freezing) and lose only one.
+    status[STATUS_RESTRICTION_DURATION] = (u8)(1 + ((gBattleState & BATTLE_BOSS) ? 0 : eo_talent(TALENT_EPICENTRE)));
     break_sounds_left = BREAK_SOUNDS;   // played by eo_combat_draw, a few frames apart
     break_sound_timer = 0;
     // Landslide: the Break cracks a shield off every other foe (never their last).
