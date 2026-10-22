@@ -1,15 +1,16 @@
 """Eltale Odyssey balance engine: plays builds through boss fights and normal-enemy packs, many times each, and
-gathers statistics (win rate, Brian's turns, enemy actions, HP lost, MP used, Breaks).
+gathers statistics (win rate, Brian's turns, enemy actions, HP lost, lowest HP, MP used, Breaks, items, spells cast).
 
 Mechanics follow the Spell Trees doc (2026-10-22) and the game's formulas (research/battle, research/enemies):
 spell power, element multipliers, defense, accuracy and agility rolls, Spirit Charge and Boost, Settling, Burn
 (kindle / stoke / spread), Frost and Freeze, Break and shields, Wind's any-press rule, boss Freeze immunity.
-Talents, gear and most items are left out on purpose: this is the spells' own baseline.
+Talents and gear are not modeled one by one; the KIT rows stand in for what they should add by each boss. CONFIG
+holds the levers a scenario can change, and BALANCE_PASS the changes the balance pass proposed (2026-10-22).
 
 Estimates (no measured source; change them here): Brian's HP, MP, defense and agility at each boss, heal amounts,
 and how area spells spread over a pack. Spell bases for the new spells are proposals in vanilla's range.
 
-Usage: python engine.py [runs] > results.json
+Usage: python engine.py [runs] > results_balance.json   (every scenario in SCENARIOS, 3 healing items)
 """
 import json
 import math
@@ -44,6 +45,47 @@ BRIAN_AGI = [14, 35, 40, 46, 51, 56, 61, 66]
 BOSS_HIT = 0.12
 MONSTER_HIT = 0.045
 MONSTER_ACT_CHANCE = 0.75   # a monster spends some turns walking into range
+
+# ---- Scenarios: levers for the balance pass (run() takes a dict that overrides these) ----
+# KIT models what the final pass (combat items, gear, talents) is expected to add by each boss: damage dealt,
+# damage taken, healing items carried, MP pool. Targets, not measurements: the balance pass assumed gear and talents
+# roughly double Brian's damage by the end.
+KIT_DMG = [1.00, 1.10, 1.20, 1.35, 1.50, 1.65, 1.80, 2.00]
+KIT_TAKEN = [1.00, 0.95, 0.90, 0.85, 0.80, 0.76, 0.73, 0.70]
+KIT_ITEMS = [2, 3, 3, 4, 4, 5, 5, 6]
+KIT_MP = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7]
+CONFIG = dict(
+    kit=False,            # apply the KIT rows above
+    none_mult=0.5,        # damage Brian's spells deal to no-element foes (game rule: 0.5)
+    burn_full=False,      # Burn ticks ignore the target's element (a Fire boss still burns at full)
+    shatter_neutral=False,  # Shatter breaks ice, so it ignores element
+    beigis_shift=True,    # Beigis takes a random element after each Break (the mod's mechanic)
+    boss_hp=[1.0] * 8,    # per-boss HP multipliers on BOSS_HP
+    wellspring=0.0,       # Wellspring (Water tier 1, 0 MP): a turn that restores this share of max MP; 0 = not in the game
+    wellspring_all=False,  # every build can draw on Wellspring, not only those with Water
+    boss_shields=None,    # per-boss shield counts; None = 6 + boss number / 2
+    pack_hp=1.0, pack_hit=[1.0] * 8,   # monster pack HP, and each monster action's share of Brian's HP, per beat
+    boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
+    spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
+    finisher=0,           # tier-5 spells need this much Charge and spend it all (no Boost on top); 0 = off
+)
+DEFAULT_CONFIG = dict(CONFIG)
+
+# The balance pass (2026-10-22) proposals, as one scenario. Not yet in the spec; the progression doc has the results.
+BALANCE_PASS = dict(
+    wellspring=0.2,       # Water tier 1: a turn for 20% of max MP (+10% a Charge)
+    finisher=2,           # tier-5 spells need 2 Charge and spend all of it
+    none_mult=0.75,       # no-element foes resist a quarter, not half
+    spells={"Hurricane": {"base": 90}, "Shatter": {"base": 900}, "Icicle": {"base": 420}, "Undertow": {"base": 260}},
+    pack_hit=[1, 1, 1, 1, 1.25, 1.5, 1.75, 2.0],   # late packs keep up with gear
+    boss_hit=[1, 1, 1, 1, 1.1, 1.15, 1.2, 1.25],
+)
+SCENARIOS = {
+    "before": dict(),
+    "before+kit": dict(kit=True),
+    "pass, no kit": dict(BALANCE_PASS),
+    "pass+kit": dict(BALANCE_PASS, kit=True),
+}
 
 # Which monster set Brian fights while heading to each boss (research/enemies: set by region and beat).
 PACK_SET = [0, 1, 4, 2, 3, 3, 3, 5]
@@ -129,6 +171,9 @@ spell(EARTH, 5, "Eruption", 820, 1, "heavy", "near", crack=1, burn=1, mp=16)
 # Water: Frost into Freeze, guards, weak heals.
 spell(WATER, 1, "Spout", 280, 1, "spout")
 spell(WATER, 1, "Mend", 0, 1, "heal", "self", heal=0.22, mp=3)
+# Wellspring (balance pass, 2026-10-22, playtest: "taking a turn to use water should be considered"): spend the turn
+# drawing water to refill MP. Boost adds 10% of max MP a charge. Only in the game when CONFIG["wellspring"] > 0.
+spell(WATER, 1, "Wellspring", 0, 1, "well", "self", mp=0)
 spell(WATER, 2, "Ice Wall", 0, 1, "wall", "self")
 spell(WATER, 2, "Soothe", 0, 1, "heal", "self", heal=0.15, mp=3)
 spell(WATER, 2, "Icicle", 360, 1, "chill", steps=1)
@@ -165,7 +210,9 @@ def power(base, elem, lv):
 
 
 def element_mult(atk_elem, def_elem):
-    if def_elem == NONE or atk_elem == def_elem:
+    if def_elem == NONE:
+        return CONFIG["none_mult"]
+    if atk_elem == def_elem:
         return 0.5
     if OPP[atk_elem] == def_elem:
         return 1.25
@@ -183,7 +230,8 @@ class Foe:
         self.atk = atk
         self.boss, self.spells, self.boss_no = boss, spells, boss_no
         self.weak = weakness(self.elem)
-        self.shields = self.max_shields = (6 + boss_no // 2) if boss else (2 if hp < 60 else 3 if hp < 200 else 4)
+        shields = CONFIG["boss_shields"][boss_no - 1] if boss and CONFIG["boss_shields"] else 6 + boss_no // 2
+        self.shields = self.max_shields = shields if boss else (2 if hp < 60 else 3 if hp < 200 else 4)
         self.broken = 0
         self.stacks, self.burn_left, self.hot = [], 0, 0
         self.frost, self.freeze, self.freeze_immune = 0, 0, 0
@@ -214,10 +262,23 @@ class Battle:
         self.mirage = 0
         self.regen, self.regen_turns = 0, 0
         self.items = items
+        self.dmg_mult, self.taken_mult = 1.0, 1.0
+        if CONFIG["kit"]:
+            self.items = KIT_ITEMS[beat] if items else 0
+            self.mp = self.max_mp = round(self.max_mp * KIT_MP[beat])
+            self.dmg_mult, self.taken_mult = KIT_DMG[beat], KIT_TAKEN[beat]
         self.calibrate()
         self.turns = self.enemy_actions = self.breaks = 0
         self.hp_lost = self.mp_used = 0
-        self.spells = [s for s in S if self.usable[s["school"]] and tier(self.lv[s["school"]]) >= s["tier"]]
+        self.low_hp = self.max_hp   # the lowest Brian's HP got (danger)
+        self.items_used = 0
+        known = [dict(s, **CONFIG["spells"].get(s["name"], {})) for s in S]
+        self.spells = [s for s in known if self.usable[s["school"]] and tier(self.lv[s["school"]]) >= s["tier"]
+                       and s["kind"] != "well"]
+        if CONFIG["wellspring"] and (self.usable[WATER] or CONFIG["wellspring_all"]):
+            self.spells.append(next(s for s in known if s["kind"] == "well"))
+        self.wells = self.staff_turns = 0
+        self.casts = {}
 
     def calibrate(self):
         """Scale each enemy's damage so its average action costs the design share of Brian's HP."""
@@ -226,10 +287,10 @@ class Battle:
                 L = f.atk
                 avg = sum(base * 0.02 * (1 + 0.2 * (1.03 ** L - 1) / 0.03) * f.atk / (f.atk + self.df) * shots * acc / 100
                           for base, acc, shots in f.spells) / len(f.spells)
-                f.dmg_scale = BOSS_HIT * self.max_hp / avg
+                f.dmg_scale = BOSS_HIT * CONFIG["boss_hit"][self.beat] * self.max_hp / avg
             else:
                 avg = f.atk * f.atk / (f.atk + self.df)
-                f.dmg_scale = MONSTER_HIT * self.max_hp / max(avg, 0.1)
+                f.dmg_scale = MONSTER_HIT * CONFIG["pack_hit"][self.beat] * self.max_hp / max(avg, 0.1)
 
     # -- helpers --
     def alive_foes(self):
@@ -246,7 +307,14 @@ class Battle:
             d *= 2
         if school == EARTH and self.settled:
             d *= 0.6
+        d *= self.dmg_mult
         return d + self.rng.random() * math.sqrt(max(d, 0))
+
+    def burn_from(self, d, school, foe):
+        """A Burn stack from a hit: 20% of it, or of what it would have dealt ignoring element (burn_full)."""
+        if CONFIG["burn_full"]:
+            d = d / element_mult(school, foe.elem)
+        return d * 0.2
 
     def crack(self, foe, n):
         if foe.broken or n <= 0 or not foe.alive():
@@ -301,6 +369,9 @@ class Battle:
         self.hp = min(self.max_hp, self.hp + amount)
 
     def boost(self):
+        # With finishers in the game Brian banks Charge for his tier-5 spell instead of Boosting everything.
+        if CONFIG["finisher"] and any(s["tier"] == 5 for s in self.spells):
+            return 0
         return min(3, self.charge)
 
     def choose(self):
@@ -313,12 +384,15 @@ class Battle:
                 return ("item", None)
         best, best_v = ("staff", None), self.staff_value()
         for s in self.spells:
-            if self.mp < s["mp"]:
+            if self.mp < s["mp"] or not self.can_finish(s):
                 continue
             v = self.value(s)
             if v > best_v:
                 best, best_v = ("spell", s), v
         return best
+
+    def can_finish(self, s):
+        return s["tier"] < 5 or self.charge >= CONFIG["finisher"]
 
     def staff_damage(self, foe):
         T = sum(self.lv)
@@ -402,11 +476,22 @@ class Battle:
             v = self.threat() * len(self.alive_foes()) * (1 + b) * 0.8
         elif kind in ("heal", "regen"):
             v = 0
+        elif kind == "well":
+            return self.well_value()
         # shield value
         if kind not in ("heal", "regen", "guard", "wall", "fog", "mirage", "confuse"):
             if self.weak_hit(s, main) or s.get("any_chance") or kind in ("downburst", "fissure"):
                 v += (1.0 / max(main.shields, 1)) * (self.threat() + per)
         return v
+
+    def well_value(self):
+        """A Wellspring turn is worth the damage the MP it brings back buys later, at the best rate Brian has."""
+        if self.mp > self.max_mp * 0.4:
+            return 0
+        gain = min(self.max_mp - self.mp, self.max_mp * (CONFIG["wellspring"] + 0.1 * self.boost()))
+        rates = [self.value(s) / s["mp"] for s in self.spells if s["mp"] and s["kind"] not in ("heal", "regen")]
+        rate = max(rates, default=0)
+        return gain * rate * 0.6
 
     def act(self, choice):
         kind, s = choice
@@ -414,6 +499,7 @@ class Battle:
         if not alive:
             return
         if kind == "staff":
+            self.staff_turns += 1
             f = alive[0]
             if self.hit_roll(self.agi, f.agi):
                 f.hp -= self.staff_damage(f)
@@ -421,17 +507,26 @@ class Battle:
             return
         if kind == "item":
             self.items -= 1
+            self.items_used += 1
             self.heal(self.max_hp * 0.4)
             return
+        self.casts[s["name"]] = self.casts.get(s["name"], 0) + 1
         self.mp -= s["mp"]
         self.mp_used += s["mp"]
         b = self.boost() if s["kind"] not in ("heal", "regen", "freeze") else 0
+        if CONFIG["finisher"] and s["tier"] == 5:
+            self.charge, b = 0, 0
+            self.spent_last = True
         if b:
             self.charge -= b
             self.spent_last = True
         main = self.main_target()
         school = s["school"]
         k = s["kind"]
+        if k == "well":
+            self.wells += 1
+            self.mp = min(self.max_mp, self.mp + self.max_mp * (CONFIG["wellspring"] + 0.1 * b))
+            return
         if k == "heal":
             self.heal(self.max_hp * s["heal"] * (1 + 0.1 * b))
             return
@@ -470,14 +565,14 @@ class Battle:
                 if self.weak_hit(s, f):
                     self.crack(f, s["crack"])
                 if s.get("burn"):
-                    self.add_burn(f, self.dmg_to(f, s["base"], school) * 0.2)
+                    self.add_burn(f, self.burn_from(self.dmg_to(f, s["base"], school), school, f))
                 if s.get("frost"):
                     self.chill(f, 1)
             elif k == "kindle":
                 d = self.dmg_to(f, s["base"], school)
                 f.hp -= d * s["hits"]
                 for _ in range(s["stacks"] + b):
-                    self.add_burn(f, d * 0.2)
+                    self.add_burn(f, self.burn_from(d, school, f))
                 if s.get("hot"):
                     f.hot = 3
                 if self.weak_hit(s, f):
@@ -502,7 +597,7 @@ class Battle:
                 if f.stacks:
                     f.hp -= sum(f.stacks)
                 else:
-                    self.add_burn(f, self.dmg_to(f, s["base"], school) * 0.2)
+                    self.add_burn(f, self.burn_from(self.dmg_to(f, s["base"], school), school, f))
                 f.hp -= self.dmg_to(f, s["base"], school)
                 f.freeze, f.frost = 0, 0
             elif k == "spout":
@@ -519,7 +614,10 @@ class Battle:
                     self.crack(f, 1)
             elif k == "shatter":
                 if f.freeze:
-                    f.hp -= self.dmg_to(f, s["base"], school) / 0.7 * (1 + 0.25 * b)
+                    d = self.dmg_to(f, s["base"], school)
+                    if CONFIG["shatter_neutral"]:
+                        d /= element_mult(school, f.elem)
+                    f.hp -= d / 0.7 * (1 + 0.25 * b)
                     f.freeze, f.frost = 0, 0
                     f.freeze_immune = 2 if f.boss else 0
             elif k in ("multi", "fan"):
@@ -530,7 +628,7 @@ class Battle:
                         d *= 1.6
                     f.hp -= d
                     if k == "fan":
-                        self.add_burn(f, d * 0.2, turns=1)
+                        self.add_burn(f, self.burn_from(d, FIRE, f), turns=1)
                     if s.get("chill"):
                         self.chill(f, 1) if self.rng.random() < 0.4 else None
                     if self.weak_hit(s, f):
@@ -598,6 +696,9 @@ class Battle:
                 if f.broken == 0:
                     if f.boss:
                         f.max_shields += 1
+                        if f.name == "Beigis" and CONFIG["beigis_shift"]:
+                            f.elem = self.rng.randrange(4)   # any element, 25% each
+                            f.weak = weakness(f.elem)
                     f.shields = f.max_shields
             if f.frost and self.rng.random() < 0.3:
                 f.frost = 0
@@ -620,18 +721,20 @@ class Battle:
             p = base * 0.02 * (1 + 0.2 * (1.03 ** L - 1) / 0.03)
             for _ in range(shots):
                 if self.rng.random() * 100 < acc * acc_mult and self.hit_roll(f.agi, self.agi):
-                    d = p * f.atk / (f.atk + self.df) * f.dmg_scale
+                    d = p * f.atk / (f.atk + self.df) * f.dmg_scale * self.taken_mult
                     d *= 0.75 + 0.5 * self.rng.random()
                     d *= (1 - self.guard)
                     self.hp -= d
                     self.hp_lost += d
+                    self.low_hp = min(self.low_hp, self.hp)
         else:
             if self.rng.random() < MONSTER_ACT_CHANCE and self.rng.random() < acc_mult and self.hit_roll(f.agi, self.agi):
-                d = f.atk * f.atk / (f.atk + self.df) * f.dmg_scale
+                d = f.atk * f.atk / (f.atk + self.df) * f.dmg_scale * self.taken_mult
                 d *= 0.75 + 0.5 * self.rng.random()
                 d *= (1 - self.guard)
                 self.hp -= d
                 self.hp_lost += d
+                self.low_hp = min(self.low_hp, self.hp)
 
 
 def build_levels(build, beat):
@@ -653,7 +756,7 @@ def boss_fight(build, beat, rng, items):
     name = BOSS_ORDER[beat]
     rec = BOSSES[name]
     atk = round(rec["atk"] * BOSS_ATTACK_SCALE[beat])
-    foe = Foe(rec, BOSS_HP[beat], atk, boss=True, spells=BOSS_SPELLS[name], boss_no=beat + 1)
+    foe = Foe(rec, round(BOSS_HP[beat] * CONFIG["boss_hp"][beat]), atk, boss=True, spells=BOSS_SPELLS[name], boss_no=beat + 1)
     return Battle(build, beat, [foe], rng, items)
 
 
@@ -664,7 +767,7 @@ def pack_fight(build, beat, rng, items):
     foes = []
     for _ in range(n):
         rec = rng.choice(pool)
-        foes.append(Foe(rec, max(1, round(rec["hp"] * scale * 1.3)), rec["atk"]))
+        foes.append(Foe(rec, max(1, round(rec["hp"] * scale * 1.3 * CONFIG["pack_hp"])), rec["atk"]))
     return Battle(build, beat, foes, rng, items)
 
 
@@ -677,7 +780,8 @@ def play(battle, max_turns=80):
     won = not battle.alive_foes() and battle.hp > 0
     return dict(won=won, turns=battle.turns, enemy_actions=battle.enemy_actions,
                 hp_lost=min(1.0, battle.hp_lost / battle.max_hp), mp_used=battle.mp_used / battle.max_mp,
-                breaks=battle.breaks)
+                breaks=battle.breaks, wells=battle.wells, staff=battle.staff_turns,
+                low_hp=max(0.0, battle.low_hp / battle.max_hp), items_used=battle.items_used, casts=battle.casts)
 
 
 BUILDS = {
@@ -695,17 +799,27 @@ def summarize(results):
         return values[min(len(values) - 1, int(q * len(values)))]
     won = [r for r in results if r["won"]]
     out = dict(win_rate=len(won) / len(results))
-    for key in ("turns", "enemy_actions", "hp_lost", "mp_used", "breaks"):
+    casts = {}
+    for r in results:
+        for name, n in r["casts"].items():
+            casts[name] = casts.get(name, 0) + n
+    total = sum(casts.values()) or 1
+    out["casts"] = {k: round(v / total, 3) for k, v in sorted(casts.items(), key=lambda kv: -kv[1])[:6]}
+    for key in ("turns", "enemy_actions", "hp_lost", "mp_used", "breaks", "wells", "staff", "low_hp", "items_used"):
         vals = [r[key] for r in results]
         out[key] = dict(median=pct(vals, 0.5), p10=pct(vals, 0.1), p90=pct(vals, 0.9),
                         mean=sum(vals) / len(vals))
     return out
 
 
-def run(runs=300, items=0, seed=1):
+def run(runs=300, items=0, seed=1, config=None, builds=None):
+    CONFIG.clear()
+    CONFIG.update(DEFAULT_CONFIG, **(config or {}))
     rng = random.Random(seed)
     data = []
     for label, build in BUILDS.items():
+        if builds and label not in builds:
+            continue
         for beat in range(8):
             for kind, maker in (("boss", boss_fight), ("pack", pack_fight)):
                 results = [play(maker(build, beat, rng, items)) for _ in range(runs)]
@@ -716,4 +830,4 @@ def run(runs=300, items=0, seed=1):
 
 if __name__ == "__main__":
     runs = int(sys.argv[1]) if len(sys.argv) > 1 else 300
-    print(json.dumps(run(runs, items=0) + run(runs, items=3, seed=2)))
+    print(json.dumps({name: run(runs, items=3, seed=7, config=cfg) for name, cfg in SCENARIOS.items()}))
