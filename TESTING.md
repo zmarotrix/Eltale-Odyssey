@@ -8,6 +8,16 @@ Your save is backed up in the dev panel slots (`before-eltale-0-1`, from before 
 
 "Checked by Claude" means I drove the game through the dev panel and looked at screenshots.
 
+## Getting started (new)
+
+- **D-pad hint**: in the field, under the element gems: a D-pad with its up arm lit and a Spirit Point pip (the
+  Spirits window), then one with its down arm lit and a staff (the Equipment window). It slides with the gems and
+  gives way to the charge diamonds in battle. The up arm blinks while you have unspent Spirit Points.
+  Checked by Claude: shown in the field, replaced by the diamonds in battle. Blinking not seen yet.
+- [ ] **Melrode townsfolk teach the new systems**: after their usual line, Edgar (on the beach) explains spirits,
+  tiers and talents; Frank shields, Break and Charge; Billy equipment and inns. Not checked in game yet (scripted
+  talking didn't trigger the conversation); talk to them and tell me if the text fits its box.
+
 ## Gold and inns
 
 - [x] Inn price window and dialogue, refusal line (checked by you)

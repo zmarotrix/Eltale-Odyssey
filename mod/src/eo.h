@@ -185,6 +185,7 @@ enum {
     ICON_STAFF, ICON_ROBE, ICON_CHARM, ICON_SIGIL,   // equipment slots, in slot order
     ICON_PIP_STEEL,                                  // an enemy's shield
     ICON_PLUS,                                       // the HUD font has no +
+    ICON_DPAD, ICON_DPAD_UP, ICON_DPAD_DOWN,         // the field's D-pad hint (hints.c)
     ICON_COUNT
 };
 #define ICON_TEXT_DY (-2)   // draw an icon at a small-text line's y + ICON_TEXT_DY to line them up
@@ -298,6 +299,7 @@ void eo_status_fixed_damage(int enemy_slot, u16 amount);  // ignores element and
 
 // ---- Gold display (gold.c) ----
 void eo_gold_resync(void);
+int eo_combat_charge_shown(void);  // the charge diamonds are under the element gems
 #define NOTICE_COLUMNS 12  // width of a gold notice line, in characters
 void eo_gold_notice(const char* line1, const char* line2);
 void eo_format_u32(char* out, const char* prefix, u32 value, const char* suffix);

@@ -804,8 +804,14 @@ RECOMP_HOOK_RETURN("hud_draw_main") void eo_combat_draw(void) {
 #define SLIDE_GONE 100   // gems this far left are off screen
 #define LINGER_FRAMES 90 // give up if they never slide
 
+static int linger = 0;
+
+// For the field's D-pad hint (hints.c), which takes the diamonds' place under the gems outside battle.
+int eo_combat_charge_shown(void) {
+    return in_battle() || linger > 0;
+}
+
 static void eo_combat_draw_body(void) {
-    static int linger = 0;
     if (!in_battle()) {
         if (linger > 0) {
             linger--;

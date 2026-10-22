@@ -18,12 +18,12 @@ enum {
 
 // The renderer reads textures from the console's 8 MB of RAM, and the mod itself is loaded above it, so the
 // atlas and palette live in the top 64 KB of the Expansion Pak's 4 MB, which the game never touches (checked
-// zero through play).
+// zero through play). The atlas may use everything up to fx.c's lights at 0x807F1200; the palette sits apart.
 #define ICON_RAM 0x807F0000
 #define atlas ((u8*)ICON_RAM)
-#define palette ((u16*)(ICON_RAM + 0x1000))
+#define palette ((u16*)0x807F3000)
 #define ATLAS_SIZE (ATLAS_W * CELL * ICON_COUNT)
-_Static_assert(ATLAS_SIZE <= 0x1000, "the atlas must fit below the palette");
+_Static_assert(ATLAS_SIZE <= 0x1200, "the atlas must end before fx.c's lights");
 static u32 descriptor[4] __attribute__((aligned(8)));  // pointer, unused, width, height (like the game's)
 
 static u16 rgba5551(int r, int g, int b) {
@@ -271,6 +271,24 @@ static void make_charm(int icon) {
 }
 
 // A green plus (art 7 x 7, columns 2-8 of the cell) for gold gained.
+// The D-pad for the field hint (hints.c): a cross with the pressed arm gold.
+static void make_dpad(int icon, int up_lit, int down_lit) {
+    static const char* const art[] = {
+        "    ####    ",
+        "    #uu#    ",
+        "    #uu#    ",
+        "#####uu#####",
+        "#ssss..ssss#",
+        "#ssss..ssss#",
+        "#####dd#####",
+        "    #dd#    ",
+        "    #dd#    ",
+        "    ####    ",
+    };
+    const u8 colors[] = { C_OUTLINE, C_STEEL, C_EMPTY, up_lit ? C_GOLD : C_STEEL, down_lit ? C_GOLD : C_STEEL };
+    paint(icon, art, 10, 0, 1, "#s.ud", colors);
+}
+
 static void make_plus(int icon) {
     static const char* const art[] = {
         "  ###  ",
@@ -342,6 +360,9 @@ void eo_icons_init(void) {
     make_pip(ICON_PIP_FULL, C_PURPLE);
     make_pip(ICON_PIP_STEEL, C_STEEL);
     make_plus(ICON_PLUS);
+    make_dpad(ICON_DPAD, 0, 0);
+    make_dpad(ICON_DPAD_UP, 1, 0);
+    make_dpad(ICON_DPAD_DOWN, 0, 1);
     make_lock(ICON_LOCK);
     make_staff(ICON_STAFF);
     make_robe(ICON_ROBE);
