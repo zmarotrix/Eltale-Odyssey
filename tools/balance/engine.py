@@ -68,6 +68,8 @@ CONFIG = dict(
     boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
     mend_mp=0.0,          # Mend also refills this share of max MP (+10% a Charge); with it on, test Mend at 0 MP
+    settle_until_rest=False,   # Settle stays until Brian rests a turn (not cleared by time or other spells)
+    rest_mp=0.0, rest_charge=0,  # what a rest turn gives everyone: share of max MP, extra Charge
     finisher=2,           # tier-5 spells need this much Charge and spend it all (no Boost on top); 0 = off
 )
 DEFAULT_CONFIG = dict(CONFIG)
@@ -279,7 +281,7 @@ class Battle:
                        and s["kind"] != "well"]
         if CONFIG["wellspring"] and (self.usable[WATER] or CONFIG["wellspring_all"]):
             self.spells.append(next(s for s in known if s["kind"] == "well"))
-        self.wells = self.staff_turns = 0
+        self.wells = self.staff_turns = self.rests = 0
         self.casts = {}
 
     def calibrate(self):
@@ -364,7 +366,7 @@ class Battle:
             self.regen_turns -= 1
         action = self.choose()
         self.act(action)
-        if self.settled:
+        if self.settled and not CONFIG["settle_until_rest"]:
             self.settled -= 1
 
     def heal(self, amount):
@@ -385,6 +387,9 @@ class Battle:
             if self.items > 0:
                 return ("item", None)
         best, best_v = ("staff", None), self.staff_value()
+        rest_v = self.rest_value()
+        if rest_v > best_v:
+            best, best_v = ("rest", None), rest_v
         for s in self.spells:
             if self.mp < s["mp"] or not self.can_finish(s):
                 continue
@@ -488,6 +493,17 @@ class Battle:
                 v += (1.0 / max(main.shields, 1)) * (self.threat() + per)
         return v
 
+    def rest_value(self):
+        """A rest turn: clears Settle (worth most of the Earth hit it un-dampens) and gives what CONFIG says."""
+        v = 0.0
+        earth = [s for s in self.spells if s["school"] == EARTH and s["kind"] == "heavy" and self.mp >= s["mp"]]
+        if self.settled and CONFIG["settle_until_rest"] and earth:
+            best = max(self.value(s) for s in earth)
+            v += best * (1 / 0.6 - 1) + best * 0.25 * CONFIG["rest_charge"]
+        if CONFIG["rest_mp"]:
+            v += self.well_value(CONFIG["rest_mp"])
+        return v
+
     def well_value(self, share):
         """A Wellspring turn is worth the damage the MP it brings back buys later, at the best rate Brian has."""
         if self.mp > self.max_mp * 0.4:
@@ -501,6 +517,12 @@ class Battle:
         kind, s = choice
         alive = self.alive_foes()
         if not alive:
+            return
+        if kind == "rest":
+            self.rests += 1
+            self.settled = 0
+            self.charge = min(5, self.charge + CONFIG["rest_charge"])
+            self.mp = min(self.max_mp, self.mp + self.max_mp * CONFIG["rest_mp"])
             return
         if kind == "staff":
             self.staff_turns += 1
@@ -649,7 +671,10 @@ class Battle:
                 f.hp -= self.dmg_to(f, s["base"], school)
                 self.crack(f, 2 if b >= 3 else 1)
         if school == EARTH and s.get("settle", True) and k == "heavy":
-            self.settled = s.get("settle_turns", 1) + 1   # covers the next turn (decremented at turn end)
+            if CONFIG["settle_until_rest"]:
+                self.settled = 1   # until a rest turn
+            else:
+                self.settled = s.get("settle_turns", 1) + 1   # covers the next turn (decremented at turn end)
 
     def add_burn(self, f, amount, turns=3):
         if f.frost or f.freeze:
@@ -788,7 +813,8 @@ def play(battle, max_turns=80):
     return dict(won=won, turns=battle.turns, enemy_actions=battle.enemy_actions,
                 hp_lost=min(1.0, battle.hp_lost / battle.max_hp), mp_used=battle.mp_used / battle.max_mp,
                 breaks=battle.breaks, wells=battle.wells, staff=battle.staff_turns,
-                low_hp=max(0.0, battle.low_hp / battle.max_hp), items_used=battle.items_used, casts=battle.casts)
+                low_hp=max(0.0, battle.low_hp / battle.max_hp), items_used=battle.items_used, casts=battle.casts,
+                rests=battle.rests)
 
 
 BUILDS = {
@@ -812,7 +838,7 @@ def summarize(results):
             casts[name] = casts.get(name, 0) + n
     total = sum(casts.values()) or 1
     out["casts"] = {k: round(v / total, 3) for k, v in sorted(casts.items(), key=lambda kv: -kv[1])[:6]}
-    for key in ("turns", "enemy_actions", "hp_lost", "mp_used", "breaks", "wells", "staff", "low_hp", "items_used"):
+    for key in ("turns", "enemy_actions", "hp_lost", "mp_used", "breaks", "wells", "staff", "low_hp", "items_used", "rests"):
         vals = [r[key] for r in results]
         out[key] = dict(median=pct(vals, 0.5), p10=pct(vals, 0.1), p90=pct(vals, 0.9),
                         mean=sum(vals) / len(vals))
