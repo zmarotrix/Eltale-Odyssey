@@ -67,6 +67,7 @@ CONFIG = dict(
     pack_hp=1.0, pack_hit=[1.0] * 8,   # monster pack HP, and each monster action's share of Brian's HP, per beat
     boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
+    mend_mp=0.0,          # Mend also refills this share of max MP (+10% a Charge); with it on, test Mend at 0 MP
     finisher=2,           # tier-5 spells need this much Charge and spend it all (no Boost on top); 0 = off
 )
 DEFAULT_CONFIG = dict(CONFIG)
@@ -476,20 +477,22 @@ class Battle:
         elif kind == "confuse":
             v = self.threat() * len(self.alive_foes()) * (1 + b) * 0.8
         elif kind in ("heal", "regen"):
+            if s["name"] == "Mend" and CONFIG["mend_mp"]:
+                return self.well_value(CONFIG["mend_mp"])
             v = 0
         elif kind == "well":
-            return self.well_value()
+            return self.well_value(CONFIG["wellspring"])
         # shield value
         if kind not in ("heal", "regen", "guard", "wall", "fog", "mirage", "confuse"):
             if self.weak_hit(s, main) or s.get("any_chance") or kind in ("downburst", "fissure"):
                 v += (1.0 / max(main.shields, 1)) * (self.threat() + per)
         return v
 
-    def well_value(self):
+    def well_value(self, share):
         """A Wellspring turn is worth the damage the MP it brings back buys later, at the best rate Brian has."""
         if self.mp > self.max_mp * 0.4:
             return 0
-        gain = min(self.max_mp - self.mp, self.max_mp * (CONFIG["wellspring"] + 0.1 * self.boost()))
+        gain = min(self.max_mp - self.mp, self.max_mp * (share + 0.1 * self.boost()))
         rates = [self.value(s) / s["mp"] for s in self.spells if s["mp"] and s["kind"] not in ("heal", "regen")]
         rate = max(rates, default=0)
         return gain * rate * 0.6
@@ -528,6 +531,9 @@ class Battle:
             self.wells += 1
             self.mp = min(self.max_mp, self.mp + self.max_mp * (CONFIG["wellspring"] + 0.1 * b))
             return
+        if k == "heal" and s["name"] == "Mend" and CONFIG["mend_mp"]:
+            self.wells += 1
+            self.mp = min(self.max_mp, self.mp + self.max_mp * CONFIG["mend_mp"])
         if k == "heal":
             self.heal(self.max_hp * s["heal"] * (1 + 0.1 * b))
             return
