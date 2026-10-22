@@ -64,7 +64,14 @@ static const SpellBalance spell_balance[] = {
 
 static void scale_bosses(void);
 
+// A new game's starting gold, from the game's new-game stats table (ROM 0x54908, copied into Brian's stats by
+// new_game_init; +0x10 is the gold counter). Vanilla gives 500; 100 now that early chests hold some (playtest,
+// 2026-10-22).
+#define NEW_GAME_GOLD (*(u32*)0x80053D18)
+#define STARTING_GOLD 100
+
 void eo_balance_apply(void) {
+    NEW_GAME_GOLD = STARTING_GOLD;
     scale_bosses();
     for (u32 i = 0; i < sizeof(spell_balance) / sizeof(spell_balance[0]); i++) {
         const SpellBalance* b = &spell_balance[i];

@@ -8,6 +8,11 @@ Your save is backed up in the dev panel slots (`before-eltale-0-1`, from before 
 
 "Checked by Claude" means I drove the game through the dev panel and looked at screenshots.
 
+## Starting gold (changed)
+
+A new game starts with **100 gold** (vanilla's table says 500); the early chests make up some of it. Saves you
+already have keep their gold. Checked by Claude: the new-game table reads 100 after boot. Not seen on a new game yet.
+
 ## Early chests (new)
 
 In the Monastery and Dondoran Castle, the first chest with each kind of item still holds it (Honey Bread, Dew Drop,
