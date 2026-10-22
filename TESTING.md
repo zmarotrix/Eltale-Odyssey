@@ -10,9 +10,10 @@ Your save is backed up in the dev panel slots (`before-eltale-0-1`, from before 
 
 ## Early chests (new)
 
-The Monastery's and Dondoran Castle's chests hold gold instead of bread and drops (the gold notice shows it):
-Monastery dining room 25, courtyard 20, barn 30 and 35; Dondoran Castle King's Room 40, 40, 50, Flora's Room 30, 30,
-40, Treasure Room 80 and 100, and a **Traveler's Robe** in the Treasure Room's middle chest (was a Replica).
+In the Monastery and Dondoran Castle, the first chest with each kind of item still holds it (Honey Bread, Dew Drop,
+Fresh Bread, Mint Leaves, Healing Potion, Heroes Drink), so you meet them; the repeats hold gold instead (the gold
+notice shows it): Monastery barn 30 and 35; King's Room #2 40, #3 50; Flora's Room #1 and #2 30 each. The Treasure
+Room's middle chest holds a **Traveler's Robe** (was a Replica).
 - [ ] Open one: "Brian found 40 gold!" and the gold notice. Not checked in game yet.
 
 ## Getting started (new)

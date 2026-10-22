@@ -29,21 +29,18 @@ typedef struct {
 } EquipmentChest;
 
 static const EquipmentChest chests[] = {
-    // The Monastery, where Brian starts: a little gold (an early fight pays about 30, Melrode's inn costs 40).
-    { 0x01, 0x02, GOLD_ONLY, 25, "Brian found %a gold!" },             // dining room (Honey Bread)
-    { 0x02, 0x05, GOLD_ONLY, 20, "Brian found %a gold!" },             // courtyard (Dew Drop)
-    { 0x03, 0x05, GOLD_ONLY, 30, "Brian found %a gold!" },             // barn #1 (Dew Drop)
-    { 0x04, 0x05, GOLD_ONLY, 35, "Brian found %a gold!" },             // barn #2 (Dew Drop)
-    // Dondoran Castle, the first castle: more gold, and a robe in the treasure room.
-    { 0x05, 0x01, GOLD_ONLY, 40, "Brian found %a gold!" },             // King's room #1 (Fresh Bread)
+    // The Monastery and Dondoran Castle (2026-10-22): the first chest with each kind of item keeps it, so players
+    // meet the items ("it's important for players to discover some items"); repeats hold a little gold instead
+    // (an early fight pays about 30, Melrode's inn costs 40), and the treasure room holds a robe.
+    // Kept: Monastery dining room (Honey Bread), courtyard (Dew Drop); Dondoran King's room #1 (Fresh Bread),
+    // Flora's room #3 (Mint Leaves), treasure room #1 (Healing Potion) and #3 (Heroes Drink).
+    { 0x03, 0x05, GOLD_ONLY, 30, "Brian found %a gold!" },             // Monastery barn #1 (Dew Drop)
+    { 0x04, 0x05, GOLD_ONLY, 35, "Brian found %a gold!" },             // Monastery barn #2 (Dew Drop)
     { 0x06, 0x01, GOLD_ONLY, 40, "Brian found %a gold!" },             // King's room #2 (Fresh Bread)
     { 0x07, 0x05, GOLD_ONLY, 50, "Brian found %a gold!" },             // King's room #3 (Dew Drop)
     { 0x08, 0x05, GOLD_ONLY, 30, "Brian found %a gold!" },             // Flora's room #1 (Dew Drop)
     { 0x09, 0x05, GOLD_ONLY, 30, "Brian found %a gold!" },             // Flora's room #2 (Dew Drop)
-    { 0x0A, 0x06, GOLD_ONLY, 40, "Brian found %a gold!" },             // Flora's room #3 (Mint Leaves)
-    { 0x0B, 0x03, GOLD_ONLY, 80, "Brian found %a gold!" },             // treasure room #1 (Healing Potion)
     { 0x0C, 0x0A, EQ_TRAVELERS_ROBE, 0, "Brian found a Traveler's Robe!" }, // treasure room #2 (Replica)
-    { 0x0D, 0x07, GOLD_ONLY, 100, "Brian found %a gold!" },            // treasure room #3 (Heroes Drink)
     { 0x0E, 0x01, EQ_WOOL_CLOAK, 0, "Brian found a Wool Cloak!" },          // Melrode, the shepherd's hut (Fresh Bread)
     { 0x55, 0x08, EQ_LEAD_MANTLE, 0, "Brian found a Lead Mantle!" },        // Glencoe Forest cabin (Silent Flute)
     { 0x32, 0x07, EQ_LEECH_PILLAR, 0, "Brian found the Leech Pillar!" },    // Blue Cave #3 (Heroes Drink)
