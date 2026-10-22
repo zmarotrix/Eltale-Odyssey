@@ -61,26 +61,29 @@ CONFIG = dict(
     shatter_neutral=False,  # Shatter breaks ice, so it ignores element
     beigis_shift=True,    # Beigis takes a random element after each Break (the mod's mechanic)
     boss_hp=[1.0] * 8,    # per-boss HP multipliers on BOSS_HP
-    wellspring=0.2,       # Wellspring (Water action, 0 MP): a turn that restores this share of max MP; 0 = not in the game
+    wellspring=0.0,       # Wellspring (Water action, 0 MP): a turn that restores this share of max MP; 0 = not in the game
     wellspring_all=False,  # every build can draw on Wellspring, not only those with Water
     boss_shields=None,    # per-boss shield counts; None = 6 + boss number / 2
     pack_hp=1.0, pack_hit=[1.0] * 8,   # monster pack HP, and each monster action's share of Brian's HP, per beat
     boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
-    mend_mp=0.0,          # Mend also refills this share of max MP (+10% a Charge); with it on, test Mend at 0 MP
-    earth_hold=0,         # scripted Earth play: press B until this much Charge before an Earth attack (Broken foes: hit now)
-    settle_mult=0.6,      # what Earth attacks deal while Settled (spec: about 40% less)
-    settle_until_rest=False,   # Settle stays until Brian rests a turn (not cleared by time or other spells)
+    mend_mp=0.2,          # Mend also refills this share of max MP (spec, 2026-10-22: Mend is free)
+    earth_hold=1,         # scripted Earth play: press B until this much Charge before an Earth attack (Broken foes: hit now)
+    settle_mult=0.4,      # what Earth attacks deal while Settled (spec: 60% less)
+    settle_until_rest=True,    # Settle stays until Brian ends a turn with B (not cleared by time or other spells)
     rest_mp=0.0, rest_charge=0,  # what a rest turn gives everyone: share of max MP, extra Charge
     finisher=2,           # tier-5 spells need this much Charge and spend it all (no Boost on top); 0 = off
 )
 DEFAULT_CONFIG = dict(CONFIG)
 
-# The balance pass (2026-10-22): its spell changes (Wellspring, finishers, no-element x0.75, the four spell bases) are
-# now the spec and the defaults above. PRE_PASS puts them back; BALANCE_PASS is the enemy side, not yet in the mod.
+# The balance pass (2026-10-22): its spell changes (free Mend, finishers, no-element x0.75, Settle -60% until a B turn,
+# Earth hits x1.15, the spell bases) are now the spec and the defaults above. PRE_PASS puts them back; BALANCE_PASS is the enemy side, not yet in the mod.
 PRE_PASS = dict(
-    wellspring=0.0, finisher=0, none_mult=0.5,
-    spells={"Hurricane": {"base": 120}, "Shatter": {"base": 720}, "Icicle": {"base": 360}, "Undertow": {"base": 200}},
+    wellspring=0.0, finisher=0, none_mult=0.5, mend_mp=0.0, earth_hold=0, settle_mult=0.6, settle_until_rest=False,
+    spells={"Hurricane": {"base": 120}, "Shatter": {"base": 720}, "Icicle": {"base": 360}, "Undertow": {"base": 200},
+            "Mend": {"heal": 0.22, "mp": 3}, "Rock": {"base": 430}, "Boulder": {"base": 520}, "Molten Rock": {"base": 480},
+            "Megalith": {"base": 900}, "Mudshot": {"base": 600}, "Avalanche": {"base": 560}, "Landslide": {"base": 620},
+            "Eruption": {"base": 820}},
 )
 BALANCE_PASS = dict(
     pack_hit=[1, 1, 1, 1, 1.25, 1.5, 1.75, 2.0],   # late packs keep up with gear
@@ -162,21 +165,21 @@ spell(FIRE, 4, "Detonate", 100, 1, "detonate", "near")
 spell(FIRE, 5, "Meteor", 480, 1, "kindle", "near", stacks=2, wide=True, hot=True, mp=16)
 spell(FIRE, 5, "Searing Steam", 0, 1, "cash", mult=3.0, mp=12)
 # Earth: heavy hits that Settle Brian; guards; shields by force. Bases about 1.5x the other schools'.
-spell(EARTH, 1, "Rock", 430, 1, "heavy", crack=1)
-spell(EARTH, 1, "Boulder", 520, 1, "heavy", crack=2, mp=3)
+spell(EARTH, 1, "Rock", 495, 1, "heavy", crack=1)
+spell(EARTH, 1, "Boulder", 600, 1, "heavy", crack=2, mp=3)
 spell(EARTH, 2, "Stoneskin", 0, 1, "guard", "self", reduce=0.3, turns=3)
-spell(EARTH, 2, "Molten Rock", 480, 1, "heavy", crack=1, burn=1)
+spell(EARTH, 2, "Molten Rock", 550, 1, "heavy", crack=1, burn=1)
 spell(EARTH, 2, "Sandblast", 110, 4, "multi", settle=False)
-spell(EARTH, 3, "Megalith", 900, 1, "heavy", crack=1, settle_turns=2, mp=10)
-spell(EARTH, 3, "Mudshot", 600, 1, "heavy", crack=1, frost=True)
+spell(EARTH, 3, "Megalith", 1035, 1, "heavy", crack=1, settle_turns=2, mp=10)
+spell(EARTH, 3, "Mudshot", 690, 1, "heavy", crack=1, frost=True)
 spell(EARTH, 3, "Quagmire", 60, 1, "chill", "near", wide=True, steps=1)
-spell(EARTH, 3, "Avalanche", 560, 1, "heavy", "cone", crack=1)
+spell(EARTH, 3, "Avalanche", 645, 1, "heavy", "cone", crack=1)
 spell(EARTH, 4, "Fissure", 40, 1, "fissure", "near")
-spell(EARTH, 4, "Landslide", 620, 1, "heavy", "cone", crack=1)
-spell(EARTH, 5, "Eruption", 820, 1, "heavy", "near", crack=1, burn=1, mp=16)
+spell(EARTH, 4, "Landslide", 715, 1, "heavy", "cone", crack=1)
+spell(EARTH, 5, "Eruption", 945, 1, "heavy", "near", crack=1, burn=1, mp=16)
 # Water: Frost into Freeze, guards, weak heals.
 spell(WATER, 1, "Spout", 280, 1, "spout")
-spell(WATER, 1, "Mend", 0, 1, "heal", "self", heal=0.22, mp=3)
+spell(WATER, 1, "Mend", 0, 1, "heal", "self", heal=0.18, mp=0)   # free: also refills MP (mend_mp)
 # Wellspring (balance pass, 2026-10-22, playtest: "taking a turn to use water should be considered"): spend the turn
 # drawing water to refill MP. Boost adds 10% of max MP a charge. Only in the game when CONFIG["wellspring"] > 0.
 spell(WATER, 1, "Wellspring", 0, 1, "well", "self", mp=0)
