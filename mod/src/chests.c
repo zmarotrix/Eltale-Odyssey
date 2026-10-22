@@ -1,7 +1,8 @@
 #include "eo.h"
 
-// Chests that hold the overhaul's equipment instead of their vanilla item (playtest, 2026-10-21: "There's a chest in
-// the house in the sheep farm ... it has Fresh Bread. We can replace that with equipment").
+// Chests that hold the overhaul's equipment or some gold instead of their vanilla item (playtest, 2026-10-21: "There's
+// a chest in the house in the sheep farm ... it has Fresh Bread. We can replace that with equipment"; 2026-10-22: the
+// Monastery's and Dondoran Castle's storeroom chests hold "a bit of gold and maybe an equip").
 //
 // Opening a chest runs func_8000496C: chest_item_message(item) writes "<item> ..." into gMessageBuffer, the message
 // window opens, then inventory_add_item(item). For a chest listed here the message is replaced, and the item it added
@@ -17,30 +18,48 @@
 #define INVENTORY_SIZE 0x96
 #define INVENTORY_EMPTY 0xFF
 
+#define GOLD_ONLY 0xFF   // a chest with gold in place of equipment
+
 typedef struct {
     u8 chest_bit;    // the chest's bit in gChestFlags
     u8 vanilla_item; // what the game puts in it
-    u8 piece;        // the equipment it holds instead
+    u8 piece;        // the equipment it holds instead, or GOLD_ONLY
+    u16 gold;        // gold it holds instead (GOLD_ONLY chests)
     const char* found;
 } EquipmentChest;
 
 static const EquipmentChest chests[] = {
-    { 0x0E, 0x01, EQ_WOOL_CLOAK, "Brian found a Wool Cloak!" },          // Melrode, the shepherd's hut (Fresh Bread)
-    { 0x55, 0x08, EQ_LEAD_MANTLE, "Brian found a Lead Mantle!" },        // Glencoe Forest cabin (Silent Flute)
-    { 0x32, 0x07, EQ_LEECH_PILLAR, "Brian found the Leech Pillar!" },    // Blue Cave #3 (Heroes Drink)
-    { 0x39, 0x08, EQ_GLASS_CHARM, "Brian found a Glass Charm!" },        // Cull Hazard #5 (Silent Flute)
-    { 0x2F, 0x04, EQ_STONE_MEMORY, "Brian found the Stone Memory!" },    // the Isle of Skye ship (Dragon's Potion)
-    { 0x1E, 0x0B, EQ_HUNTERS_CHARM, "Brian found a Hunter's Charm!" },   // Dindom Dries hut (Giant's Shoes)
-    { 0x18, 0x0C, EQ_SPELLSTRIKE, "Brian found the Spellstrike!" },      // Limelin Castle treasury #1 (Silver Amulet)
-    { 0x19, 0x09, EQ_PRISM_STAFF, "Brian found a Prism Staff!" },        // Limelin Castle treasury #2 (Celine's Bell)
-    { 0x25, 0x0D, EQ_EMBER_HEART, "Brian found the Ember Heart!" },      // Shamwood, Lavaar's room (Golden Amulet)
-    { 0x3F, 0x0C, EQ_MOUNTAIN_STAFF, "Brian found a Mountain Staff!" },  // Baragoon Tunnel #6 (Silver Amulet)
-    { 0x45, 0x04, EQ_PHOENIX_STAFF, "Brian found a Phoenix Staff!" },    // Boil Hole #5 (Dragon's Potion)
-    { 0x24, 0x09, EQ_KNIGHTS_MANTLE, "Brian found a Knight's Mantle!" }, // Baragoon Moor inn #6 (Celine's Bell)
-    { 0x49, 0x07, EQ_LEVIATHAN_STAFF, "Brian found a Leviathan Staff!" },// Brannoch Castle cannon room #2 (Heroes Drink)
-    { 0x4B, 0x0D, EQ_TITAN_STAFF, "Brian found a Titan Staff!" },        // Brannoch Castle, Hi Dad Bye Dad #2 (Golden Amulet)
-    { 0x4D, 0x09, EQ_SKYREED_STAFF, "Brian found a Skyreed Staff!" },    // Leonardo to the rescue #2 (Celine's Bell)
-    { 0x4F, 0x0C, EQ_DRAGON_ROBE, "Brian found a Dragon Robe!" },        // Leonardo to the rescue #4 (Silver Amulet)
+    // The Monastery, where Brian starts: a little gold (an early fight pays about 30, Melrode's inn costs 40).
+    { 0x01, 0x02, GOLD_ONLY, 25, "Brian found %a gold!" },             // dining room (Honey Bread)
+    { 0x02, 0x05, GOLD_ONLY, 20, "Brian found %a gold!" },             // courtyard (Dew Drop)
+    { 0x03, 0x05, GOLD_ONLY, 30, "Brian found %a gold!" },             // barn #1 (Dew Drop)
+    { 0x04, 0x05, GOLD_ONLY, 35, "Brian found %a gold!" },             // barn #2 (Dew Drop)
+    // Dondoran Castle, the first castle: more gold, and a robe in the treasure room.
+    { 0x05, 0x01, GOLD_ONLY, 40, "Brian found %a gold!" },             // King's room #1 (Fresh Bread)
+    { 0x06, 0x01, GOLD_ONLY, 40, "Brian found %a gold!" },             // King's room #2 (Fresh Bread)
+    { 0x07, 0x05, GOLD_ONLY, 50, "Brian found %a gold!" },             // King's room #3 (Dew Drop)
+    { 0x08, 0x05, GOLD_ONLY, 30, "Brian found %a gold!" },             // Flora's room #1 (Dew Drop)
+    { 0x09, 0x05, GOLD_ONLY, 30, "Brian found %a gold!" },             // Flora's room #2 (Dew Drop)
+    { 0x0A, 0x06, GOLD_ONLY, 40, "Brian found %a gold!" },             // Flora's room #3 (Mint Leaves)
+    { 0x0B, 0x03, GOLD_ONLY, 80, "Brian found %a gold!" },             // treasure room #1 (Healing Potion)
+    { 0x0C, 0x0A, EQ_TRAVELERS_ROBE, 0, "Brian found a Traveler's Robe!" }, // treasure room #2 (Replica)
+    { 0x0D, 0x07, GOLD_ONLY, 100, "Brian found %a gold!" },            // treasure room #3 (Heroes Drink)
+    { 0x0E, 0x01, EQ_WOOL_CLOAK, 0, "Brian found a Wool Cloak!" },          // Melrode, the shepherd's hut (Fresh Bread)
+    { 0x55, 0x08, EQ_LEAD_MANTLE, 0, "Brian found a Lead Mantle!" },        // Glencoe Forest cabin (Silent Flute)
+    { 0x32, 0x07, EQ_LEECH_PILLAR, 0, "Brian found the Leech Pillar!" },    // Blue Cave #3 (Heroes Drink)
+    { 0x39, 0x08, EQ_GLASS_CHARM, 0, "Brian found a Glass Charm!" },        // Cull Hazard #5 (Silent Flute)
+    { 0x2F, 0x04, EQ_STONE_MEMORY, 0, "Brian found the Stone Memory!" },    // the Isle of Skye ship (Dragon's Potion)
+    { 0x1E, 0x0B, EQ_HUNTERS_CHARM, 0, "Brian found a Hunter's Charm!" },   // Dindom Dries hut (Giant's Shoes)
+    { 0x18, 0x0C, EQ_SPELLSTRIKE, 0, "Brian found the Spellstrike!" },      // Limelin Castle treasury #1 (Silver Amulet)
+    { 0x19, 0x09, EQ_PRISM_STAFF, 0, "Brian found a Prism Staff!" },        // Limelin Castle treasury #2 (Celine's Bell)
+    { 0x25, 0x0D, EQ_EMBER_HEART, 0, "Brian found the Ember Heart!" },      // Shamwood, Lavaar's room (Golden Amulet)
+    { 0x3F, 0x0C, EQ_MOUNTAIN_STAFF, 0, "Brian found a Mountain Staff!" },  // Baragoon Tunnel #6 (Silver Amulet)
+    { 0x45, 0x04, EQ_PHOENIX_STAFF, 0, "Brian found a Phoenix Staff!" },    // Boil Hole #5 (Dragon's Potion)
+    { 0x24, 0x09, EQ_KNIGHTS_MANTLE, 0, "Brian found a Knight's Mantle!" }, // Baragoon Moor inn #6 (Celine's Bell)
+    { 0x49, 0x07, EQ_LEVIATHAN_STAFF, 0, "Brian found a Leviathan Staff!" },// Brannoch Castle cannon room #2 (Heroes Drink)
+    { 0x4B, 0x0D, EQ_TITAN_STAFF, 0, "Brian found a Titan Staff!" },        // Brannoch Castle, Hi Dad Bye Dad #2 (Golden Amulet)
+    { 0x4D, 0x09, EQ_SKYREED_STAFF, 0, "Brian found a Skyreed Staff!" },    // Leonardo to the rescue #2 (Celine's Bell)
+    { 0x4F, 0x0C, EQ_DRAGON_ROBE, 0, "Brian found a Dragon Robe!" },        // Leonardo to the rescue #4 (Silver Amulet)
 };
 #define CHEST_ENTRIES (sizeof(chests) / sizeof(chests[0]))
 
@@ -72,7 +91,8 @@ RECOMP_HOOK("chest_item_message") void eo_chest_before_message(s32 item) {
 
 RECOMP_HOOK_RETURN("chest_item_message") void eo_chest_after_message(void) {
     if (pending != 0) {
-        eo_text_encode_full(gMessageBuffer, pending->found);
+        char line[40];
+        eo_text_encode_full(gMessageBuffer, eo_text_fill(line, pending->found, 0, pending->gold, 0));
     }
 }
 
@@ -87,14 +107,19 @@ RECOMP_HOOK_RETURN("inventory_add_item") void eo_chest_after_add(void) {
             break;
         }
     }
-    eo_equipment_give(pending->piece);
+    if (pending->piece == GOLD_ONLY) {
+        GOLD += pending->gold;   // the gold notice shows it
+    } else {
+        eo_equipment_give(pending->piece);
+    }
     pending = 0;
 }
 
-// Saves that opened one of these chests before the overhaul (and got the vanilla item) get the piece once.
+// Saves that opened one of these chests before the overhaul (and got the vanilla item) get the piece once; gold
+// chests already paid out their item, so they give nothing more.
 void eo_chests_on_load(void) {
     for (u32 i = 0; i < CHEST_ENTRIES; i++) {
-        if (chest_opened(chests[i].chest_bit) && !eo_equipment_owned(chests[i].piece)) {
+        if (chests[i].piece != GOLD_ONLY && chest_opened(chests[i].chest_bit) && !eo_equipment_owned(chests[i].piece)) {
             eo_equipment_give(chests[i].piece);
         }
     }

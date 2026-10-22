@@ -8,6 +8,13 @@ Your save is backed up in the dev panel slots (`before-eltale-0-1`, from before 
 
 "Checked by Claude" means I drove the game through the dev panel and looked at screenshots.
 
+## Early chests (new)
+
+The Monastery's and Dondoran Castle's chests hold gold instead of bread and drops (the gold notice shows it):
+Monastery dining room 25, courtyard 20, barn 30 and 35; Dondoran Castle King's Room 40, 40, 50, Flora's Room 30, 30,
+40, Treasure Room 80 and 100, and a **Traveler's Robe** in the Treasure Room's middle chest (was a Replica).
+- [ ] Open one: "Brian found 40 gold!" and the gold notice. Not checked in game yet.
+
 ## Getting started (new)
 
 - **D-pad hint**: in the field, under the element gems: a D-pad with its up arm lit and a Spirit Point pip (the
