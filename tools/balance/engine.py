@@ -68,6 +68,7 @@ CONFIG = dict(
     boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
     mend_mp=0.0,          # Mend also refills this share of max MP (+10% a Charge); with it on, test Mend at 0 MP
+    settle_mult=0.6,      # what Earth attacks deal while Settled (spec: about 40% less)
     settle_until_rest=False,   # Settle stays until Brian rests a turn (not cleared by time or other spells)
     rest_mp=0.0, rest_charge=0,  # what a rest turn gives everyone: share of max MP, extra Charge
     finisher=2,           # tier-5 spells need this much Charge and spend it all (no Boost on top); 0 = off
@@ -310,7 +311,7 @@ class Battle:
         if foe.broken:
             d *= 2
         if school == EARTH and self.settled:
-            d *= 0.6
+            d *= CONFIG["settle_mult"]
         d *= self.dmg_mult
         return d + self.rng.random() * math.sqrt(max(d, 0))
 
@@ -499,7 +500,7 @@ class Battle:
         earth = [s for s in self.spells if s["school"] == EARTH and s["kind"] == "heavy" and self.mp >= s["mp"]]
         if self.settled and CONFIG["settle_until_rest"] and earth:
             best = max(self.value(s) for s in earth)
-            v += best * (1 / 0.6 - 1) + best * 0.25 * CONFIG["rest_charge"]
+            v += best * (1 / CONFIG["settle_mult"] - 1) + best * 0.25 * CONFIG["rest_charge"]
         if CONFIG["rest_mp"]:
             v += self.well_value(CONFIG["rest_mp"])
         return v
