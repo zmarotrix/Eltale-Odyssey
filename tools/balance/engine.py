@@ -56,33 +56,34 @@ KIT_ITEMS = [2, 3, 3, 4, 4, 5, 5, 6]
 KIT_MP = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7]
 CONFIG = dict(
     kit=False,            # apply the KIT rows above
-    none_mult=0.5,        # damage Brian's spells deal to no-element foes (game rule: 0.5)
+    none_mult=0.75,       # damage Brian's spells deal to no-element foes (spec; the game's rule was 0.5)
     burn_full=False,      # Burn ticks ignore the target's element (a Fire boss still burns at full)
     shatter_neutral=False,  # Shatter breaks ice, so it ignores element
     beigis_shift=True,    # Beigis takes a random element after each Break (the mod's mechanic)
     boss_hp=[1.0] * 8,    # per-boss HP multipliers on BOSS_HP
-    wellspring=0.0,       # Wellspring (Water tier 1, 0 MP): a turn that restores this share of max MP; 0 = not in the game
+    wellspring=0.2,       # Wellspring (Water action, 0 MP): a turn that restores this share of max MP; 0 = not in the game
     wellspring_all=False,  # every build can draw on Wellspring, not only those with Water
     boss_shields=None,    # per-boss shield counts; None = 6 + boss number / 2
     pack_hp=1.0, pack_hit=[1.0] * 8,   # monster pack HP, and each monster action's share of Brian's HP, per beat
     boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
-    finisher=0,           # tier-5 spells need this much Charge and spend it all (no Boost on top); 0 = off
+    finisher=2,           # tier-5 spells need this much Charge and spend it all (no Boost on top); 0 = off
 )
 DEFAULT_CONFIG = dict(CONFIG)
 
-# The balance pass (2026-10-22) proposals, as one scenario. Not yet in the spec; the progression doc has the results.
+# The balance pass (2026-10-22): its spell changes (Wellspring, finishers, no-element x0.75, the four spell bases) are
+# now the spec and the defaults above. PRE_PASS puts them back; BALANCE_PASS is the enemy side, not yet in the mod.
+PRE_PASS = dict(
+    wellspring=0.0, finisher=0, none_mult=0.5,
+    spells={"Hurricane": {"base": 120}, "Shatter": {"base": 720}, "Icicle": {"base": 360}, "Undertow": {"base": 200}},
+)
 BALANCE_PASS = dict(
-    wellspring=0.2,       # Water tier 1: a turn for 20% of max MP (+10% a Charge)
-    finisher=2,           # tier-5 spells need 2 Charge and spend all of it
-    none_mult=0.75,       # no-element foes resist a quarter, not half
-    spells={"Hurricane": {"base": 90}, "Shatter": {"base": 900}, "Icicle": {"base": 420}, "Undertow": {"base": 260}},
     pack_hit=[1, 1, 1, 1, 1.25, 1.5, 1.75, 2.0],   # late packs keep up with gear
     boss_hit=[1, 1, 1, 1, 1.1, 1.15, 1.2, 1.25],
 )
 SCENARIOS = {
-    "before": dict(),
-    "before+kit": dict(kit=True),
+    "before": dict(PRE_PASS),
+    "before+kit": dict(PRE_PASS, kit=True),
     "pass, no kit": dict(BALANCE_PASS),
     "pass+kit": dict(BALANCE_PASS, kit=True),
 }
@@ -176,15 +177,15 @@ spell(WATER, 1, "Mend", 0, 1, "heal", "self", heal=0.22, mp=3)
 spell(WATER, 1, "Wellspring", 0, 1, "well", "self", mp=0)
 spell(WATER, 2, "Ice Wall", 0, 1, "wall", "self")
 spell(WATER, 2, "Soothe", 0, 1, "heal", "self", heal=0.15, mp=3)
-spell(WATER, 2, "Icicle", 360, 1, "chill", steps=1)
+spell(WATER, 2, "Icicle", 420, 1, "chill", steps=1)
 spell(WATER, 2, "Glacier", 120, 1, "chill", "near", steps=1)
 spell(WATER, 3, "Hailstorm", 70, 6, "chill", "near", steps=1, multi=True)
 spell(WATER, 3, "Ice Shards", 140, 3, "chill", "spread3", steps=1)
 spell(WATER, 3, "Whiteout", 0, 1, "fog", "all")
 spell(WATER, 3, "Frost Nova", 90, 1, "chill", "all", steps=1)
 spell(WATER, 4, "Renew", 0, 1, "regen", "self", heal=0.12, mp=8)
-spell(WATER, 4, "Shatter", 720, 1, "shatter")
-spell(WATER, 4, "Undertow", 200, 1, "chill", steps=2)
+spell(WATER, 4, "Shatter", 900, 1, "shatter")
+spell(WATER, 4, "Undertow", 260, 1, "chill", steps=2)
 spell(WATER, 5, "Absolute Zero", 0, 1, "freeze", mp=12)
 spell(WATER, 5, "Deluge", 500, 1, "chill", "all", steps=1, mp=16)
 # Wind: many hits; any press of a Wind spell counts for shields; tempo and defense.
@@ -197,7 +198,7 @@ spell(WIND, 3, "Mirage", 0, 1, "mirage", "self", mp=5)
 spell(WIND, 4, "Whirlwind", 100, 4, "multi", "all")
 spell(WIND, 5, "Confusion", 0, 1, "confuse", "all", presses_elements=(WIND, EARTH, WATER))
 spell(WIND, 5, "Downburst", 800, 1, "downburst", presses_elements=(WIND, EARTH, EARTH), mp=14)
-spell(WIND, 5, "Hurricane", 120, 6, "multi", "all", any_chance=1.0, mp=16)
+spell(WIND, 5, "Hurricane", 90, 6, "multi", "all", any_chance=1.0, mp=16)
 
 
 def tier(level):
