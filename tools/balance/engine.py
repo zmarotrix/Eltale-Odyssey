@@ -68,6 +68,7 @@ CONFIG = dict(
     boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
     mend_mp=0.0,          # Mend also refills this share of max MP (+10% a Charge); with it on, test Mend at 0 MP
+    earth_hold=0,         # scripted Earth play: press B until this much Charge before an Earth attack (Broken foes: hit now)
     settle_mult=0.6,      # what Earth attacks deal while Settled (spec: about 40% less)
     settle_until_rest=False,   # Settle stays until Brian rests a turn (not cleared by time or other spells)
     rest_mp=0.0, rest_charge=0,  # what a rest turn gives everyone: share of max MP, extra Charge
@@ -373,7 +374,9 @@ class Battle:
     def heal(self, amount):
         self.hp = min(self.max_hp, self.hp + amount)
 
-    def boost(self):
+    def boost(self, s=None):
+        if CONFIG["earth_hold"] and s and self.earth_hit(s):
+            return min(3, self.charge)
         # With finishers in the game Brian banks Charge for his tier-5 spell instead of Boosting everything.
         if CONFIG["finisher"] and any(s["tier"] == 5 for s in self.spells):
             return 0
@@ -397,7 +400,13 @@ class Battle:
             v = self.value(s)
             if v > best_v:
                 best, best_v = ("spell", s), v
+        if (CONFIG["earth_hold"] and best[0] == "spell" and self.earth_hit(best[1])
+                and self.charge < CONFIG["earth_hold"] and not self.main_target().broken):
+            return ("rest", None)
         return best
+
+    def earth_hit(self, s):
+        return s["school"] == EARTH and s["kind"] == "heavy" and s["tier"] < 5
 
     def can_finish(self, s):
         return s["tier"] < 5 or self.charge >= CONFIG["finisher"]
@@ -425,7 +434,7 @@ class Battle:
 
     def value(self, s):
         main = self.main_target()
-        b = self.boost() if s["kind"] not in ("heal", "regen") else 0
+        b = self.boost(s) if s["kind"] not in ("heal", "regen") else 0
         kind = s["kind"]
         school = s["school"]
         n_targets = {"single": 1, "cone": 1 + 0.6 * (len(self.alive_foes()) - 1),
@@ -540,7 +549,7 @@ class Battle:
         self.casts[s["name"]] = self.casts.get(s["name"], 0) + 1
         self.mp -= s["mp"]
         self.mp_used += s["mp"]
-        b = self.boost() if s["kind"] not in ("heal", "regen", "freeze") else 0
+        b = self.boost(s) if s["kind"] not in ("heal", "regen", "freeze") else 0
         if CONFIG["finisher"] and s["tier"] == 5:
             self.charge, b = 0, 0
             self.spent_last = True
