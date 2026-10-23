@@ -119,7 +119,7 @@ static int pick_target(void) {
 }
 
 RECOMP_HOOK_RETURN("pad_read") void eo_lockon_input(void) {
-    if (!(gBattleState & 0x1) || !eo_talent(TALENT_LOCK_ON)) {
+    if (!(gBattleState & 0x1)) {
         held = 0;
         target = -1;
         return;

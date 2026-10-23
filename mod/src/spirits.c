@@ -38,6 +38,7 @@ static const u8 tier_gate[TIERS + 1] = { 0, 1, 12, 30, 48, 66 };
 static const u8 old_tier_cost[TIERS + 1] = { 0, 0, 3, 6, 10, 15 };   // what tiers cost before, for the refund
 #define PROGRESSION_FLAGS (gEo.reserved[0])
 #define FLAG_TIERS_BY_LEVEL 0x01
+#define FLAG_TALENTS_V2 0x02       // the 16-talent trees (talents.c); older saves get their talent points back once
 static const char* const element_names[SCHOOLS] = { "Fire", "Earth", "Water", "Wind" };
 static const char unknown_name[] = "???";
 
@@ -127,7 +128,7 @@ static void set_up_save(void) {
             }
         }
     }
-    PROGRESSION_FLAGS |= FLAG_TIERS_BY_LEVEL;
+    PROGRESSION_FLAGS |= FLAG_TIERS_BY_LEVEL | FLAG_TALENTS_V2;
     gEo.spirits_ready = 1;
     dirty = 1;
 }
@@ -138,7 +139,7 @@ static void apply(void) {
         for (int i = 0; i < SPELLS; i++) {
             u8* stats = SPELL_STAT_TABLES[s] + i * SPELL_STAT_SIZE;
             // Tier-5 spells are finishers: in battle they open only once Brian holds 2 Charge (combat.c).
-            int open = spell_tier[s][i] <= open_tier(s) && (spell_tier[s][i] < TIERS || eo_combat_finisher_ready());
+            int open = spell_tier[s][i] <= open_tier(s) && (spell_tier[s][i] < TIERS || eo_combat_finisher_ready_for(s));
             *(u16*)(stats + SPELL_LEVEL_REQ) = open ? REQ_OPEN : REQ_LOCKED;
             SPELL_NAME_TABLES[s][i] = is_discovered(s, i) ? spell_names[s][i] : unknown_name;
         }
@@ -252,6 +253,11 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
         PROGRESSION_FLAGS |= FLAG_TIERS_BY_LEVEL;
         dirty = 1;
     }
+    // A save from the nine-talent trees: its talent points come back once.
+    if (!(PROGRESSION_FLAGS & FLAG_TALENTS_V2)) {
+        eo_talents_refund_old();
+        PROGRESSION_FLAGS |= FLAG_TALENTS_V2;
+    }
     int spirits = count_spirits();
     if (spirits > gEo.spirits_counted) {
         gEo.spirit_points = (u8)(gEo.spirit_points + (spirits - gEo.spirits_counted));
@@ -268,8 +274,9 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
         }
     }
     static int finisher_ready = -1;
-    if (eo_combat_finisher_ready() != finisher_ready) {
-        finisher_ready = eo_combat_finisher_ready();
+    int ready = eo_combat_finisher_ready_for(0) | (eo_combat_finisher_ready_for(3) << 1);
+    if (ready != finisher_ready) {
+        finisher_ready = ready;
         dirty = 1;
     }
     if (dirty) {
@@ -298,13 +305,15 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
 #define BTN_DDOWN 0x0400
 #define BTN_DLEFT 0x0200
 #define BTN_DRIGHT 0x0100
-// Pages (D-pad left / right): attunement, then one talent tree per element, one 12-pixel row per talent.
+// Pages (D-pad left / right): levels, then one talent tree per element, one 12-pixel row per talent, ten at a time
+// (the list scrolls with the cursor).
 #define PAGES 5
 #define TALENT_ROW_H 12
+#define TALENT_ROWS_SHOWN 10
 #define TALENT_LIST_Y LIST_Y
-#define TALENT_INFO_Y (TALENT_LIST_Y + TALENTS_PER_SCHOOL * TALENT_ROW_H + 3)
+#define TALENT_INFO_Y (TALENT_LIST_Y + TALENT_ROWS_SHOWN * TALENT_ROW_H + 3)
 #define TALENT_WIN_H (TALENT_INFO_Y + SMALL_LINE + SMALL_PAD - 2 - WIN_Y)
-#define RANK_X (NAME_X + 15 * SMALL_W)     // rank pips
+#define RANK_X (NAME_X + 17 * SMALL_W)     // rank pips (names are at most 16 characters)
 #define RANK_STEP 8
 #define TALENT_GATE_X (RANK_X + 3 * RANK_STEP + 6)
 #define STICK_THRESHOLD 40
@@ -318,6 +327,7 @@ extern u16 gBattleState;
 static int window_open = 0;
 static int page = 0;          // 0 attunement, 1-4 the Fire, Earth, Water and Wind talent trees
 static int cursor = 0;
+static int top = 0;           // first talent row shown
 static u16 pressed = 0;
 static int stick_held = 0;
 
@@ -367,12 +377,19 @@ static void handle_input(void) {
     } else if (p & (BTN_DLEFT | BTN_DRIGHT)) {
         page = (page + ((p & BTN_DRIGHT) ? 1 : PAGES - 1)) % PAGES;
         cursor = 0;
+        top = 0;
         eo_sfx(SFX_CONFIRM);
     } else if (p & BTN_DUP) {
         cursor = (cursor + rows - 1) % rows;
     } else if (p & BTN_DDOWN) {
         cursor = (cursor + 1) % rows;
-    } else if (p & BTN_A) {
+    }
+    if (cursor < top) {
+        top = cursor;
+    } else if (cursor >= top + TALENT_ROWS_SHOWN) {
+        top = cursor - TALENT_ROWS_SHOWN + 1;
+    }
+    if (p & BTN_A) {
         if (page == 0) {
             eo_sfx(SFX_CANCEL);   // tiers open by level; nothing to buy here
         } else if (eo_talent_learn((page - 1) * TALENTS_PER_SCHOOL + cursor)) {
@@ -400,21 +417,24 @@ static s32 draw_header(s32 h) {
     return points_x;
 }
 
-// A talent tree: each talent with its rank pips, then MAX, its level gate (red until met) or its cost per rank
-// (green when affordable, red when not); the bottom line says what the selected one does.
+// A talent tree: each talent with its rank pips, then MAX, its level gate (red until met), TAKEN for a capstone
+// when another tree's is learned, or its cost per rank (green when affordable, red when not); the bottom line says
+// what the selected one does. Ten rows show at a time; arrows at the left say there are more.
 static void draw_talents(void) {
     char line[16];
     int school = page - 1;
     int first = school * TALENTS_PER_SCHOOL;
     s32 points_x = draw_header(TALENT_WIN_H);
-    for (int i = 0; i < TALENTS_PER_SCHOOL; i++) {
+    for (int i = top; i < top + TALENT_ROWS_SHOWN && i < TALENTS_PER_SCHOOL; i++) {
         const TalentInfo* t = eo_talent_info(first + i);
         int rank = eo_talent(first + i);
         int open = ELEMENT_LEVELS[school] >= t->level;
-        s32 y = TALENT_LIST_Y + i * TALENT_ROW_H + 2;
+        s32 y = TALENT_LIST_Y + (i - top) * TALENT_ROW_H + 2;
         eo_ui_small(NAME_X, y, i == cursor ? TEXT_GOOD : (rank > 0 || open) ? TEXT_NORMAL : TEXT_DIM, t->name);
         if (rank >= t->ranks) {
             eo_ui_small(TALENT_GATE_X, y, TEXT_GOOD, "MAX");
+        } else if (eo_talent_blocked(first + i)) {
+            eo_ui_small(TALENT_GATE_X, y, TEXT_DIM, "TAKEN");
         } else if (!open) {
             eo_format_u32(line, "LV ", t->level, "");
             eo_ui_small(TALENT_GATE_X, y, TEXT_WARN, line);
@@ -424,22 +444,28 @@ static void draw_talents(void) {
         }
     }
     eo_ui_small(WIN_X + SMALL_PAD, TALENT_INFO_Y, TEXT_NORMAL, eo_talent_info(first + cursor)->effect);
+    if (top > 0) {
+        eo_ui_small(WIN_X + SMALL_PAD, TALENT_LIST_Y + 2, TEXT_DIM, "-");
+    }
+    if (top + TALENT_ROWS_SHOWN < TALENTS_PER_SCHOOL) {
+        eo_ui_small(WIN_X + SMALL_PAD, TALENT_LIST_Y + (TALENT_ROWS_SHOWN - 1) * TALENT_ROW_H + 2, TEXT_DIM, "-");
+    }
 
     eo_icons_begin();
     eo_icon_draw(ICON_PIP_FULL, points_x - ICON_W, WIN_Y + SMALL_PAD + ICON_TEXT_DY);
-    for (int i = 0; i < TALENTS_PER_SCHOOL; i++) {
+    for (int i = top; i < top + TALENT_ROWS_SHOWN && i < TALENTS_PER_SCHOOL; i++) {
         const TalentInfo* t = eo_talent_info(first + i);
         int rank = eo_talent(first + i);
-        s32 y = TALENT_LIST_Y + i * TALENT_ROW_H + 2 + ICON_TEXT_DY;
+        s32 y = TALENT_LIST_Y + (i - top) * TALENT_ROW_H + 2 + ICON_TEXT_DY;
         eo_icon_draw(ICON_FIRE + school, GEM_X, y);
         for (int r = 0; r < t->ranks; r++) {   // learned ranks filled
             eo_icon_draw(r < rank ? ICON_PIP_FULL : ICON_PIP_EMPTY, RANK_X + r * RANK_STEP, y);
         }
-        if (rank < t->ranks && ELEMENT_LEVELS[school] >= t->level) {
+        if (rank < t->ranks && ELEMENT_LEVELS[school] >= t->level && !eo_talent_blocked(first + i)) {
             eo_icon_draw(ICON_PIP_FULL, TALENT_GATE_X, y);
         }
     }
-    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, TALENT_LIST_Y + cursor * TALENT_ROW_H + 2 + ICON_TEXT_DY);
+    eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, TALENT_LIST_Y + (cursor - top) * TALENT_ROW_H + 2 + ICON_TEXT_DY);
 }
 
 // Text y of an attunement row: centered on the 13-pixel row.

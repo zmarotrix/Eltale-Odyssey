@@ -118,7 +118,7 @@ typedef struct {
     // Equipment (equipment.c)
     u32 owned_equipment;   // one bit per piece
     u8 equipped[4];        // staff, robe, charm, sigil: piece + 1, 0 = none
-    u8 talent_ranks[40];   // ranks learned per talent (talents.c)
+    u8 talent_ranks[40];   // ranks learned, 2 bits a talent (talents.c; 16 bytes used)
     // Shop stock left today (shop.c): the day it belongs to (+1, 0 = never stocked) and one count per row.
     u16 shop_day[7];
     u8 shop_left[7][7];
@@ -220,22 +220,40 @@ int eo_status_poisoned(void);
 void eo_fx_update(void);              // every frame in battle
 
 // ---- Talents (talents.c): a tree per element, bought rank by rank with Spirit Points ----
+// Each school: five rows of three (two of up to 3 ranks, one single pick), then its capstone.
 enum {
     // Fire
-    TALENT_SMOULDER, TALENT_FANNED_FLAMES, TALENT_KINDLING, TALENT_CONFLAGRATION, TALENT_FIREBRAND,
-    TALENT_WILDFIRE, TALENT_SEARING, TALENT_HEAT_HAZE, TALENT_INFERNO,
+    TALENT_KINDLING, TALENT_EMBER_HEART, TALENT_SEARING_STAFF,
+    TALENT_FAN_THE_COALS, TALENT_LINGERING_FLAME, TALENT_HOT_HANDS,
+    TALENT_WILDFIRE, TALENT_PYRE, TALENT_ASH_VEIL,
+    TALENT_CONFLAGRATION, TALENT_BLAZE, TALENT_PHOENIX,
+    TALENT_INFERNO, TALENT_SMOLDERING_SHIELDS, TALENT_CINDER_SKIN,
+    TALENT_ETERNAL_FLAME,
     // Earth
-    TALENT_BEDROCK, TALENT_WEIGHT, TALENT_STONESKIN, TALENT_SHATTER, TALENT_FAULT_LINE,
-    TALENT_AFTERSHOCK, TALENT_BULWARK, TALENT_LANDSLIDE, TALENT_EPICENTRE,
+    TALENT_BEDROCK, TALENT_THICK_SKIN, TALENT_HEAVY_STAFF,
+    TALENT_STEADY_FOOTING, TALENT_MOMENTUM, TALENT_BRACE,
+    TALENT_FAULT_LINE, TALENT_STONESKIN_MASTERY, TALENT_QUARRY,
+    TALENT_TREMOR, TALENT_GRANITE_WILL, TALENT_PLANTED_FEET,
+    TALENT_COLOSSUS, TALENT_UNBREAKABLE, TALENT_SEISMIC,
+    TALENT_AVALANCHE,
     // Water
-    TALENT_DEEP_FREEZE, TALENT_WELLSPRING, TALENT_TIDAL_FORCE, TALENT_STILL_WATERS, TALENT_UNDERTOW,
-    TALENT_FROSTBITE, TALENT_RIPTIDE, TALENT_UNDERCURRENT, TALENT_GLACIER,
+    TALENT_DEEP_WELL, TALENT_COLD_SNAP, TALENT_TIDE_STAFF,
+    TALENT_FROSTBITE, TALENT_CLEAR_WATERS, TALENT_WINTERS_GRIP,
+    TALENT_GLACIAL_SHATTER, TALENT_HYPOTHERMIA, TALENT_ICE_ARMOR,
+    TALENT_RIME, TALENT_PERMAFROST, TALENT_LIVING_WATER,
+    TALENT_DEEP_FREEZE, TALENT_WELLSPRING, TALENT_TIDAL_HEART,
+    TALENT_GLACIER_HEART,
     // Wind
-    TALENT_CROSSWIND, TALENT_LOCK_ON, TALENT_TAILWIND, TALENT_SHIFTING_WINDS, TALENT_EYE_OF_THE_STORM,
-    TALENT_CYCLONE, TALENT_SECOND_WIND, TALENT_UPDRAFT, TALENT_MAELSTROM,
+    TALENT_GALE_FORCE, TALENT_FLEET, TALENT_WHISTLING_STAFF,
+    TALENT_SQUALL, TALENT_EVASION, TALENT_TAILWIND,
+    TALENT_CYCLONE, TALENT_CROSSWIND, TALENT_UPDRAFT,
+    TALENT_TEMPEST_FURY, TALENT_EYE_OF_THE_STORM, TALENT_SECOND_BREATH,
+    TALENT_SHEAR_FORCE, TALENT_ZEPHYR_STEP, TALENT_STORM_CALLER,
+    TALENT_SECOND_WIND,
     TALENT_COUNT
 };
-#define TALENTS_PER_SCHOOL 9
+#define TALENTS_PER_SCHOOL 16
+_Static_assert(TALENT_COUNT == 4 * TALENTS_PER_SCHOOL, "16 talents a school");
 typedef struct {
     const char* name;
     u8 school;
@@ -247,6 +265,13 @@ typedef struct {
 const TalentInfo* eo_talent_info(int talent);
 int eo_talent(int talent);         // ranks learned, 0 = none
 int eo_talent_learn(int talent);   // 1 if a rank was learned now (level and points checked)
+int eo_talent_blocked(int talent); // a capstone while another tree's capstone is learned
+void eo_talents_refund_old(void);  // a save from the nine-talent trees: points back, ranks cleared
+int eo_talents_spell_percent(int element, int broken, int frozen, int burning);
+int eo_talents_staff_percent(int frozen);
+int eo_talents_taken_percent(void);
+int eo_talents_mp_percent(int school);
+int eo_combat_finisher_ready_for(int school);   // Storm Caller: Wind finishers need 1 less Charge
 
 // ---- Lock-On (lockon.c): Wind's Z-targeting talent ----
 int eo_lockon_target(void);   // enemy slot Brian is locked onto, -1 if none
@@ -264,6 +289,7 @@ int eo_spells_hit_percent(int slot, int frozen, int burning);
 int eo_spells_weak_extra_cracks(void);
 int eo_spells_staff_percent(int slot);
 int eo_spells_frosted(int slot);
+void eo_spells_frost_foe(int slot);
 int eo_spells_confused(int slot);
 // combat.c, for spells.c
 int eo_combat_frozen(int slot);

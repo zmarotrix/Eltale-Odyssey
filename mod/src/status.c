@@ -22,12 +22,11 @@
 // with one enemy or three. Research: research/battle/README.md (turns, damage) and research/enemies.
 
 #define MAX_ENEMIES 6
-#define BURN_STACKS 4        // room for Inferno's fourth; 3 without it
+#define BURN_STACKS 5        // room for Wildfire's fourth and Eternal Flame's fifth
 #define BASE_BURN_STACKS 3
+#define TICK_TALENT_PERCENT 10   // Kindling, Inferno: Burn ticks, a rank
+#define SMOLDER_CHANCE 10        // Smoldering Shields: a tick cracks a shield, a rank
 #define BURN_PERCENT 20      // per stack per turn (30 made Fire the best boss damage by far; balance pass)
-#define FANNED_PERCENT 5     // more per Fanned Flames rank
-#define CONFLAGRATION_PERCENT 25
-#define WILDFIRE_PERCENT 50  // of the dying foe's strongest stack, per rank
 #define SFX_DETONATE 0x0F     // the Ember spell's own sound (playtest, 2026-10-21)
 #define FLARE_RADIUS 70.0f   // battle units; a pack's members stand about 20-60 apart
 #define BURN_TURNS 3
@@ -100,8 +99,17 @@ static int is_enemy_battle_data(void* p) {
 
 // ---- Burn ----
 
+// Wildfire at rank 3 fits a fourth stack; Eternal Flame five.
 static int burn_stack_limit(void) {
-    return BASE_BURN_STACKS + (eo_talent(TALENT_INFERNO) ? 1 : 0);
+    if (eo_talent(TALENT_ETERNAL_FLAME)) {
+        return 5;
+    }
+    return BASE_BURN_STACKS + (eo_talent(TALENT_WILDFIRE) >= 3 ? 1 : 0);
+}
+
+// Lingering Flame at rank 3: a turn longer.
+static u8 burn_turns(void) {
+    return (u8)(BURN_TURNS + (eo_talent(TALENT_LINGERING_FLAME) >= 3 ? 1 : 0));
 }
 
 static u16 strongest_stack(int slot) {
@@ -125,7 +133,7 @@ static void burn_add_stack(int slot, u16 amount) {
     if (amount > b->stacks[weakest]) {
         b->stacks[weakest] = amount;
     }
-    b->turns_left = (u8)(BURN_TURNS + eo_talent(TALENT_SMOULDER));
+    b->turns_left = burn_turns();
     b->fresh = 1;
 }
 
@@ -151,19 +159,23 @@ static void burn_tick_all(void) {
         for (int i = 0; i < BURN_STACKS; i++) {
             total += b->stacks[i];
         }
-        total = total * (100 + (b->hot_turns > 0 ? b->hot_percent : 0) + b->bank_percent) / 100;
+        total = total * (100 + (b->hot_turns > 0 ? b->hot_percent : 0) + b->bank_percent +
+                         TICK_TALENT_PERCENT * (u32)(eo_talent(TALENT_KINDLING) + eo_talent(TALENT_INFERNO))) / 100;
         if (b->hot_turns > 0) {
             b->hot_turns--;
         }
         if (total > 0) {
             eo_fx_burn_hit(slot);
             enemy_take_damage(slot, (u16)(total > 0xFFFF ? 0xFFFF : total), ELEMENT_FIRE, DAMAGE_NO_ELEMENT, burn_attacker);
-            if (eo_talent(TALENT_HEAT_HAZE) && BRIAN_MP < BRIAN_MAX_MP) {
-                BRIAN_MP++;   // Heat Haze
+            if (get_rand(100) < SMOLDER_CHANCE * eo_talent(TALENT_SMOLDERING_SHIELDS)) {
+                eo_combat_crack(slot, 1);   // Smoldering Shields
             }
         }
         if (b->turns_left == 0) {
             continue;   // the tick killed it (Wildfire's death watch cleared its Burn)
+        }
+        if (eo_talent(TALENT_ETERNAL_FLAME)) {
+            continue;   // Eternal Flame: it never runs out
         }
         if (--b->turns_left == 0) {
             *b = (Burn){ 0 };
@@ -182,7 +194,6 @@ void eo_status_burn_cash(int slot, u32 percent) {
         total += b->stacks[i];
     }
     total = total * b->turns_left * percent / 100;
-    total = total * (100 + CONFLAGRATION_PERCENT * (u32)eo_talent(TALENT_CONFLAGRATION)) / 100;
     *b = (Burn){ 0 };
     if (total > 0 && ENEMY_HP(slot) > 0) {
         eo_fx_burn_hit(slot);
@@ -238,7 +249,7 @@ void eo_status_burn_grow(int slot, int percent) {
         u32 grown = (u32)b->stacks[i] * (100 + (u32)percent) / 100;
         b->stacks[i] = (u16)(grown > 0xFFFF ? 0xFFFF : grown);
     }
-    b->turns_left = (u8)(BURN_TURNS + eo_talent(TALENT_SMOULDER));
+    b->turns_left = burn_turns();
 }
 
 // Banked Fire: no ticks for `turns`, then every tick deals `percent` more.
@@ -285,8 +296,7 @@ void eo_status_burn_detonate(int slot, f32 radius) {
     }
 }
 
-// Any damage that kills a burning foe sets off Wildfire.
-static void wildfire(int slot);
+// Any damage that kills a burning foe puts its Burn out.
 static int death_watch_slot = -1;
 
 RECOMP_HOOK("enemy_take_damage") void eo_status_watch_death(s32 slot, u16 power, u16 element, u16 flags, void* attacker) {
@@ -297,7 +307,6 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_death_watch(void) {
     int slot = death_watch_slot;
     death_watch_slot = -1;
     if (slot >= 0 && ENEMY_HP(slot) == 0) {
-        wildfire(slot);
         burns[slot] = (Burn){ 0 };
     }
 }
@@ -353,7 +362,6 @@ void eo_status_add_burn(int slot, u16 amount) {
 // FLARE_RADIUS of it, as a stack as strong as the foe's strongest.
 
 static void spread_burn(int slot, u16 amount);
-static void wildfire(int slot);
 
 void eo_status_flare(int slot) {
     if (slot < 0 || slot >= MAX_ENEMIES || burns[slot].turns_left == 0) {
@@ -362,18 +370,6 @@ void eo_status_flare(int slot) {
     eo_fx_flare(slot);
     eo_sfx(SFX_DETONATE);
     spread_burn(slot, strongest_stack(slot));
-}
-
-// Wildfire: a burning foe that dies throws its Burn onto the foes around it.
-static void wildfire(int slot) {
-    int rank = eo_talent(TALENT_WILDFIRE);
-    u16 amount = (u16)(strongest_stack(slot) * WILDFIRE_PERCENT * rank / 100);
-    if (rank == 0 || burns[slot].turns_left == 0 || amount == 0) {
-        return;
-    }
-    eo_fx_flare(slot);
-    eo_sfx(SFX_DETONATE);
-    spread_burn(slot, amount);
 }
 
 // Every live foe within FLARE_RADIUS of `slot` (and free to take Burn) gets a stack of `amount`.
@@ -444,13 +440,6 @@ void eo_status_cure_poison(void) {
 RECOMP_HOOK("spell_type_heal") void eo_status_on_heal(void) {
     if (!(gBattleState & BATTLE_ACTIVE) || !(gBattleState & BATTLE_ENEMY_TURN)) {
         eo_status_cure_poison();
-        if (eo_talent(TALENT_UNDERTOW)) {
-            for (int i = 0; i < 12; i++) {
-                if ((BRIAN_STATUS_BITS & (1 << i)) && BRIAN_STATUS_COUNTDOWNS[i] > 1) {
-                    BRIAN_STATUS_COUNTDOWNS[i] = 1;
-                }
-            }
-        }
     }
 }
 
@@ -492,11 +481,11 @@ RECOMP_HOOK_RETURN("frame_build") void eo_status_frame(void) {
 #define ALWAYS_LANDS_MODE 2
 
 int eo_status_burn_percent(void) {
-    return BURN_PERCENT + FANNED_PERCENT * eo_talent(TALENT_FANNED_FLAMES);
+    return BURN_PERCENT;
 }
 
 int eo_status_blocks(void* fighter, int by_brian, int except_burn) {
-    if (fighter == 0 || (by_brian && eo_talent(TALENT_SHIFTING_WINDS))) {
+    if (fighter == 0) {
         return 0;
     }
     if (fighter == BRIAN_BATTLE_DATA) {
@@ -571,10 +560,12 @@ RECOMP_HOOK_RETURN("spell_status_roll") void eo_status_after_roll(void) {
 #define PROJECTILE_CASTER 0x24
 static u8* storm_countdown = 0;
 
+#define STATUS_EVADE 5
+
 RECOMP_HOOK("spell_status_set_duration") void eo_status_before_duration(u8* projectile, u8* target, s32 status) {
     storm_countdown = 0;
-    if (status < 0 || status >= 12 || target == 0 || *(void**)(projectile + PROJECTILE_CASTER) != BRIAN_BATTLE_DATA ||
-        eo_talent(TALENT_EYE_OF_THE_STORM) == 0) {
+    if (status != STATUS_EVADE || target != BRIAN_BATTLE_DATA || *(void**)(projectile + PROJECTILE_CASTER) != BRIAN_BATTLE_DATA ||
+        eo_talent(TALENT_UPDRAFT) == 0) {
         return;
     }
     u8* stats = *(u8**)(target + BATTLE_DATA_STATS);
@@ -583,7 +574,7 @@ RECOMP_HOOK("spell_status_set_duration") void eo_status_before_duration(u8* proj
 
 RECOMP_HOOK_RETURN("spell_status_set_duration") void eo_status_after_duration(void) {
     if (storm_countdown != 0) {
-        *storm_countdown = (u8)(*storm_countdown + eo_talent(TALENT_EYE_OF_THE_STORM));
+        *storm_countdown = (u8)(*storm_countdown + 1);
         storm_countdown = 0;
     }
 }

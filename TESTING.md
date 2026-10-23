@@ -227,28 +227,42 @@ Every spell has its own name, no levels (Rock, Boulder, ...); the list is in mod
       Burn, Freeze, Poison; Brian included, so a buffed Brian can't be poisoned and a poisoned Brian can't buff
       himself). Burn still stacks on a burning foe. Break isn't a status. Not checked in play yet.
 
-## Talents (new)
+## Talents (rebuilt 2026-10-23)
 
-The Spirits window (D-pad up) has five pages: **ATTUNE** and one talent tree per element (FIRE, EARTH, WATER,
-WIND); D-pad left / right switches. Each tree has 9 talents with ranks (pips); deeper rows need a higher element
-level (1, 3, 6, 10, 12, 16, 20, 25, 30). Each rank costs 2 Spirit Points, capstones 5: about 150 points fill
-every tree, on top of 92 for full attunement, out of 98 in the game.
+The Spirits window (D-pad up): **LEVELS**, then one tree per element (D-pad left / right). Each tree has 16 talents:
+five rows that open at element level 1, 12, 30, 48 and 60 (two talents of up to 3 ranks and one single pick each),
+then a capstone at 68. The list shows ten at a time and scrolls with the cursor (a dash at the left says there's
+more). Ranks cost 1 point in rows 1-2, 2 in row 3, 3 in rows 4-5, and 4 for a capstone: a whole tree is 74 points.
+**Only one capstone** in all four trees: the others show TAKEN. Saves with talents from the old 9-talent trees get
+those points back once (the old ranks are cleared).
 
 | Fire | Earth | Water | Wind |
 |---|---|---|---|
-| Smoulder 2: Burn +1 turn | Bedrock 2: +1 starting charge | Deep Freeze 2: Freeze +1 turn | Crosswind 2: Wind Boost +1 shot per charge |
-| Fanned Flames 3: Burn +5% of the hit | Weight 3: Earth +4% | Wellspring 3: Water healing +10% | Lock-On 1: hold Z to lock on (see below) |
-| Kindling 3: Fire +4% | Stoneskin 3: Defense +2 | Tidal Force 3: Water +4% | Tailwind 2: weakness charge twice a turn, then every hit |
-| Conflagration 2: ignition +25% | Shatter 2: Broken +15% | Still Waters 2: +1 MP every other turn / every turn | Shifting Winds 1: your statuses ignore the limit |
-| Firebrand 1: any staff hit burns | Fault Line 1: Earth weak hits take 2 shields | Undertow 1: Water healing ends your status | Eye of the Storm 2: your statuses +1 turn |
-| Wildfire 2: a burning foe's death spreads its Burn (50/100%) | Aftershock 2: Earth Boost +10% per charge | Frostbite 2: frozen foes +15% | Cyclone 3: Wind hits 5% chance to crack any shield |
-| Searing 3: burning foes +5% | Bulwark 1: first hit each fight halved | Riptide 1: freezing gives 1 charge | Second Wind 1: Boost 3 gives 1 charge back |
-| Heat Haze 1: Burn ticks give 1 MP | Landslide 1: a Break cracks every other foe | Undercurrent 3: Water spells 10% free | Updraft 2: hold 1 more charge |
-| Inferno (cap): Burn stacks to 4 | Epicentre (cap): Broken one more turn | Glacier (cap): freezing cracks a shield | Maelstrom (cap): 2 charge a turn |
+| Kindling 3: Burn ticks +10% | Bedrock 3: Earth +7% | Deep Well 3: Mend +2% HP and MP | Gale Force 3: Wind +6% |
+| Ember Heart 3: Fire +6% | Thick Skin 3: take 2% less | Cold Snap 3: Water +6% | Fleet 3: agility +5% |
+| Searing Staff: swings add Burn, take 6% less | Heavy Staff: swings +30%, take 6% less | Tide Staff: swings Frost, take 6% less | Whistling Staff: swings +30%, take 6% less |
+| Fan the Coals 3: stoking +10% | Steady Footing 3: Settle loses 7% less | Frostbite 3: frozen foes +8% | Squall 3: many-hit spells 8% more hits |
+| Lingering Flame 3: Burn +1 turn at rank 3 | Momentum 3: Earth Boost +5% a charge | Clear Waters 3: Water MP -9% | Evasion 3: foes miss 3% more |
+| Hot Hands: Fire MP -25% | Brace: passing while Settled halves hits | Winter's Grip: bosses resist freeze 1 turn less | Tailwind: Wind MP -25% |
+| Wildfire 3: a 4th stack at rank 3 | Fault Line 3: Earth weak hits may crack 1 more | Glacial Shatter 3: Shatter +0.2x | Cyclone 3: Wind hits 5% to crack any shield |
+| Pyre 3: Searing Steam +15% | Stone Mastery 3: guards +5% | Hypothermia 3: 10% to chill a step colder | Crosswind 3: Wind +10% on Broken |
+| Ash Veil: take 7% less | Quarry: Earth MP -25% | Ice Armor: take 7% less | Updraft: Mirage, Whiteout +1 turn |
+| Conflagration 3: burning foes +5% | Tremor 3: Earth +10% on Broken | Rime 3: Water +5% | Tempest Fury 3: Wind +5% |
+| Blaze 3: Fire +5% | Granite Will 3: take 3% less | Permafrost 3: Freeze +1 turn at rank 3 | Eye of the Storm 3: take 3% less |
+| Phoenix: once a fight, under 25% HP heal 30% | Planted Feet: passing while Settled +1 Charge | Living Water: heal 3% each turn | Second Breath: start with 1 Charge |
+| Inferno 3: Burn ticks +10% | Colossus 3: Earth +7% | Deep Freeze 3: Shatter +0.2x | Shear Force 3: many-hit spells 8% more hits |
+| Smolder Shields 3: Burn ticks 10% to crack | Unbreakable 3: hits soak 4% | Wellspring 3: Mend +5% MP | Zephyr Step 3: foes miss 3% more |
+| Cinder Skin: take 7% less | Seismic: heavy Earth hits always crack 1 | Tidal Heart: healing +25% | Storm Caller: Wind finishers need 1 Charge |
+| **Eternal Flame**: Burn never ends, 5 stacks | **Avalanche**: every 3rd Earth cast 2x | **Glacier Heart**: bosses refreeze at once | **Second Wind**: every 3rd round you act twice |
 
-(Numbers are per rank.)
+Differences from the doc: Unbreakable soaks 4% of each hit a rank instead of raising max HP, and Wellspring makes
+Mend restore 5% more MP a rank instead of raising max MP (changing the max would be written into the save). Wildfire
+no longer spreads a dying foe's Burn. Lock-On is no longer a talent: everyone has it (below).
 
-**Lock-On** (Wind, Lv 3): in battle, hold **Z** and Brian locks onto an enemy (the one most straight ahead) and
+- [ ] Checked by Claude: the pages, scrolling, costs, TAKEN, learning ranks (points come off), Second Wind (every
+  third round Brian went twice), Hot Hands (Blaze 5 MP), Eternal Flame, Living Water, Brace. The rest: not yet.
+
+**Lock-On** (everyone now; was a Wind talent): in battle, hold **Z** and Brian locks onto an enemy (the one most straight ahead) and
 keeps facing it while you move, which aims your spells. Tap Z again to switch to the next enemy. A pale-gold
 sparkle floats over the target. Z doesn't swing or cast while the talent is learned (A and R still do).
 While locked, the stick moves Brian any way it would normally (strafing no longer pulls him toward the target), and
@@ -256,9 +270,6 @@ the camera swings round behind him to look at the target.
 - [x] Camera turn and strafing: checked by you (2026-10-21). Since then the camera turns a little faster, and
       standing still keeps him facing the target for casts (loads on the next launch).
 - [ ] Switching targets with a second tap: not checked yet.
-
-- [ ] Pages draw (checked by Claude). Learning ranks and every effect: not checked yet (needs points and levels;
-      the dev panel's Brian tab can raise element levels, and Spirit Points can be set from the Memory tab).
 
 ## Equipment (new, only partly checked)
 

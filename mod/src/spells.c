@@ -191,7 +191,7 @@ const char* eo_spells_text(int school, int index) {
 
 u32 eo_spells_mp_cost(int school, int index) {
     const SpellDef* d = def_of(school, index);
-    return d != 0 ? d->mp : 0;
+    return d != 0 ? (d->mp * (100 - (u32)eo_talents_mp_percent(school)) + 50) / 100 : 0;
 }
 
 // ---- MP: every spell its own cost ----
@@ -215,7 +215,7 @@ static void set_mp_cost(s32 spell) {
     }
     u16 presses = *(u16*)(SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE + REC_PRESSES);
     if (presses >= 1 && presses <= 3) {
-        MP_COSTS[presses] = d->mp;
+        MP_COSTS[presses] = (u16)((d->mp * (100 - eo_talents_mp_percent(school)) + 50) / 100);
     }
 }
 
@@ -318,6 +318,7 @@ static u16 meteor_damage;
 static u8 meteor_stacks;
 static u16 rock_damage;
 static u8 scalded;                  // Searing Steam scalded Brian this cast
+static u8 phoenix_used;             // Phoenix: once a battle
 
 #define FOG_MISS_PERCENT 40
 #define FROST_TURNS 2
@@ -338,6 +339,17 @@ static void reset_battle(void) {
     guard_turns = wall_turns = fog_turns = haze_turns = renew_turns = storm_turns = 0;
     juggernaut = 0;
     meteor_armed = 0;
+    phoenix_used = 0;
+}
+
+// Tidal Heart: all of Brian's healing.
+static u32 healing(u32 amount) {
+    return amount * (100 + (eo_talent(TALENT_TIDAL_HEART) ? 25 : 0)) / 100;
+}
+
+static void heal_brian(u32 amount) {
+    u32 hp = BRIAN_HP + healing(amount);
+    BRIAN_HP = (u16)(hp > BRIAN_MAX_HP ? BRIAN_MAX_HP : hp);
 }
 
 RECOMP_HOOK("battle_build_turn_order") void eo_spells_on_battle_start(void) {
@@ -414,6 +426,9 @@ static void chill(int i, int steps) {
         return;
     }
     eo_status_burn_clear(i);
+    if (get_rand(100) < 10 * eo_talent(TALENT_HYPOTHERMIA)) {
+        steps++;   // Hypothermia
+    }
     for (int k = 0; k < steps; k++) {
         if (eo_combat_frozen(i)) {
             eo_combat_freeze_longer(i);
@@ -434,6 +449,14 @@ static void burn(int i, u32 amount) {
     unfrost(i);
     eo_combat_thaw(i);
     eo_status_add_burn(i, (u16)(amount < 1 ? 1 : amount > 0xFFFF ? 0xFFFF : amount));
+}
+
+// Tide Staff (talent): a swing Frosts.
+void eo_spells_frost_foe(int slot) {
+    if (alive(slot) && !eo_combat_broken(slot) && !eo_combat_frozen(slot)) {
+        eo_status_burn_clear(slot);
+        frost(slot, FROST_TURNS);
+    }
 }
 
 int eo_spells_frosted(int slot) {
@@ -462,7 +485,7 @@ void eo_spells_on_cast(int school, int index, int boost) {
             break;
         case K_STONESKIN:
             guard_turns = (u8)(3 + boost);
-            guard_percent = 30;
+            guard_percent = (u8)(30 + 5 * eo_talent(TALENT_STONESKIN_MASTERY));
             break;
         case K_JUGGERNAUT:
             juggernaut = (u8)(200 + 50 * boost > 255 ? 255 : 200 + 50 * boost);   // 3x, half again more a charge
@@ -475,22 +498,22 @@ void eo_spells_on_cast(int school, int index, int boost) {
             wall_turns = (u8)(1 + boost);
             break;
         case K_WHITEOUT:
-            fog_turns = (u8)(2 + boost);
+            fog_turns = (u8)(2 + boost + eo_talent(TALENT_UPDRAFT));
             break;
         case K_MEND: {
             // Free: 18% of max HP and 20% of max MP at Water 12 or more, less below (by the spell-power curve).
+            // Deep Well: 2% more of each a rank; Wellspring: 5% more MP a rank.
             u32 scale = eo_progression_mend_permille();
-            u32 hp = (u32)BRIAN_MAX_HP * 18 * scale / 100000 * (100 + 10 * (u32)boost) / 100;
-            u32 mp = (u32)BRIAN_MAX_MP * 20 * scale / 100000;
-            u32 nhp = BRIAN_HP + (hp < 1 ? 1 : hp);
+            u32 well = 2 * (u32)eo_talent(TALENT_DEEP_WELL);
+            u32 hp = (u32)BRIAN_MAX_HP * (18 + well) * scale / 100000 * (100 + 10 * (u32)boost) / 100;
+            u32 mp = (u32)BRIAN_MAX_MP * (20 + well + 5 * (u32)eo_talent(TALENT_WELLSPRING)) * scale / 100000;
+            heal_brian(hp < 1 ? 1 : hp);
             u32 nmp = BRIAN_MP + (mp < 1 ? 1 : mp);
-            BRIAN_HP = (u16)(nhp > BRIAN_MAX_HP ? BRIAN_MAX_HP : nhp);
             BRIAN_MP = (u16)(nmp > BRIAN_MAX_MP ? BRIAN_MAX_MP : nmp);
             break;
         }
         case K_SOOTHE: {
-            u32 nhp = BRIAN_HP + (u32)BRIAN_MAX_HP * (15 + (u32)boost * 2) / 100;
-            BRIAN_HP = (u16)(nhp > BRIAN_MAX_HP ? BRIAN_MAX_HP : nhp);
+            heal_brian((u32)BRIAN_MAX_HP * (15 + (u32)boost * 2) / 100);
             eo_status_cure_poison();
             for (int k = 0; k < 12; k++) {
                 if ((BRIAN_STATUS_BITS & (1 << k)) && BRIAN_STATUS_COUNTDOWNS[k] > 1) {
@@ -578,7 +601,10 @@ int eo_spells_hit_percent(int slot, int frozen, int burning) {
         return 0;
     }
     if (d->kind == K_SHATTER && frozen) {
-        return 414;   // 315 base on a frozen foe lands as 900 x 1.8 (the engine's Shatter); elsewhere a weak hit
+        // 315 base on a frozen foe lands as 900 x 1.8 (the engine's Shatter), 0.2x more a talent rank; elsewhere
+        // it's a weak hit.
+        int tenths = 18 + 2 * (eo_talent(TALENT_GLACIAL_SHATTER) + eo_talent(TALENT_DEEP_FREEZE));
+        return 900 * tenths * 10 / 315 - 100;
     }
     if (d->kind == K_FAN && burning) {
         return 60;
@@ -648,7 +674,7 @@ static void effect(const SpellDef* d, const Hit* h, int i, u32 amount, int main_
             break;
         }
         case K_BELLOWS:
-            eo_status_burn_heat(i, 3, 50 + 25 * b);
+            eo_status_burn_heat(i, 3, 50 + 25 * b + 10 * eo_talent(TALENT_FAN_THE_COALS));
             break;
         case K_SCALD:
             if (eo_status_burn_total(i) > 0) {
@@ -662,13 +688,13 @@ static void effect(const SpellDef* d, const Hit* h, int i, u32 amount, int main_
             eo_combat_thaw(i);
             break;
         case K_FLARE_UP:
-            eo_status_burn_grow(i, 50 + 25 * b);
+            eo_status_burn_grow(i, 50 + 25 * b + 10 * eo_talent(TALENT_FAN_THE_COALS));
             break;
         case K_PYRE:
             eo_status_burn_cash(i, 100 + 20 * (u32)b);
             break;
         case K_FIRESTORM:
-            eo_status_burn_heat(i, 3 + b, 50);
+            eo_status_burn_heat(i, 3 + b, 50 + 10 * eo_talent(TALENT_FAN_THE_COALS));
             break;
         case K_DETONATE:
             eo_status_burn_detonate(i, NEAR_RADIUS + BOOST_RADIUS * b);
@@ -685,7 +711,7 @@ static void effect(const SpellDef* d, const Hit* h, int i, u32 amount, int main_
             meteor_stacks = (u8)(2 + b);
             break;
         case K_SEARING: {
-            u32 total = eo_status_burn_total(i) * (300 + 50 * (u32)b) / 100;
+            u32 total = eo_status_burn_total(i) * (300 + 50 * (u32)b) / 100 * (100 + 15 * (u32)eo_talent(TALENT_PYRE)) / 100;
             eo_status_burn_clear(i);
             fixed_hit(i, total);
             for (int k = 0; k < MAX_ENEMIES; k++) {
@@ -842,16 +868,25 @@ RECOMP_HOOK_RETURN("player_take_damage") void eo_spells_after_brian_damage(void)
     }
     u32 lost = hp_before_hit - BRIAN_HP;
     u32 back = 0;
+    int evade = 3 * (eo_talent(TALENT_EVASION) + eo_talent(TALENT_ZEPHYR_STEP));
     if (wall_turns > 0 && spell_on_brian) {
         back = lost;   // the wall stops the spell
     } else if (fog_turns > 0 && get_rand(100) < FOG_MISS_PERCENT) {
         back = lost;   // lost in the fog
-    } else if (guard_turns > 0) {
-        back = lost * guard_percent / 100;
+    } else if (get_rand(100) < evade) {
+        back = lost;   // Evasion, Zephyr Step
+    } else {
+        u32 soak = (guard_turns > 0 ? guard_percent : 0) + (u32)eo_talents_taken_percent();
+        back = lost * (soak > 90 ? 90 : soak) / 100;
     }
     if (back > 0 && BRIAN_HP > 0) {
         u32 hp = BRIAN_HP + back;
         BRIAN_HP = (u16)(hp > BRIAN_MAX_HP ? BRIAN_MAX_HP : hp);
+    }
+    // Phoenix: once a battle, falling under a quarter of his HP heals 30%.
+    if (eo_talent(TALENT_PHOENIX) && !phoenix_used && BRIAN_HP > 0 && (u32)BRIAN_HP * 4 < BRIAN_MAX_HP) {
+        phoenix_used = 1;
+        heal_brian((u32)BRIAN_MAX_HP * 30 / 100);
     }
     // Heat Haze: whoever hit him catches a Burn stack.
     if (haze_turns > 0 && lost > back) {
@@ -883,8 +918,10 @@ static void brian_turn_begins(void) {
     }
     if (renew_turns > 0) {
         renew_turns--;
-        u32 hp = BRIAN_HP + renew_heal;
-        BRIAN_HP = (u16)(hp > BRIAN_MAX_HP ? BRIAN_MAX_HP : hp);
+        heal_brian(renew_heal);
+    }
+    if (eo_talent(TALENT_LIVING_WATER) && BRIAN_HP > 0) {
+        heal_brian((u32)BRIAN_MAX_HP * 3 / 100 + 1);
     }
     // Meteor lands: heavy damage and hot Burn on everything near the mark.
     if (meteor_armed) {

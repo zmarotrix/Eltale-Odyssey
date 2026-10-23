@@ -21,11 +21,10 @@
 #define START_CHARGE 0   // every battle starts empty (playtest, 2026-10-21); Bedrock adds
 #define BROKEN_BONUS_PERCENT 100   // double damage: worth spending the Break turn on, or on healing instead (playtest, 2026-10-21)
 // Talents (talents.c) bending these rules, per rank.
-#define SCHOOL_TALENT_PERCENT 4    // Kindling, Weight, Tidal Force, Gale Force
-#define SHATTER_PERCENT 15
-#define FROSTBITE_PERCENT 15
-#define SEARING_PERCENT 5
-#define AFTERSHOCK_PERCENT 10      // on top of Earth Boost's 40 per charge
+#define MOMENTUM_PERCENT 5         // Momentum: Earth Boost per charge, a rank
+#define STEADY_PERMILLE 70         // Steady Footing: Settled Earth spells, a rank
+#define FAULT_LINE_CHANCE 33       // Fault Line: an extra crack on an Earth weakness hit, a rank
+#define MULTI_HIT_PERCENT 8        // Squall, Shear Force: more hits for many-hit spells, a rank
 #define CYCLONE_CHANCE 5
 #define STONE_MEMORY_PERCENT 15
 // Bosses (game design document, "Keeping 1v1 boss fights from becoming a rotation"): besides growing shields and
@@ -110,7 +109,6 @@ static u8 spent_last_turn = 0;
 static u8 spent_this_turn = 0;
 static u8 weakness_bonus_given = 0;
 static u8 reflected_this_battle = 0;  // Mirror Shard
-static u8 bulwark_used = 0;           // Bulwark talent
 static u32 turns_taken = 0;           // Brian's turns this battle (Still Waters)
 static u32 cast_turn = 0;             // turns_taken + 1 when Brian last cast (one cast a turn)
 static u32 turn_swing_used = 0;       // turns_taken + 1 when Brian last swung (first swing a turn)
@@ -140,9 +138,32 @@ static u8 ending_enemy_turn = 0;
 
 static int in_battle(void);
 
+// Charge a tier-5 spell of `school` needs (Storm Caller: Wind's need 1 less).
+static int finisher_charge(int school) {
+    return FINISHER_CHARGE - (school == WIND && eo_talent(TALENT_STORM_CALLER) ? 1 : 0);
+}
+
+int eo_combat_finisher_ready_for(int school) {
+    return !in_battle() || charge >= finisher_charge(school);
+}
+
 int eo_combat_finisher_ready(void) {
-    return !in_battle() || charge >= FINISHER_CHARGE;
-}            // defense the Stone Staff has added this fight
+    return eo_combat_finisher_ready_for(FIRE);
+}
+
+// How long a thawed boss resists freezing: Winter's Grip shortens it; with Glacier Heart it doesn't.
+static u8 boss_freeze_immunity(void) {
+    if (eo_talent(TALENT_GLACIER_HEART)) {
+        return 0;
+    }
+    return (u8)(BOSS_FREEZE_IMMUNE - eo_talent(TALENT_WINTERS_GRIP));
+}
+
+// Avalanche (Earth capstone): every third Earth attack of a battle deals double.
+static u8 earth_casts = 0;
+static u8 avalanche_now = 0;
+// Brace: a turn ended with A while Settled halves the hits until Brian's next turn.
+static u8 braced = 0;            // defense the Stone Staff has added this fight
 
 // The boost of the spell being cast right now (0 when none), and what was changed for it.
 static u8 active_boost = 0;
@@ -151,12 +172,9 @@ static u8* active_spell = 0;
 static u16 saved_base;
 static u16 saved_shots;
 
-// Each school's +damage talent (Wind's tree has Lock-On instead).
-static const u8 school_talent[4] = { TALENT_KINDLING, TALENT_WEIGHT, TALENT_TIDAL_FORCE, TALENT_COUNT };
-
-// Most charge Brian can hold: 5, more with Updraft.
+// Most charge Brian can hold.
 static u8 max_charge(void) {
-    return (u8)(MAX_CHARGE + eo_talent(TALENT_UPDRAFT));
+    return MAX_CHARGE;
 }
 
 static void gain_charge(int amount) {
@@ -218,13 +236,15 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
         g->max_shields = g->shields = shields_for(record, boss);
     }
     charge = 0;
-    gain_charge(START_CHARGE + eo_talent(TALENT_BEDROCK) + (eo_equipment_worn(EQ_HOURGLASS_CHARM) ? 2 : 0));
+    gain_charge(START_CHARGE + eo_talent(TALENT_SECOND_BREATH) + (eo_equipment_worn(EQ_HOURGLASS_CHARM) ? 2 : 0));
+    earth_casts = 0;
+    avalanche_now = 0;
+    braced = 0;
     first_cast_turn = 0;
     settled = settle_pending = 0;
     for (int i = 0; i < MAX_ENEMIES; i++) {
         frozen_before[i] = ice_window[i] = freeze_immune[i] = 0;
     }
-    bulwark_used = 0;
     turns_taken = 0;
     cast_turn = turn_swing_used = 0;
     earth_streak = 0;
@@ -272,19 +292,9 @@ static void break_enemy(int i) {
     g->broken = 1;
     u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
     *(u16*)status |= STATUS_RESTRICTION_BIT;   // its next turn is skipped by the game itself
-    // Epicentre: two lost turns, but bosses resist control effects (as with freezing) and lose only one.
-    status[STATUS_RESTRICTION_DURATION] = (u8)(1 + ((gBattleState & BATTLE_BOSS) ? 0 : eo_talent(TALENT_EPICENTRE)));
+    status[STATUS_RESTRICTION_DURATION] = 1;
     break_sounds_left = BREAK_SOUNDS;   // played by eo_combat_draw, a few frames apart
     break_sound_timer = 0;
-    // Landslide: the Break cracks a shield off every other foe (never their last).
-    if (eo_talent(TALENT_LANDSLIDE)) {
-        for (int k = 0; k < MAX_ENEMIES; k++) {
-            if (k != i && ENEMY_HP(k) > 0 && !guards[k].broken && guards[k].shields > 1) {
-                guards[k].shields--;
-                eo_fx_shield_hit(k, 0);
-            }
-        }
-    }
 }
 
 // Sound for a shield knocked off without a Break (playtest pick, 2026-10-21). It plays alongside the game's own hit
@@ -334,14 +344,10 @@ static void freeze_enemy(int i, int turns) {
             return;   // still shaking off the last freeze
         }
         turns = 1;  // bosses resist control effects
+    } else if (eo_talent(TALENT_PERMAFROST) >= 3) {
+        turns++;    // Permafrost
     }
     *(u16*)status |= STATUS_RESTRICTION_BIT;
-    if (eo_talent(TALENT_RIPTIDE)) {
-        gain_charge(1);
-    }
-    if (eo_talent(TALENT_GLACIER)) {
-        crack_shields(i, 1);
-    }
     if (status[STATUS_RESTRICTION_DURATION] < turns) {
         status[STATUS_RESTRICTION_DURATION] = (u8)turns;
     }
@@ -386,7 +392,7 @@ void eo_combat_thaw(int slot) {
     ice_window[slot] = 0;
     frozen_before[slot] = 0;
     if (gBattleState & BATTLE_BOSS) {
-        freeze_immune[slot] = BOSS_FREEZE_IMMUNE;
+        freeze_immune[slot] = boss_freeze_immunity();
     }
 }
 
@@ -460,22 +466,32 @@ RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u1
     if (hit_kind != HIT_SPELL || g->broken) {
         return;
     }
+    int index = last_brian_spell & 0xFF;
+    int heavy_hit = element == EARTH && index < 15 && earth_settle[index] > 0;   // an Earth attack that Settles
     if (g->weakness == NO_WEAKNESS || element != g->weakness) {
-        // Cyclone: a Wind hit may crack a shield anyway.
+        // Cyclone: a Wind hit may crack a shield anyway. Seismic: so does a heavy Earth hit, always.
         if (element == WIND && get_rand(100) < CYCLONE_CHANCE * eo_talent(TALENT_CYCLONE)) {
+            crack_shields(slot, 1);
+        } else if (heavy_hit && eo_talent(TALENT_SEISMIC)) {
             crack_shields(slot, 1);
         }
         return;
     }
     g->revealed = 1;
-    // Weakness hits give charge once a turn; Tailwind: twice, then every time.
-    int tailwind = eo_talent(TALENT_TAILWIND);
-    if (tailwind >= 2 || weakness_bonus_given < 1 + tailwind) {
+    // Weakness hits give charge once a turn.
+    if (weakness_bonus_given < 1) {
         gain_charge(1);
         weakness_bonus_given++;
     }
-    int heavy = element == EARTH && (eo_talent(TALENT_FAULT_LINE) || eo_equipment_worn(EQ_MOUNTAIN_STAFF));
-    crack_shields(slot, (heavy ? 2 : 1) + eo_spells_weak_extra_cracks());
+    // Mountain Staff: Earth weakness hits take 2 shields; Fault Line: a third of the time a rank, 1 more.
+    int cracks = 1 + eo_spells_weak_extra_cracks();
+    if (element == EARTH && eo_equipment_worn(EQ_MOUNTAIN_STAFF)) {
+        cracks++;
+    }
+    if (element == EARTH && get_rand(100) < FAULT_LINE_CHANCE * eo_talent(TALENT_FAULT_LINE)) {
+        cracks++;
+    }
+    crack_shields(slot, cracks);
 }
 
 // Damage numbers: 9 slots of 0x1C bytes at 0x800873D0 (+0x00 the fighter's battle data, +0x04 digits, +0x0C timer,
@@ -538,22 +554,25 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     u32 extra = 0;
     u32 percent = 0;
     if (hit_was_broken) {
-        percent += BROKEN_BONUS_PERCENT + SHATTER_PERCENT * (u32)eo_talent(TALENT_SHATTER);
-    } else if (hit_was_frozen) {
-        percent += FROSTBITE_PERCENT * (u32)eo_talent(TALENT_FROSTBITE);
-    }
-    if (hit_was_burning) {
-        percent += SEARING_PERCENT * (u32)eo_talent(TALENT_SEARING);
+        percent += BROKEN_BONUS_PERCENT;
     }
     // Same element or no element: the game's 0.5x becomes 0.75x (missing the weakness already costs the shield cracks).
     if (hit_was_resisted) {
         percent += RESIST_SOFTEN_PERCENT;
     }
+    // Gear and talents: what they add counts as plain (white) unless a mechanic also pushed the hit.
+    u32 plain = 0;
     if (hit_kind == HIT_STAFF) {
         extra += (u32)eo_equip_staff_bonus();
+        plain = (u32)eo_talents_staff_percent(hit_was_frozen);
+        percent += plain;
     } else if (hit_element < 4) {
-        percent += (u32)eo_equip_element_percent(hit_element) +
-                   SCHOOL_TALENT_PERCENT * (u32)eo_talent(school_talent[hit_element]);
+        plain = (u32)eo_equip_element_percent(hit_element) +
+                (u32)eo_talents_spell_percent(hit_element, hit_was_broken, hit_was_frozen, hit_was_burning);
+        percent += plain;
+        if (hit_element == EARTH && avalanche_now) {
+            percent += 100;   // Avalanche
+        }
         // Stone Memory: each Earth spell cast in a row hits 15% harder (to 30%).
         if (hit_element == EARTH && eo_equipment_worn(EQ_STONE_MEMORY)) {
             percent += STONE_MEMORY_PERCENT * (u32)(earth_streak > 1 ? (earth_streak - 1 > 2 ? 2 : earth_streak - 1) : 0);
@@ -597,8 +616,7 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     // Which way the mechanics pushed this hit, for the number's color: a weakness hit, a Broken, burning or frozen
     // bonus or a stoke on a burning foe buffs it; the foe resisting the element or a stoke on a foe that isn't
     // burning weakens it. Gear bonuses alone leave it white.
-    int buffed = hit_was_weak || hit_was_broken || percent > (u32)(hit_element < 4 ? eo_equip_element_percent(hit_element) +
-                 SCHOOL_TALENT_PERCENT * eo_talent(school_talent[hit_element]) : 0) + (hit_was_resisted ? RESIST_SOFTEN_PERCENT : 0);
+    int buffed = hit_was_weak || hit_was_broken || percent > plain + (hit_was_resisted ? RESIST_SOFTEN_PERCENT : 0);
     int weakened = hit_was_resisted;
     u32 shown = hit;
     // A boss adapted to the element Brian keeps casting gives back part of the hit.
@@ -635,13 +653,17 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
             if (eo_equipment_worn(EQ_EMBER_STAFF)) {
                 eo_status_flare(slot);
             }
-        } else if (ENEMY_HP(slot) > 0 && (eo_equipment_worn(EQ_PHOENIX_STAFF) || eo_talent(TALENT_FIREBRAND))) {
+        } else if (ENEMY_HP(slot) > 0 && (eo_equipment_worn(EQ_PHOENIX_STAFF) || eo_talent(TALENT_SEARING_STAFF))) {
             eo_status_add_burn(slot, (u16)(hit * (u32)eo_status_burn_percent() / 100 + 1));
         }
         // Stone Staff: every swing hardens Brian, +3 defense for the rest of the fight (up to +12).
         if (eo_equipment_worn(EQ_STONE_STAFF) && stone_guard < STONE_GUARD_MAX) {
             stone_guard = (u8)(stone_guard + STONE_GUARD_STEP);
             BRIAN_DEFENSE_NOW = (u16)(BRIAN_DEFENSE_NOW + STONE_GUARD_STEP);
+        }
+        // Tide Staff (talent): swings Frost the foe.
+        if (eo_talent(TALENT_TIDE_STAFF) && ENEMY_HP(slot) > 0) {
+            eo_spells_frost_foe(slot);
         }
         // Tide Staff: swings heal Brian for half the damage they deal.
         if (eo_equipment_worn(EQ_TIDE_STAFF)) {
@@ -699,11 +721,9 @@ RECOMP_HOOK_RETURN("player_take_damage") void eo_combat_after_brian_damage(void)
         u16 back = (u16)((bulwark_hp - *hp_now) * SCARRED_PERCENT / 100);
         *hp_now = (u16)(*hp_now + back);
     }
-    // Bulwark: the first hit Brian takes each fight is halved.
-    u16* hp = (u16*)gPlayerMainData + 2;
-    if (in_battle() && !bulwark_used && eo_talent(TALENT_BULWARK) && *hp < bulwark_hp) {
-        *hp = (u16)(*hp + (bulwark_hp - *hp) / 2);
-        bulwark_used = 1;
+    // Brace: braced on a turn ended with A while Settled, hits until his next turn are halved.
+    if (in_battle() && braced && *hp_now < bulwark_hp) {
+        *hp_now = (u16)(*hp_now + (bulwark_hp - *hp_now) / 2);
     }
     if (mirror_slot < 0) {
         return;
@@ -737,7 +757,10 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
     if (!(gBattleState & BATTLE_ENEMY_TURN)) {
         // Settle: a turn ended with A (no spell, no swing) clears a level; this turn's Earth attack Settles him now.
         int acted = cast_turn == turns_taken + 1 || turn_swing_used == turns_taken + 1;
+        braced = 0;
         if (!acted && settled > 0) {
+            braced = (u8)eo_talent(TALENT_BRACE);
+            gain_charge(eo_talent(TALENT_PLANTED_FEET));
             settled--;
         }
         if (settle_pending > settled) {
@@ -755,7 +778,7 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
                 *(u16*)status &= (u16)~STATUS_RESTRICTION_BIT;
             }
             if (gBattleState & BATTLE_BOSS) {
-                freeze_immune[i] = BOSS_FREEZE_IMMUNE;
+                freeze_immune[i] = boss_freeze_immunity();
             }
         }
         // Brian's turn is over: undo this turn's boost, remember whether he spent.
@@ -790,23 +813,27 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
         }
     }
     if (!spent_last_turn) {
-        gain_charge(eo_talent(TALENT_MAELSTROM) ? 2 : 1);
+        gain_charge(1);
     }
     spent_last_turn = 0;
     weakness_bonus_given = 0;
-    // Still Waters: MP at the start of Brian's turns (every other turn at rank 1, every turn at rank 2).
     turns_taken++;
-    int still = eo_talent(TALENT_STILL_WATERS);
-    u16* mp = (u16*)gPlayerMainData + 4;
-    if ((still >= 2 || (still == 1 && (turns_taken & 1))) && mp[0] < mp[1]) {
-        mp[0]++;
-    }
 }
 
 // The game ticks a fighter's statuses inside battle_end_turn: a foe it just thawed keeps its ice until Brian's
 // turn ends (the window above).
 RECOMP_HOOK_RETURN("battle_end_turn") void eo_combat_after_turn_end(void) {
-    if (!in_battle() || !ending_enemy_turn) {
+    if (!in_battle()) {
+        return;
+    }
+    if (!ending_enemy_turn) {
+        // Second Wind: every third round Brian acts twice (the game just handed the turn to an enemy; take it back).
+        static u32 second_wind_turn = 0;
+        if (eo_talent(TALENT_SECOND_WIND) && turns_taken % 3 == 2 && second_wind_turn != turns_taken + 1 &&
+            (gBattleState & BATTLE_ENEMY_TURN)) {
+            second_wind_turn = turns_taken + 1;
+            gBattleState &= (u16)~BATTLE_ENEMY_TURN;
+        }
         return;
     }
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -852,7 +879,8 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     int finisher = eo_spirits_tier(school, index) == 5;
     int used = boost;
     if (finisher && new_cast) {
-        used = charge > FINISHER_CHARGE ? charge - FINISHER_CHARGE : 0;
+        int need = finisher_charge(school);
+        used = charge > need ? charge - need : 0;
         used = used > MAX_BOOST ? MAX_BOOST : used;
         boost = 0;
         charge = 0;
@@ -860,12 +888,16 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     }
     if (new_cast) {
         eo_spells_on_cast(school, index, used);
+        if (school == EARTH && type == SPELL_TYPE_DAMAGE) {
+            earth_casts++;
+            avalanche_now = eo_talent(TALENT_AVALANCHE) && earth_casts % 3 == 0;
+        }
     }
     if (school == EARTH && type == SPELL_TYPE_DAMAGE && earth_settle[index] > settle_pending) {
         settle_pending = earth_settle[index];
     }
     int echo = school == WATER && type == SPELL_TYPE_DAMAGE && eo_equipment_worn(EQ_TIDAL_ECHO);
-    int wellspring = school == WATER && type == SPELL_TYPE_HEAL ? eo_talent(TALENT_WELLSPRING) : 0;
+    int wellspring = 0;
     int leviathan = school == WATER && type == SPELL_TYPE_HEAL && eo_equipment_worn(EQ_LEVIATHAN_STAFF);
     int tether = school == WIND && type == SPELL_TYPE_DAMAGE && eo_equipment_worn(EQ_GALE_TETHER);
     int curve = type == SPELL_TYPE_DAMAGE;   // every damaging spell: the overhaul's power curve (progression.c)
@@ -892,14 +924,14 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     eo_spells_boost(school, index, &damage_pct, &shots_pct);
     if (damage_pct > 0) {
         if (school == EARTH) {
-            damage_pct += AFTERSHOCK_PERCENT * eo_talent(TALENT_AFTERSHOCK);
+            damage_pct += MOMENTUM_PERCENT * eo_talent(TALENT_MOMENTUM);
         }
         base = (u16)(base * (100 + damage_pct * used) / 100);
     }
     if (shots_pct > 0) {
         // +10 points with each Crosswind rank and the Skyreed Staff. A flat +2 a charge made a 3-charge Wind Cutter
         // 4x (balance pass, 2026-10-21).
-        u32 pct = (u32)shots_pct + 10 * (u32)eo_talent(TALENT_CROSSWIND) + (eo_equipment_worn(EQ_SKYREED_STAFF) ? 10 : 0);
+        u32 pct = (u32)shots_pct + (eo_equipment_worn(EQ_SKYREED_STAFF) ? 10 : 0);
         u32 extra_shots = ((u32)saved_shots * pct * used + 50) / 100;
         if (used > 0 && extra_shots < (u32)used) {
             extra_shots = used;
@@ -909,13 +941,19 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     if (tether) {
         shots++;
     }
+    // Squall and Shear Force: many-hit spells hit more often (the fraction of a hit is a chance at one more).
+    u32 more = MULTI_HIT_PERCENT * (u32)(eo_talent(TALENT_SQUALL) + eo_talent(TALENT_SHEAR_FORCE));
+    if (type == SPELL_TYPE_DAMAGE && saved_shots >= 2 && more > 0) {
+        u32 hundredths = (u32)shots * more;
+        shots = (u16)(shots + hundredths / 100 + ((u32)get_rand(100) < hundredths % 100 ? 1 : 0));
+    }
     if (school == WATER && type == SPELL_TYPE_HEAL) {
         base = (u16)(base * (100 + 10 * used + 10 * wellspring + (leviathan ? 25 : 0)) / 100);
     }
     if (curve) {
         u32 scaled = (u32)base * eo_progression_spell_scale(school) / 1000;
         if (school == EARTH && settled) {
-            scaled = scaled * SETTLE_PERMILLE / 1000;
+            scaled = scaled * (SETTLE_PERMILLE + STEADY_PERMILLE * (u32)eo_talent(TALENT_STEADY_FOOTING)) / 1000;
         }
         base = (u16)(scaled > 0 ? (scaled > 0xFFFF ? 0xFFFF : scaled) : 1);
     }
@@ -924,9 +962,6 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     if (boost > 0) {
         charge -= boost;
         spent_this_turn = 1;
-        if (boost >= MAX_BOOST && eo_talent(TALENT_SECOND_WIND)) {
-            gain_charge(1);   // Second Wind
-        }
     }
     boost = 0;
 }
