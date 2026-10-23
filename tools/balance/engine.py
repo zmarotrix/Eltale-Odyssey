@@ -62,6 +62,7 @@ KIT_ITEMS = [2, 3, 3, 4, 4, 5, 5, 6]
 KIT_MP = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7]
 CONFIG = dict(
     kit=False,            # apply the KIT rows above
+    same_mult=0.5,        # damage Brian's spells deal to a foe of the same element (game rule: 0.5)
     none_mult=0.75,       # damage Brian's spells deal to no-element foes (spec; the game's rule was 0.5)
     burn_full=False,      # Burn ticks ignore the target's element (a Fire boss still burns at full)
     shatter_neutral=False,  # Shatter breaks ice, so it ignores element
@@ -247,7 +248,7 @@ def element_mult(atk_elem, def_elem):
     if def_elem == NONE:
         return CONFIG["none_mult"]
     if atk_elem == def_elem:
-        return 0.5
+        return CONFIG["same_mult"]
     if OPP[atk_elem] == def_elem:
         return 1.25
     return 1.0
