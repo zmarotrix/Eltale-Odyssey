@@ -19,6 +19,9 @@ import random
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from talents import allocate as allocate_talents   # noqa: E402
+
 FIRE, EARTH, WATER, WIND = range(4)
 NAMES = ["Fire", "Earth", "Water", "Wind"]
 OPP = {FIRE: WATER, WATER: FIRE, EARTH: WIND, WIND: EARTH}
@@ -36,9 +39,9 @@ LEVELS_GAINED = [s + b for s, b in zip(SPIRITS_BY_BOSS, BATTLE_LEVELS_BY_BOSS)] 
 TIER_LEVEL = [1, 12, 30, 48, 66]
 LEVEL_CAP = 99   # the game's is 50; raised so one school can max but never two
 BOSS_ORDER = ["Solvaring", "Zelse", "Nepty", "Shilf", "Fargo", "Guilty", "Beigis", "Mammon"]
-BOSS_HP = [240, 790, 1040, 2010, 2620, 2880, 4280, 4850]   # fitted for a player with 75% of the spirits
+BOSS_HP = [270, 900, 1190, 2560, 3570, 3660, 5930, 6220]   # with the talent trees and a quarter-strength gear kit   # fitted for a player with 75% of the spirits
 VANILLA_BOSS_HP = [200, 680, 880, 1000, 1500, 1800, 1900, 2300]
-PACK_HP_SCALE = [0.79, 0.91, 0.85, 1.34, 1.21, 1.40, 1.39, 1.22]   # monster HP x this, fitted with the bosses
+PACK_HP_SCALE = [0.92, 1.09, 0.96, 1.60, 1.53, 1.80, 1.67, 1.59]   # monster HP x this, fitted with the bosses
 BOSS_ATTACK_SCALE = [1.00, 1.05, 1.10, 1.10, 1.15, 1.15, 1.20, 1.20]   # balance.c
 # Brian's own stats when he reaches each boss (estimates; Zelse matches the 2026-10-21 playtest setup).
 BRIAN_HP = [80, 160, 200, 260, 310, 370, 430, 490]
@@ -82,6 +85,10 @@ CONFIG = dict(
     spirit_share=0.75,    # share of the spirits Brian has found (fights are tuned for 0.75; completionists are ahead)
     levels=None,          # element levels gained by each boss (None = LEVELS_GAINED)
     tier_cap=None,        # highest spell tier open at each boss whatever the level (story gate); None = level only
+    talents=False,        # spend Spirit Points on the talent trees (talents.py)
+    talent_off=(),        # talent effects switched off (for testing what each one is worth)
+    talent_scale=1.0,     # multiplies every percentage talent effect (one-off picks and capstones stay as they are)
+    kit_scale=1.0,        # share of the KIT's damage, defense and MP bonus that gear gives (1 = gear and talents together)
     gear={},              # per-build items, {"Wind/Earth": {"shards": 3, "same_mult": 0.8, "school_dmg": {2: 1.25}}}:
                           # shards = uses per boss fight of a consumable that makes the next spell strike the boss's
                           # weakness; same_mult = own-element resistance with the item; school_dmg = damage by school
@@ -105,6 +112,8 @@ PRE_PASS = dict(
             "Eruption": {"base": 820}},
 )
 BALANCE_PASS = dict(
+    talents=True,         # the talent trees (talents.py), with gear a quarter of the old KIT stand-in
+    kit_scale=0.25,
     pack_hit=[1, 1, 1, 1, 1.25, 1.5, 1.75, 2.0],   # late packs keep up with gear
     # Fitted to the original game (2026-10-22): Brian's attacking turns about the original's plus a little, damage
     # taken per fight on its curve (smoothed, slightly harder), every boss won by at least 85% of builds. One boss action
@@ -308,9 +317,27 @@ class Battle:
         self.items = items
         self.dmg_mult, self.taken_mult = 1.0, 1.0
         if CONFIG["kit"]:
+            ks = CONFIG["kit_scale"]
             self.items = (CONFIG["kit_items"] or KIT_ITEMS)[beat] if items else 0
-            self.mp = self.max_mp = round(self.max_mp * KIT_MP[beat])
-            self.dmg_mult, self.taken_mult = KIT_DMG[beat], KIT_TAKEN[beat]
+            self.mp = self.max_mp = round(self.max_mp * (1 + (KIT_MP[beat] - 1) * ks))
+            self.dmg_mult = 1 + (KIT_DMG[beat] - 1) * ks
+            self.taken_mult = 1 - (1 - KIT_TAKEN[beat]) * ks
+        self.tal = {}
+        if CONFIG["talents"]:
+            points = round(SPIRITS_BY_BOSS[beat] * CONFIG["spirit_share"])
+            self.tal = allocate_talents(build, self.lv, points)
+            fixed = {"staff_burn", "staff_frost", "brace", "phoenix", "eternal", "avalanche", "glacier", "second_wind",
+                     "seismic", "veil", "start_charge", "rest_charge", "immune_less", "finisher_less", "burn_turns",
+                     "max_stacks", "freeze_extra"}
+            self.tal = {k: v if k in fixed else v * CONFIG["talent_scale"] for k, v in self.tal.items()}
+            self.tal = {k: v for k, v in self.tal.items() if k not in CONFIG["talent_off"]}
+        T = self.T
+        self.hp = self.max_hp = round(self.max_hp * (1 + T("max_hp")))
+        self.mp = self.max_mp = round(self.max_mp * (1 + T("max_mp")))
+        self.agi *= 1 + T("agi")
+        self.charge = int(T("start_charge"))
+        self.phoenix_used = self.braced = False
+        self.earth_hits = 0
         self.calibrate()
         self.turns = self.enemy_actions = self.breaks = 0
         self.hp_lost = self.mp_used = 0
@@ -326,6 +353,15 @@ class Battle:
             self.spells += [s for s in known if s["name"] == "Mend"]
         self.wells = self.staff_turns = self.rests = 0
         self.casts = {}
+
+    def T(self, key):
+        return self.tal.get(key, 0)
+
+    def cost(self, s):
+        return s["mp"] * (1 - self.T(f"mp{s['school']}"))
+
+    def freeze_immunity(self):
+        return 0 if self.T("glacier") else max(0, 2 - int(self.T("immune_less")))
 
     def calibrate(self):
         """Scale each enemy's damage so its average action costs the design share of Brian's HP."""
@@ -355,10 +391,12 @@ class Battle:
         if self.imbued:
             m = 1.25   # a weakness shard: this spell strikes the boss's weakness
         d *= m * self.gear.get("school_dmg", {}).get(school, 1.0)
+        d *= (1 + self.T(f"dmg{school}") + (self.T(f"broken{school}") if foe.broken else 0)
+              + (self.T("burning_vuln") if foe.stacks else 0) + (self.T("frozen_vuln") if foe.freeze else 0))
         if foe.broken:
             d *= 2
         if school == EARTH and self.settled:
-            d *= CONFIG["settle_mult"]
+            d *= min(1.0, CONFIG["settle_mult"] + self.T("settle_add"))
         d *= self.dmg_mult * CONFIG["dmg_scale"]
         return d + self.rng.random() * math.sqrt(max(d, 0)) if noise else d
 
@@ -411,6 +449,9 @@ class Battle:
         if not self.spent_last:
             self.charge = min(5, self.charge + 1)
         self.spent_last = False
+        self.braced = False
+        if self.T("regen"):
+            self.heal(self.max_hp * self.T("regen"))
         if self.regen_turns:
             self.heal(self.regen)
             self.regen_turns -= 1
@@ -420,7 +461,7 @@ class Battle:
             self.settled -= 1
 
     def heal(self, amount):
-        self.hp = min(self.max_hp, self.hp + amount)
+        self.hp = min(self.max_hp, self.hp + amount * (1 + self.T("heal_mult")))
 
     def boost(self, s=None):
         if CONFIG["earth_hold"] and s and self.earth_hit(s):
@@ -433,7 +474,7 @@ class Battle:
     def choose(self):
         # Low HP: heal (Water spells first, then an item if the scenario allows).
         if self.hp < self.max_hp * 0.35:
-            heals = [s for s in self.spells if s["kind"] in ("heal", "regen") and self.mp >= s["mp"]]
+            heals = [s for s in self.spells if s["kind"] in ("heal", "regen") and self.mp >= self.cost(s)]
             best_heal = max(heals, key=self.heal_amount, default=None)
             # a heal smaller than a boss hit (about 12%) loses the race; attack instead once items run out
             if best_heal and self.heal_amount(best_heal) >= 0.15:
@@ -447,7 +488,7 @@ class Battle:
         if rest_v > best_v:
             best, best_v = ("rest", None), rest_v
         for s in self.spells:
-            if self.mp < s["mp"] or not self.can_finish(s):
+            if self.mp < self.cost(s) or not self.can_finish(s):
                 continue
             v = self.value(s)
             if v > best_v:
@@ -461,14 +502,15 @@ class Battle:
         return s["school"] == EARTH and s["kind"] == "heavy" and s["tier"] < 5
 
     def can_finish(self, s):
-        return s["tier"] < 5 or self.charge >= CONFIG["finisher"]
+        need = CONFIG["finisher"] - (self.T("finisher_less") if s["school"] == WIND else 0)
+        return s["tier"] < 5 or self.charge >= need
 
     def staff_damage(self, foe):
         T = sum(self.lv)
         p = (T / 2 + sum(min(l, T / 4) for l in self.lv))
         A = T
         d = p * A / (A + foe.df) * (2 if foe.broken else 1)
-        return d * CONFIG["dmg_scale"]
+        return d * CONFIG["dmg_scale"] * (1 + self.T("staff_mult"))
 
     def staff_value(self):
         alive = self.alive_foes()
@@ -495,7 +537,7 @@ class Battle:
     def shatter_setup(self, foe):
         """Freezing a foe is worth part of the Shatter it sets up, if Brian knows Shatter."""
         sh = next((s for s in self.spells if s["kind"] == "shatter"), None)
-        if not sh or self.mp < sh["mp"] + 4:
+        if not sh or self.mp < self.cost(sh) + 4:
             return 0
         return 0.6 * self.dmg_to(foe, sh["base"], sh["school"], noise=False) * CONFIG["shatter_mult"]
 
@@ -507,7 +549,9 @@ class Battle:
         return min(1.0, p(self.lv[WATER]) / p(12))
 
     def heal_amount(self, s):
-        return s.get("heal", 0) * (self.mend_scale() if s["name"] == "Mend" else 1)
+        if s["name"] == "Mend":
+            return s.get("heal", 0) * self.mend_scale() + self.T("mend_add")
+        return s.get("heal", 0)
 
     def value(self, s):
         main = self.main_target()
@@ -553,7 +597,7 @@ class Battle:
         elif kind == "shatter":
             if not main.freeze:
                 return 0
-            v = per * CONFIG["shatter_mult"] * (1 + 0.25 * b)
+            v = per * (CONFIG["shatter_mult"] + self.T("shatter_add")) * (1 + 0.25 * b)
         elif kind == "freeze":
             if main.freeze or main.freeze_immune:
                 return 0
@@ -586,7 +630,7 @@ class Battle:
     def rest_value(self):
         """A rest turn: clears Settle (worth most of the Earth hit it un-dampens) and gives what CONFIG says."""
         v = 0.0
-        earth = [s for s in self.spells if s["school"] == EARTH and s["kind"] == "heavy" and self.mp >= s["mp"]]
+        earth = [s for s in self.spells if s["school"] == EARTH and s["kind"] == "heavy" and self.mp >= self.cost(s)]
         if self.settled and CONFIG["settle_until_rest"] and earth:
             best = max(self.value(s) for s in earth)
             v += best * (1 / CONFIG["settle_mult"] - 1) + best * 0.25 * CONFIG["rest_charge"]
@@ -615,6 +659,9 @@ class Battle:
             return
         if kind == "rest":
             self.rests += 1
+            if self.settled:
+                self.braced = bool(self.T("brace"))
+                self.charge = min(5, self.charge + int(self.T("rest_charge")))
             self.settled = 0
             self.charge = min(5, self.charge + CONFIG["rest_charge"])
             self.mp = min(self.max_mp, self.mp + self.max_mp * CONFIG["rest_mp"])
@@ -623,7 +670,12 @@ class Battle:
             self.staff_turns += 1
             f = alive[0]
             if self.hit_roll(self.agi, f.agi):
-                f.hp -= self.staff_damage(f)
+                d = self.staff_damage(f)
+                f.hp -= d
+                if self.T("staff_burn"):
+                    self.add_burn(f, d * 0.2)
+                if self.T("staff_frost"):
+                    self.chill(f, 1)
             self.mp = min(self.max_mp, self.mp + 2)   # Brian's own staff restores MP on a hit
             return
         if kind == "item":
@@ -632,8 +684,8 @@ class Battle:
             self.heal(self.max_hp * 0.4)
             return
         self.casts[s["name"]] = self.casts.get(s["name"], 0) + 1
-        self.mp -= s["mp"]
-        self.mp_used += s["mp"]
+        self.mp -= self.cost(s)
+        self.mp_used += self.cost(s)
         b = self.boost(s) if s["kind"] not in ("heal", "regen", "freeze") else 0
         if CONFIG["finisher"] and s["tier"] == 5:
             self.charge, b = 0, 0
@@ -650,7 +702,7 @@ class Battle:
             return
         if k == "heal" and s["name"] == "Mend" and CONFIG["mend_mp"]:
             self.wells += 1
-            self.mp = min(self.max_mp, self.mp + self.max_mp * CONFIG["mend_mp"] * self.mend_scale())
+            self.mp = min(self.max_mp, self.mp + self.max_mp * (CONFIG["mend_mp"] * self.mend_scale() + self.T("mend_add")))
         if k == "heal":
             self.heal(self.max_hp * self.heal_amount(s) * (1 + 0.1 * b))
             return
@@ -658,16 +710,16 @@ class Battle:
             self.regen, self.regen_turns = self.max_hp * s["heal"], 3
             return
         if k == "guard":
-            self.guard, self.guard_turns = s["reduce"], s["turns"] + b
+            self.guard, self.guard_turns = min(0.8, s["reduce"] + self.T("guard_add")), s["turns"] + b
             return
         if k == "wall":
             self.wall = 1 + b
             return
         if k == "fog":
-            self.fog = 2 + b
+            self.fog = 2 + b + int(self.T("veil"))
             return
         if k == "mirage":
-            self.mirage = 2 + b
+            self.mirage = 2 + b + int(self.T("veil"))
             return
         if k == "confuse":
             for f in self.alive_foes():
@@ -681,13 +733,22 @@ class Battle:
                 main.freeze = (1 if main.boss else 2 + b) + 1
             return
         targets = self.targets(s, main)
+        heavy_mult = 1.0
+        if k == "heavy" and school == EARTH:
+            self.earth_hits += 1
+            if self.T("avalanche") and self.earth_hits % 3 == 0:
+                heavy_mult = 2.0
         for f in targets:
             if not self.hit_roll(self.agi, f.agi):
                 continue
             if k == "heavy":
-                f.hp -= self.dmg_to(f, s["base"], school) * (1 + 0.25 * b)
+                per_charge = 0.25 + (self.T("earth_boost") if school == EARTH else 0)
+                f.hp -= self.dmg_to(f, s["base"], school) * (1 + per_charge * b) * heavy_mult
                 if self.weak_hit(s, f):
-                    self.crack(f, s["crack"])
+                    extra = 1 if school == EARTH and self.rng.random() < self.T("fault") else 0
+                    self.crack(f, s["crack"] + extra)
+                elif school == EARTH and self.T("seismic"):
+                    self.crack(f, 1)
                 if s.get("burn"):
                     self.add_burn(f, self.burn_from(self.dmg_to(f, s["base"], school), school, f))
                 if s.get("frost"):
@@ -707,10 +768,10 @@ class Battle:
                     f.hot = 3 + b
             elif k == "flare":
                 f.hp -= self.dmg_to(f, s["base"], school)
-                f.stacks = [x * (1.5 + 0.25 * b) for x in f.stacks]
+                f.stacks = [x * (1.5 + 0.25 * b) * (1 + self.T("flare")) for x in f.stacks]
                 f.burn_left = 3
             elif k == "cash":
-                f.hp -= sum(f.stacks) * f.burn_left * s["mult"] * (1 + 0.2 * b)
+                f.hp -= sum(f.stacks) * f.burn_left * s["mult"] * (1 + 0.2 * b) * (1 + self.T("cash"))
                 f.stacks, f.burn_left = [], 0
             elif k == "detonate":
                 for o in self.alive_foes():
@@ -743,11 +804,11 @@ class Battle:
                     f.freeze = frozen
                     if CONFIG["shatter_neutral"]:
                         d /= element_mult(school, f.elem)
-                    f.hp -= d * CONFIG["shatter_mult"] * (1 + 0.25 * b)
+                    f.hp -= d * (CONFIG["shatter_mult"] + self.T("shatter_add")) * (1 + 0.25 * b)
                     f.freeze, f.frost = 0, 0
-                    f.freeze_immune = 2 if f.boss else 0
+                    f.freeze_immune = self.freeze_immunity() if f.boss else 0
             elif k in ("multi", "fan"):
-                n = int(round(s["hits"] * (1 + 0.4 * b)))
+                n = int(round(s["hits"] * (1 + 0.4 * b) * (1 + self.T("hits"))))
                 for _ in range(n):
                     d = self.dmg_to(f, s["base"], school)
                     if k == "fan" and f.stacks:
@@ -760,6 +821,8 @@ class Battle:
                     if self.weak_hit(s, f):
                         self.crack(f, 1)
                     elif s.get("any_chance") and self.rng.random() < s["any_chance"]:
+                        self.crack(f, 1)
+                    elif school == WIND and self.rng.random() < self.T("any_crack"):
                         self.crack(f, 1)
             elif k == "downburst":
                 f.hp -= self.dmg_to(f, s["base"], school) * (1 + 0.25 * b)
@@ -776,16 +839,19 @@ class Battle:
     def add_burn(self, f, amount, turns=3):
         if f.frost or f.freeze:
             f.frost = f.freeze = 0   # Fire thaws
-        if len(f.stacks) < 3:
+        cap = 5 if self.T("eternal") else 3 + int(self.T("max_stacks") + 1e-9)
+        if len(f.stacks) < cap:
             f.stacks.append(amount)
-        f.burn_left = max(f.burn_left, turns)
+        f.burn_left = max(f.burn_left, turns + int(self.T("burn_turns") + 1e-9))
 
     def chill(self, f, steps):
+        if self.T("chill_extra") and self.rng.random() < self.T("chill_extra"):
+            steps += 1
         if f.stacks:
             f.stacks, f.burn_left = [], 0   # Water puts Burn out
         level = f.frost + (1 if f.freeze else 0) + steps
         if level >= 2 and not f.freeze_immune:
-            f.freeze = (1 if f.boss else 2) + 1
+            f.freeze = (1 if f.boss else 2 + int(self.T("freeze_extra") + 1e-9)) + 1
             f.frost = 0
         else:
             f.frost = 1
@@ -795,8 +861,11 @@ class Battle:
         for f in self.alive_foes():
             # Burn ticks
             if f.stacks and f.burn_left:
-                f.hp -= sum(f.stacks) * (1.5 if f.hot else 1.0)
-                f.burn_left -= 1
+                f.hp -= sum(f.stacks) * (1.5 if f.hot else 1.0) * (1 + self.T("burn_tick"))
+                if self.T("burn_crack") and self.rng.random() < self.T("burn_crack"):
+                    self.crack(f, 1)
+                if not self.T("eternal"):
+                    f.burn_left -= 1
                 if f.burn_left == 0:
                     f.stacks = []
             if f.hot:
@@ -805,7 +874,7 @@ class Battle:
             if f.freeze == 1:   # the start of its first turn after the skips: it thaws and acts
                 f.freeze = 0
                 if f.boss:
-                    f.freeze_immune = 2
+                    f.freeze_immune = self.freeze_immunity()
             if f.skip:
                 f.skip = False
             elif f.freeze > 1:
@@ -851,21 +920,33 @@ class Battle:
             L = f.atk
             p = base * 0.02 * (1 + 0.2 * (1.03 ** L - 1) / 0.03)
             for _ in range(shots):
+                if self.rng.random() < self.T("evade"):
+                    continue
                 if self.rng.random() * 100 < acc * acc_mult and self.hit_roll(f.agi, self.agi):
-                    d = p * f.atk / (f.atk + self.df) * f.dmg_scale * self.taken_mult
+                    d = p * f.atk / (f.atk + self.df) * f.dmg_scale * self.taken_mult * self.taken_tal()
                     d *= 0.75 + 0.5 * self.rng.random()
                     d *= (1 - self.guard)
                     self.hp -= d
                     self.hp_lost += d
                     self.low_hp = min(self.low_hp, self.hp)
         else:
-            if self.rng.random() < MONSTER_ACT_CHANCE and self.rng.random() < acc_mult and self.hit_roll(f.agi, self.agi):
-                d = f.atk * f.atk / (f.atk + self.df) * f.dmg_scale * self.taken_mult
+            if (self.rng.random() < MONSTER_ACT_CHANCE and self.rng.random() < acc_mult
+                    and self.rng.random() >= self.T("evade") and self.hit_roll(f.agi, self.agi)):
+                d = f.atk * f.atk / (f.atk + self.df) * f.dmg_scale * self.taken_mult * self.taken_tal()
                 d *= 0.75 + 0.5 * self.rng.random()
                 d *= (1 - self.guard)
                 self.hp -= d
                 self.hp_lost += d
                 self.low_hp = min(self.low_hp, self.hp)
+        self.check_phoenix()
+
+    def taken_tal(self):
+        return max(0.4, 1 - self.T("taken")) * (0.5 if self.braced else 1.0)
+
+    def check_phoenix(self):
+        if self.T("phoenix") and not self.phoenix_used and 0 < self.hp < self.max_hp * 0.25:
+            self.phoenix_used = True
+            self.heal(self.max_hp * 0.3)
 
 
 def build_levels(build, beat):
@@ -908,6 +989,8 @@ def pack_fight(build, beat, rng, items):
 def play(battle, max_turns=80):
     while battle.alive_foes() and battle.hp > 0 and battle.turns < max_turns:
         battle.brian_turn()
+        if battle.T("second_wind") and battle.turns % 3 == 0 and battle.alive_foes():
+            battle.act(battle.choose())   # Second Wind: every third round Brian acts twice
         if not battle.alive_foes():
             break
         battle.enemies_turn()
