@@ -21,6 +21,7 @@
 
 // Stat record fields (research/spells).
 #define REC_RULE 0x02
+#define RULE_OUTSIDE_BATTLE 0x0002
 #define REC_FIRST_COPIED 0x0A    // range onwards; level, presses and count stay the slot's own
 #define REC_BASE 0x0C
 #define REC_TYPE 0x10
@@ -206,6 +207,47 @@ u32 eo_spells_mp_cost(int school, int index) {
 #define BRIAN_SPELL_COUNT (*(u16*)0x8007BBD4)
 s32 spell_find_by_inputs(u16 count, u8* inputs);
 
+#define REC_PRESS_LIST 0x06
+#define MENU_PAD (*(u16*)0x80092876)    // the buttons spell_menu_input reads
+#define MENU_C_BUTTONS 0x000F
+
+static u32 cost_of(int school, int index) {
+    return (spells[school][index].mp * (100 - (u32)eo_talents_mp_percent(school)) + 50) / 100;
+}
+
+// While Brian presses elements, each press is checked against the spell the presses so far make, and refused if
+// he can't pay for it. A press should go through when any spell it leads to is affordable (Water, then Water
+// again for the free Mend, at 0 MP), so a press is charged the cheapest spell that starts with those presses
+// (the last two of three in either order, as the game matches them). Casting checks the spell's own cost.
+static int menu_open = 0;
+
+RECOMP_HOOK("spell_menu_input") void eo_spells_menu_begin(void) {
+    menu_open = 1;
+}
+
+RECOMP_HOOK_RETURN("spell_menu_input") void eo_spells_menu_end(void) {
+    menu_open = 0;
+}
+
+static u32 cheapest_from(int school, int index) {
+    u8* rec = SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE;
+    u16 n = *(u16*)(rec + REC_PRESSES);
+    u32 best = cost_of(school, index);
+    for (int i = 0; i < SPELLS; i++) {
+        u8* other = SPELL_STAT_TABLES[school] + i * SPELL_STAT_SIZE;
+        u16 m = *(u16*)(other + REC_PRESSES);
+        if (m <= n || m > 3) {
+            continue;
+        }
+        int leads = n == 1 || (n == 2 && (other[REC_PRESS_LIST + 1] == rec[REC_PRESS_LIST + 1] ||
+                                          other[REC_PRESS_LIST + 2] == rec[REC_PRESS_LIST + 1]));
+        if (leads && cost_of(school, i) < best) {
+            best = cost_of(school, i);
+        }
+    }
+    return best;
+}
+
 static void set_mp_cost(s32 spell) {
     int school = (spell >> 8) & 0xF;
     int index = spell & 0xFF;
@@ -215,7 +257,8 @@ static void set_mp_cost(s32 spell) {
     }
     u16 presses = *(u16*)(SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE + REC_PRESSES);
     if (presses >= 1 && presses <= 3) {
-        MP_COSTS[presses] = (u16)((d->mp * (100 - eo_talents_mp_percent(school)) + 50) / 100);
+        int pressing = menu_open && (MENU_PAD & MENU_C_BUTTONS);
+        MP_COSTS[presses] = (u16)(pressing ? cheapest_from(school, index) : cost_of(school, index));
     }
 }
 
@@ -260,6 +303,10 @@ void eo_spells_init(void) {
                 for (int k = 0; k < STATUS_BYTES; k++) {
                     rec[REC_STATUS + k] = 0;
                 }
+            }
+            if (d->kind == K_MEND) {
+                // Mend is for battle only: free in the field it would make every rest and inn pointless.
+                *(u16*)(rec + REC_RULE) = (u16)(*(u16*)(rec + REC_RULE) & ~RULE_OUTSIDE_BATTLE);
             }
         }
     }

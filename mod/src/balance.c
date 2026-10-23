@@ -47,7 +47,7 @@ typedef struct {
 } SetScale;
 
 static const SetScale set_scale[] = {
-    { 12, 120, 100 },   // 0 Holy Plains, Connor Forest (before Solvaring)
+    { 12, 200, 115 },   // 0 Holy Plains, Connor Forest (before Solvaring): playtest 2026-10-23, foes fell in 2 hits
     { 15, 142, 105 },   // 1 Dondoran Flats and the long road (before Zelse)
     { 11, 208, 110 },   // 2 Carmagh caves, Limelin (before Shilf)
     { 13, 199, 115 },   // 3 the desert, Boil Hole, Brannoch (Fargo to Beigis: see desert_hp)
