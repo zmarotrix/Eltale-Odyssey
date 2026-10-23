@@ -44,6 +44,9 @@
 #define PRISM_PERCENT 20
 #define GLASS_PERCENT 25
 #define RESIST_SOFTEN_PERCENT 50   // 0.5x resisted hits become 0.75x
+#define SETTLE_PERMILLE 400        // Earth spells while Brian is Settled deal 0.4x
+#define FINISHER_CHARGE 2          // tier-5 spells need this much Charge and spend all of it
+#define BOSS_FREEZE_IMMUNE 2       // a thawed boss can't be frozen again for this many of its turns
 #define BLOODSTONE_PERCENT 20      // Bloodstone: spells while Brian is under half HP
 #define EXECUTIONER_PERCENT 30     // Executioner's Charm: foes under a quarter of their HP
 #define STORM_GLASS_PERCENT 30     // Storm Glass: Wind spells on frozen foes
@@ -116,7 +119,30 @@ static u8 last_cast_school = 0xFF;    // element of Brian's last spell (Prism Si
 static u8 element_changed = 0;
 static u8 stone_guard = 0;
 static u8 element_streak = 0;         // spells of the same element cast in a row (boss adaptation)
-static u32 first_cast_turn = 0;       // turns_taken + 1 of the battle's first spell (Echo Stone)            // defense the Stone Staff has added this fight
+static u32 first_cast_turn = 0;       // turns_taken + 1 of the battle's first spell (Echo Stone)
+
+// Settle (Spell Trees doc, Earth): an Earth attack Settles Brian from the turn after; while Settled his Earth spells
+// deal 0.4x. Only a turn he ends with A (no spell, no swing; moving is fine) clears it: one turn per level, and
+// Megalith Settles 2 deep. The attack's own turn is never Settled, so every rock of it lands at full strength.
+static u8 settled = 0;
+static u8 settle_pending = 0;
+// Settle depth by Earth spell slot: Sandblast (Earth+Wind) and Rockstorm (Earth+Wind+Wind) don't Settle, nor do
+// the guard and control spells; Megalith (Earth+Earth+Earth) Settles 2.
+static const u8 earth_settle[15] = { 1, 1, 0, 1, 0, 2, 1, 0, 1, 0, 0, 1, 0, 1, 0 };
+
+// Freeze (Spell Trees doc, Water): a frozen foe skips its turn and stays frozen until the start of its next one, so
+// Brian always gets a turn against the ice (Shatter). The game thaws a foe at the end of its skipped turn; the bit
+// goes back on until Brian's turn ends. A thawed boss resists freezing for 2 of its turns.
+static u8 frozen_before[MAX_ENEMIES];
+static u8 ice_window[MAX_ENEMIES];
+static u8 freeze_immune[MAX_ENEMIES];
+static u8 ending_enemy_turn = 0;
+
+static int in_battle(void);
+
+int eo_combat_finisher_ready(void) {
+    return !in_battle() || charge >= FINISHER_CHARGE;
+}            // defense the Stone Staff has added this fight
 
 // The boost of the spell being cast right now (0 when none), and what was changed for it.
 static u8 active_boost = 0;
@@ -194,6 +220,10 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
     charge = 0;
     gain_charge(START_CHARGE + eo_talent(TALENT_BEDROCK) + (eo_equipment_worn(EQ_HOURGLASS_CHARM) ? 2 : 0));
     first_cast_turn = 0;
+    settled = settle_pending = 0;
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        frozen_before[i] = ice_window[i] = freeze_immune[i] = 0;
+    }
     bulwark_used = 0;
     turns_taken = 0;
     cast_turn = turn_swing_used = 0;
@@ -300,6 +330,9 @@ static void crack_shields(int i, int count) {
 static void freeze_enemy(int i, int turns) {
     u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
     if (gBattleState & BATTLE_BOSS) {
+        if (freeze_immune[i] > 0) {
+            return;   // still shaking off the last freeze
+        }
         turns = 1;  // bosses resist control effects
     }
     *(u16*)status |= STATUS_RESTRICTION_BIT;
@@ -644,13 +677,46 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
     if (!in_battle()) {
         return;
     }
+    ending_enemy_turn = (gBattleState & BATTLE_ENEMY_TURN) != 0;
     if (!(gBattleState & BATTLE_ENEMY_TURN)) {
+        // Settle: a turn ended with A (no spell, no swing) clears a level; this turn's Earth attack Settles him now.
+        int acted = cast_turn == turns_taken + 1 || turn_swing_used == turns_taken + 1;
+        if (!acted && settled > 0) {
+            settled--;
+        }
+        if (settle_pending > settled) {
+            settled = settle_pending;
+        }
+        settle_pending = 0;
+        // The ice window ends with Brian's turn: the foe thaws and acts; a boss resists freezing for a while.
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            if (!ice_window[i]) {
+                continue;
+            }
+            ice_window[i] = 0;
+            u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
+            if (!guards[i].broken) {
+                *(u16*)status &= (u16)~STATUS_RESTRICTION_BIT;
+            }
+            if (gBattleState & BATTLE_BOSS) {
+                freeze_immune[i] = BOSS_FREEZE_IMMUNE;
+            }
+        }
         // Brian's turn is over: undo this turn's boost, remember whether he spent.
         restore_active_spell();
         spent_last_turn = spent_this_turn;
         spent_this_turn = 0;
         boost = 0;
         return;
+    }
+    // Which foes are frozen (not Broken) as this enemy turn ends: one the game thaws now gets its ice window.
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
+        frozen_before[i] = ENEMY_HP(i) > 0 && !guards[i].broken && status != 0 &&
+                           (*(u16*)status & STATUS_RESTRICTION_BIT) != 0;
+        if (freeze_immune[i] > 0) {
+            freeze_immune[i]--;
+        }
     }
     // An enemy's turn is over, so Brian's begins: a Broken enemy that has now lost its turn recovers.
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -678,6 +744,22 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
     u16* mp = (u16*)gPlayerMainData + 4;
     if ((still >= 2 || (still == 1 && (turns_taken & 1))) && mp[0] < mp[1]) {
         mp[0]++;
+    }
+}
+
+// The game ticks a fighter's statuses inside battle_end_turn: a foe it just thawed keeps its ice until Brian's
+// turn ends (the window above).
+RECOMP_HOOK_RETURN("battle_end_turn") void eo_combat_after_turn_end(void) {
+    if (!in_battle() || !ending_enemy_turn) {
+        return;
+    }
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
+        if (frozen_before[i] && ENEMY_HP(i) > 0 && status != 0 && !(*(u16*)status & STATUS_RESTRICTION_BIT)) {
+            *(u16*)status |= STATUS_RESTRICTION_BIT;
+            ice_window[i] = 1;
+        }
+        frozen_before[i] = 0;
     }
 }
 
@@ -709,6 +791,16 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     }
     u8* stats = SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE;
     u16 type = *(u16*)(stats + SPELL_TYPE);
+    // A finisher (tier 5) spends all of Brian's Charge, with no Boost on top.
+    int finisher = eo_spirits_tier(school, index) == 5;
+    if (finisher) {
+        boost = 0;
+        charge = 0;
+        spent_this_turn = 1;
+    }
+    if (school == EARTH && type == SPELL_TYPE_DAMAGE && earth_settle[index] > settle_pending) {
+        settle_pending = earth_settle[index];
+    }
     int echo = school == WATER && type == SPELL_TYPE_DAMAGE && eo_equipment_worn(EQ_TIDAL_ECHO);
     int wellspring = school == WATER && type == SPELL_TYPE_HEAL ? eo_talent(TALENT_WELLSPRING) : 0;
     int leviathan = school == WATER && type == SPELL_TYPE_HEAL && eo_equipment_worn(EQ_LEVIATHAN_STAFF);
@@ -745,6 +837,9 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     }
     if (curve) {
         u32 scaled = (u32)base * eo_progression_spell_scale(school) / 1000;
+        if (school == EARTH && settled) {
+            scaled = scaled * SETTLE_PERMILLE / 1000;
+        }
         base = (u16)(scaled > 0 ? (scaled > 0xFFFF ? 0xFFFF : scaled) : 1);
     }
     *(u16*)(stats + SPELL_BASE) = base;

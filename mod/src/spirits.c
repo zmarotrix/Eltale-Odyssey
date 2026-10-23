@@ -70,6 +70,10 @@ static int is_discovered(int school, int index) {
     return (gEo.discovered[bit / 8] >> (bit % 8)) & 1;
 }
 
+int eo_spirits_tier(int school, int index) {
+    return tables_ready && school >= 0 && school < SCHOOLS && index >= 0 && index < SPELLS ? spell_tier[school][index] : 1;
+}
+
 int eo_spirits_known(int school, int index) {
     return is_discovered(school, index);
 }
@@ -133,7 +137,9 @@ static void apply(void) {
     for (int s = 0; s < SCHOOLS; s++) {
         for (int i = 0; i < SPELLS; i++) {
             u8* stats = SPELL_STAT_TABLES[s] + i * SPELL_STAT_SIZE;
-            *(u16*)(stats + SPELL_LEVEL_REQ) = spell_tier[s][i] <= open_tier(s) ? REQ_OPEN : REQ_LOCKED;
+            // Tier-5 spells are finishers: in battle they open only once Brian holds 2 Charge (combat.c).
+            int open = spell_tier[s][i] <= open_tier(s) && (spell_tier[s][i] < TIERS || eo_combat_finisher_ready());
+            *(u16*)(stats + SPELL_LEVEL_REQ) = open ? REQ_OPEN : REQ_LOCKED;
             SPELL_NAME_TABLES[s][i] = is_discovered(s, i) ? spell_names[s][i] : unknown_name;
         }
     }
@@ -260,6 +266,11 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
             gEo.tiers[s] = (u8)open_tier(s);
             dirty = 1;
         }
+    }
+    static int finisher_ready = -1;
+    if (eo_combat_finisher_ready() != finisher_ready) {
+        finisher_ready = eo_combat_finisher_ready();
+        dirty = 1;
     }
     if (dirty) {
         apply();

@@ -136,6 +136,8 @@ u32 eo_now(void);
 // ---- Progression (progression.c) ----
 #define DAMAGE_SCALE_THOUSANDTHS 760   // all of Brian's damage, spells and staff
 u32 eo_progression_spell_scale(int school);   // thousandths: the 1.5%-a-level curve over the game's 3%, x0.76
+int eo_spirits_tier(int school, int index);   // the spell's tier, 1-5
+int eo_combat_finisher_ready(void);           // tier-5 spells castable now (2 Charge in battle)
 
 // ---- Native UI pieces (ui.c) ----
 // Small text in the HUD's 6 x 8 font. Palettes on parchment: 0 dark grey (normal), 1 red (warning),
