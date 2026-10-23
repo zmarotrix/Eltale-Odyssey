@@ -81,6 +81,9 @@ CONFIG = dict(
     spirit_share=0.75,    # share of the spirits Brian has found (fights are tuned for 0.75; completionists are ahead)
     levels=None,          # element levels gained by each boss (None = LEVELS_GAINED)
     tier_cap=None,        # highest spell tier open at each boss whatever the level (story gate); None = level only
+    gear={},              # per-build items, {"Wind/Earth": {"shards": 3, "same_mult": 0.8, "school_dmg": {2: 1.25}}}:
+                          # shards = uses per boss fight of a consumable that makes the next spell strike the boss's
+                          # weakness; same_mult = own-element resistance with the item; school_dmg = damage by school
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
     mend_mp=0.2,          # Mend also refills this share of max MP (spec, 2026-10-22: Mend is free)
     earth_hold=1,         # scripted Earth play: press B until this much Charge before an Earth attack (Broken foes: hit now)
@@ -281,6 +284,10 @@ class Foe:
 
 class Battle:
     def __init__(self, build, beat, foes, rng, items):
+        label = next((k for k, v in BUILDS.items() if v == build), None)
+        self.gear = CONFIG["gear"].get(label, {})
+        self.shards = self.gear.get("shards", 0) if foes and foes[0].boss else 0
+        self.imbued = False
         self.rng = rng
         self.beat = beat
         self.lv = build_levels(build, beat)
@@ -341,7 +348,12 @@ class Battle:
     def dmg_to(self, foe, base, school, noise=True):
         A = sum(self.lv)
         d = power(base, school, self.lv) * A / (A + foe.df * (1.4 if foe.freeze else 1.0) * (0.7 if foe.def_down else 1.0))
-        d *= element_mult(school, foe.elem)
+        m = element_mult(school, foe.elem)
+        if school == foe.elem and "same_mult" in self.gear:
+            m = self.gear["same_mult"]
+        if self.imbued:
+            m = 1.25   # a weakness shard: this spell strikes the boss's weakness
+        d *= m * self.gear.get("school_dmg", {}).get(school, 1.0)
         if foe.broken:
             d *= 2
         if school == EARTH and self.settled:
@@ -384,6 +396,8 @@ class Battle:
 
     def weak_hit(self, spell, foe):
         """A weakness hit: the spell's element, or for Wind spells any of its presses."""
+        if self.imbued:
+            return True
         if foe.weak is None:
             return False
         if spell["school"] == foe.weak:
@@ -580,6 +594,11 @@ class Battle:
 
     def act(self, choice):
         kind, s = choice
+        self.imbued = False
+        if (kind == "spell" and self.shards and s["base"] and self.foes[0].boss
+                and not self.weak_hit(s, self.foes[0])):
+            self.shards -= 1
+            self.imbued = True
         alive = self.alive_foes()
         if not alive:
             return
