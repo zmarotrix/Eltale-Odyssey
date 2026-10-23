@@ -43,6 +43,14 @@
 #define BRIAN_DEFENSE_NOW (*(u16*)0x8007BBC0)   // in-battle defense
 #define PRISM_PERCENT 20
 #define GLASS_PERCENT 25
+#define BLOODSTONE_PERCENT 20      // Bloodstone: spells while Brian is under half HP
+#define EXECUTIONER_PERCENT 30     // Executioner's Charm: foes under a quarter of their HP
+#define STORM_GLASS_PERCENT 30     // Storm Glass: Wind spells on frozen foes
+#define LANTERN_PERCENT 20         // Ember Lantern: spells on burning foes
+#define GLACIAL_PIN_PERCENT 25     // Glacial Pin: spells on frozen foes
+#define ECHO_STONE_PERCENT 50      // Echo Stone: the first spell of each battle
+#define MISER_PERCENT 10           // Miser's Purse: more damage taken
+#define SCARRED_PERCENT 25         // Scarred Leather: less damage taken under half HP
 #define STOKE_FRESH_PERCENT 70     // a stoking Fire spell on a foe that isn't burning
 #define STOKE_BURNING_PERCENT 140  // ... and on one that is
 #define NO_WEAKNESS 0xFF
@@ -106,7 +114,8 @@ static u8 earth_streak = 0;           // Earth spells cast in a row (Stone Memor
 static u8 last_cast_school = 0xFF;    // element of Brian's last spell (Prism Sigil)
 static u8 element_changed = 0;
 static u8 stone_guard = 0;
-static u8 element_streak = 0;         // spells of the same element cast in a row (boss adaptation)            // defense the Stone Staff has added this fight
+static u8 element_streak = 0;         // spells of the same element cast in a row (boss adaptation)
+static u32 first_cast_turn = 0;       // turns_taken + 1 of the battle's first spell (Echo Stone)            // defense the Stone Staff has added this fight
 
 // The boost of the spell being cast right now (0 when none), and what was changed for it.
 static u8 active_boost = 0;
@@ -182,7 +191,8 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
         g->max_shields = g->shields = shields_for(record, boss);
     }
     charge = 0;
-    gain_charge(START_CHARGE + eo_talent(TALENT_BEDROCK));
+    gain_charge(START_CHARGE + eo_talent(TALENT_BEDROCK) + (eo_equipment_worn(EQ_HOURGLASS_CHARM) ? 2 : 0));
+    first_cast_turn = 0;
     bulwark_used = 0;
     turns_taken = 0;
     cast_turn = turn_swing_used = 0;
@@ -435,6 +445,27 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
         if (eo_equipment_worn(EQ_PRISM_SIGIL) && element_changed) {
             percent += PRISM_PERCENT;
         }
+        u16* brian = (u16*)gPlayerMainData;
+        if (eo_equipment_worn(EQ_BLOODSTONE) && brian[2] * 2 < brian[3]) {
+            percent += BLOODSTONE_PERCENT;
+        }
+        if (eo_equipment_worn(EQ_STORM_GLASS) && hit_element == WIND && hit_was_frozen) {
+            percent += STORM_GLASS_PERCENT;
+        }
+        if (eo_equipment_worn(EQ_EMBER_LANTERN) && hit_was_burning) {
+            percent += LANTERN_PERCENT;
+        }
+        if (eo_equipment_worn(EQ_GLACIAL_PIN) && hit_was_frozen) {
+            percent += GLACIAL_PIN_PERCENT;
+        }
+        if (eo_equipment_worn(EQ_ECHO_STONE) && cast_turn == first_cast_turn) {
+            percent += ECHO_STONE_PERCENT;
+        }
+    }
+    // Executioner's Charm: a foe under a quarter of its HP takes 30% more from anything.
+    if (eo_equipment_worn(EQ_EXECUTIONERS_CHARM) && ENEMY_RECORD(slot) != 0 &&
+        (u32)hit_hp * 4 < *(u16*)(ENEMY_RECORD(slot) + RECORD_MAX_HP)) {
+        percent += EXECUTIONER_PERCENT;
     }
     // Glass Charm: everything Brian deals is 25% more.
     if (eo_equipment_worn(EQ_GLASS_CHARM)) {
@@ -552,6 +583,17 @@ RECOMP_HOOK_RETURN("player_take_damage") void eo_combat_after_brian_damage(void)
         u16 more = (u16)((bulwark_hp - *hp_now) * GLASS_PERCENT / 100);
         *hp_now = (u16)(*hp_now > more ? *hp_now - more : 1);
     }
+    // Miser's Purse: what Brian takes is 10% more (never below 1 HP from the extra).
+    if (in_battle() && eo_equipment_worn(EQ_MISERS_PURSE) && *hp_now < bulwark_hp && *hp_now > 0) {
+        u16 more = (u16)((bulwark_hp - *hp_now) * MISER_PERCENT / 100);
+        *hp_now = (u16)(*hp_now > more ? *hp_now - more : 1);
+    }
+    // Scarred Leather: a hit taken while under half HP is 25% smaller.
+    u16 max_hp = ((u16*)gPlayerMainData)[3];
+    if (in_battle() && eo_equipment_worn(EQ_SCARRED_LEATHER) && *hp_now < bulwark_hp && bulwark_hp * 2 < max_hp) {
+        u16 back = (u16)((bulwark_hp - *hp_now) * SCARRED_PERCENT / 100);
+        *hp_now = (u16)(*hp_now + back);
+    }
     // Bulwark: the first hit Brian takes each fight is halved.
     u16* hp = (u16*)gPlayerMainData + 2;
     if (in_battle() && !bulwark_used && eo_talent(TALENT_BULWARK) && *hp < bulwark_hp) {
@@ -641,6 +683,9 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     // Once per cast (the first shot of the turn): Stone Memory's streak and Prism Sigil's element change.
     if (cast_turn != turns_taken + 1) {
         cast_turn = turns_taken + 1;
+        if (first_cast_turn == 0) {
+            first_cast_turn = cast_turn;
+        }
         earth_streak = school == EARTH ? earth_streak + 1 : 0;
         element_streak = school == last_cast_school ? (u8)(element_streak + 1) : 1;
         element_changed = last_cast_school != 0xFF && school != last_cast_school;

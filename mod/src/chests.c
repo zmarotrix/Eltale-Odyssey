@@ -57,6 +57,19 @@ static const EquipmentChest chests[] = {
     { 0x4B, 0x0D, EQ_TITAN_STAFF, 0, "Brian found a Titan Staff!" },        // Brannoch Castle, Hi Dad Bye Dad #2 (Golden Amulet)
     { 0x4D, 0x09, EQ_SKYREED_STAFF, 0, "Brian found a Skyreed Staff!" },    // Leonardo to the rescue #2 (Celine's Bell)
     { 0x4F, 0x0C, EQ_DRAGON_ROBE, 0, "Brian found a Dragon Robe!" },        // Leonardo to the rescue #4 (Silver Amulet)
+    // Odd finds (2026-10-22), in rough story order; each replaces a repeat of a common item.
+    { 0x54, 0x0B, EQ_SHEPHERDS_CROOK, 0, "Brian found a Shepherd's Crook!" },     // Connor Forest hut (Giant's Shoes)
+    { 0x57, 0x02, EQ_IRON_PLATE, 0, "Brian found an Iron Plate!" },              // Windward Forest cabin (Honey Bread)
+    { 0x11, 0x01, EQ_HOURGLASS_CHARM, 0, "Brian found an Hourglass Charm!" },    // Normoon 1st mill #2 (Fresh Bread)
+    { 0x0F, 0x0C, EQ_BLOODSTONE, 0, "Brian found a Bloodstone!" },               // Larapool well room (Silver Amulet)
+    { 0x34, 0x06, EQ_EXECUTIONERS_CHARM, 0, "Brian found the Executioner's Charm!" }, // Blue Cave #5 (Mint Leaves)
+    { 0x14, 0x02, EQ_SMITHS_HAMMER, 0, "Brian found a Smith's Hammer!" },        // Limelin Castle armory #1 (Honey Bread)
+    { 0x16, 0x06, EQ_SCARRED_LEATHER, 0, "Brian found Scarred Leather!" },       // Limelin Castle armory #3 (Mint Leaves)
+    { 0x37, 0x02, EQ_STORM_GLASS, 0, "Brian found the Storm Glass!" },           // Cull Hazard #3 (Honey Bread)
+    { 0x26, 0x08, EQ_EMBER_LANTERN, 0, "Brian found an Ember Lantern!" },        // Shamwood #1 (Silent Flute)
+    { 0x21, 0x0B, EQ_MISERS_PURSE, 0, "Brian found a Miser's Purse!" },          // Baragoon Moor inn #3 (Giant's Shoes)
+    { 0x43, 0x0B, EQ_GLACIAL_PIN, 0, "Brian found a Glacial Pin!" },             // Boil Hole #3 (Giant's Shoes)
+    { 0x47, 0x06, EQ_ECHO_STONE, 0, "Brian found an Echo Stone!" },              // Brannoch Castle hallway #2 (Mint Leaves)
 };
 #define CHEST_ENTRIES (sizeof(chests) / sizeof(chests[0]))
 

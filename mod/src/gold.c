@@ -74,6 +74,11 @@ static void watch_gold(void) {
         gold += (gold - shown_gold) / 2;
         GOLD = gold;
     }
+    // Miser's Purse: winnings come double.
+    if (gold > shown_gold && eo_equipment_worn(EQ_MISERS_PURSE)) {
+        gold += gold - shown_gold;
+        GOLD = gold;
+    }
     char line1[24];
     char line2[24];
     // A coin and the total on top, the change below it: green for winnings, red with "-" for spending.

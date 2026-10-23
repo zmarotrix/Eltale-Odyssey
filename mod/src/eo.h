@@ -122,7 +122,8 @@ typedef struct {
     // Shop stock left today (shop.c): the day it belongs to (+1, 0 = never stocked) and one count per row.
     u16 shop_day[7];
     u8 shop_left[7][7];
-    u8 reserved[17];
+    u8 owned_more[4];      // equipment bits 32-63 (owned_equipment holds 0-31)
+    u8 reserved[13];
 } EoSaveBlock;
 
 _Static_assert(sizeof(EoSaveBlock) == 160, "the save block must fill the 160 free bytes exactly");
@@ -264,6 +265,9 @@ enum {
     EQ_LEAD_MANTLE, EQ_GALE_TETHER, EQ_EMBER_HEART, EQ_STONE_MEMORY, EQ_SPELLSTRIKE,
     EQ_TITAN_STAFF, EQ_PHOENIX_STAFF, EQ_LEVIATHAN_STAFF, EQ_SKYREED_STAFF, EQ_MOUNTAIN_STAFF, EQ_PRISM_STAFF,
     EQ_KNIGHTS_MANTLE, EQ_DRAGON_ROBE, EQ_HUNTERS_CHARM, EQ_GLASS_CHARM, EQ_PRISM_SIGIL,
+    // Odd finds for chests that held repeats of common items (2026-10-22): small trade-offs and build hooks
+    EQ_SHEPHERDS_CROOK, EQ_IRON_PLATE, EQ_HOURGLASS_CHARM, EQ_BLOODSTONE, EQ_EXECUTIONERS_CHARM, EQ_SMITHS_HAMMER,
+    EQ_SCARRED_LEATHER, EQ_STORM_GLASS, EQ_EMBER_LANTERN, EQ_MISERS_PURSE, EQ_GLACIAL_PIN, EQ_ECHO_STONE,
     EQUIPMENT_COUNT
 };
 typedef struct {

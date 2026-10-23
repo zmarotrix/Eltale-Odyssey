@@ -255,6 +255,18 @@ anywhere but change equipment only at an inn. The charm slot opens after Solvari
 | Skyreed Staff | Staff | Staff 8 more, Wind 1.25x, Wind Boost +10% more shots per charge | Leonardo section chest #2 (was Celine's Bell) |
 | Dragon Robe | Robe | Defense 24 more, immune to Poison | Leonardo section chest #4 (was Silver Amulet) |
 | Prism Sigil | Sigil | A spell of a different element from the last: 20% more | Beigis |
+| Shepherd's Crook | Staff | Swings 4 more, and its swings still give MP | Connor Forest hut chest (was Giant's Shoes) |
+| Iron Plate | Robe | Defense 14 more, move 30% less in battle | Windward Forest cabin chest (was Honey Bread) |
+| Hourglass Charm | Charm | Battles start with 2 more Charge | Normoon 1st mill chest #2 (was Fresh Bread) |
+| Bloodstone | Charm | Spells 1.2x while you're under half HP | Larapool well room chest (was Silver Amulet) |
+| Executioner's Charm | Charm | Foes under a quarter of their HP take 1.3x | Blue Cave chest #5 (was Mint Leaves) |
+| Smith's Hammer | Staff | Swings 20 more; spells cost 1 more MP | Limelin Castle armory chest #1 (was Honey Bread) |
+| Scarred Leather | Robe | Defense 6 more; hits taken under half HP are 0.75x | Limelin Castle armory chest #3 (was Mint Leaves) |
+| Storm Glass | Sigil | Wind spells on frozen foes: 1.3x | Cull Hazard chest #3 (was Honey Bread) |
+| Ember Lantern | Sigil | Spells on burning foes: 1.2x | Shamwood chest #1 (was Silent Flute) |
+| Miser's Purse | Charm | Gold 2x, take 10% more damage | Baragoon Moor inn chest #3 (was Giant's Shoes) |
+| Glacial Pin | Sigil | Spells on frozen foes: 1.25x | Boil Hole chest #3 (was Giant's Shoes) |
+| Echo Stone | Charm | The first spell each battle: 1.5x | Brannoch Castle hallway chest #2 (was Mint Leaves) |
 
 The pieces are built around the six styles: Pyromancer (Ember Staff, Ember Heart, Phoenix Staff), Stonewall
 (Lead Mantle, Stone Memory, Mountain Staff), Tidecaller (Leech Pillar, Tidal Echo, Leviathan Staff), Tempest

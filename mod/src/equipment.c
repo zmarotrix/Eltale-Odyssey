@@ -49,6 +49,19 @@ static const EquipmentInfo catalog[EQUIPMENT_COUNT] = {
     [EQ_HUNTERS_CHARM]  = { "Hunter's Charm",    SLOT_CHARM, 0,    "Battles pay half again in gold." },
     [EQ_GLASS_CHARM]    = { "Glass Charm",       SLOT_CHARM, 0,    "Deal and take 25% more damage." },
     [EQ_PRISM_SIGIL]    = { "Prism Sigil",       SLOT_SIGIL, 0,    "New element each cast: 20% more." },
+    // Odd finds (chests.c): each a small trade-off or a hook for one style of play.
+    [EQ_SHEPHERDS_CROOK]    = { "Shepherd's Crook",    SLOT_STAFF, 0, "Swings 4 more, still give MP." },
+    [EQ_IRON_PLATE]         = { "Iron Plate",          SLOT_ROBE,  0, "Defense 14 more, move 30% less." },
+    [EQ_HOURGLASS_CHARM]    = { "Hourglass Charm",     SLOT_CHARM, 0, "Battles start with 2 Charge." },
+    [EQ_BLOODSTONE]         = { "Bloodstone",          SLOT_CHARM, 0, "Under half HP: spells 1.2x." },
+    [EQ_EXECUTIONERS_CHARM] = { "Executioner's Charm", SLOT_CHARM, 0, "Foes under 25% HP take 1.3x." },
+    [EQ_SMITHS_HAMMER]      = { "Smith's Hammer",      SLOT_STAFF, 0, "Swing 20 more; spells 1 MP more" },
+    [EQ_SCARRED_LEATHER]    = { "Scarred Leather",     SLOT_ROBE,  0, "Defense 6. Low HP: hits 0.75x." },
+    [EQ_STORM_GLASS]        = { "Storm Glass",         SLOT_SIGIL, 0, "Wind on frozen foes: 1.3x." },
+    [EQ_EMBER_LANTERN]      = { "Ember Lantern",       SLOT_SIGIL, 0, "Spells on burning foes: 1.2x." },
+    [EQ_MISERS_PURSE]       = { "Miser's Purse",       SLOT_CHARM, 0, "Gold 2x, take 10% more damage." },
+    [EQ_GLACIAL_PIN]        = { "Glacial Pin",         SLOT_SIGIL, 0, "Spells on frozen foes: 1.25x." },
+    [EQ_ECHO_STONE]         = { "Echo Stone",          SLOT_CHARM, 0, "First spell each battle: 1.5x." },
 };
 
 const EquipmentInfo* eo_equipment_info(int piece) {
@@ -56,6 +69,9 @@ const EquipmentInfo* eo_equipment_info(int piece) {
 }
 
 int eo_equipment_owned(int piece) {
+    if (piece >= 32) {
+        return (gEo.owned_more[(piece - 32) / 8] >> ((piece - 32) % 8)) & 1;
+    }
     return (gEo.owned_equipment >> piece) & 1;
 }
 
@@ -73,6 +89,10 @@ int eo_equipment_in_slot(int slot) {
 }
 
 void eo_equipment_give(int piece) {
+    if (piece >= 32) {
+        gEo.owned_more[(piece - 32) / 8] |= (u8)(1u << ((piece - 32) % 8));
+        return;
+    }
     gEo.owned_equipment |= 1u << piece;
 }
 
@@ -91,6 +111,8 @@ int eo_equip_staff_bonus(void) {
         case EQ_SKYREED_STAFF:
         case EQ_MOUNTAIN_STAFF: return 8;
         case EQ_PRISM_STAFF: return 6;
+        case EQ_SHEPHERDS_CROOK: return 4;
+        case EQ_SMITHS_HAMMER: return 20;
         default: return 0;
     }
 }
@@ -126,6 +148,8 @@ int eo_equip_defense(void) {
         case EQ_LEAD_MANTLE: return 10;
         case EQ_KNIGHTS_MANTLE: return 16;
         case EQ_DRAGON_ROBE: return 24;
+        case EQ_IRON_PLATE: return 14;
+        case EQ_SCARRED_LEATHER: return 6;
         default: return 0;
     }
 }
@@ -145,6 +169,10 @@ RECOMP_HOOK_RETURN("player_battle_init") void eo_equipment_on_battle_init(void) 
     // Gale Staff: Brian moves 30% farther each turn.
     if (worn_in(SLOT_STAFF) == EQ_GALE_STAFF) {
         BRIAN_MOVE_MULTIPLIER *= 1.3f;
+    }
+    // Iron Plate: heavy, so Brian moves 30% less each turn.
+    if (worn_in(SLOT_ROBE) == EQ_IRON_PLATE) {
+        BRIAN_MOVE_MULTIPLIER *= 0.7f;
     }
 }
 
@@ -399,7 +427,10 @@ RECOMP_HOOK_RETURN("spell_cast_init") void eo_equipment_after_cast(void) {
     int charm = worn_in(SLOT_CHARM);
     if (charm == EQ_PILGRIMS_SOUL) {
         BRIAN_MP = (u16)(mp + cost / 2);            // spells cost half (rounded up)
-    } else if (charm == EQ_GAMBLERS_COIN) {
+    } else if (worn_in(SLOT_STAFF) == EQ_SMITHS_HAMMER) {
+        BRIAN_MP = mp > 0 ? (u16)(mp - 1) : 0;     // Smith's Hammer: spells cost 1 more MP
+    }
+    if (charm == EQ_GAMBLERS_COIN) {
         if (get_rand(2) == 0) {
             BRIAN_MP = mp_before_cast;              // free
         } else {
@@ -417,7 +448,9 @@ RECOMP_HOOK("player_state_staff_hit") void eo_equipment_before_staff(void) {
 }
 
 RECOMP_HOOK_RETURN("player_state_staff_hit") void eo_equipment_after_staff(void) {
-    int no_mp = worn_in(SLOT_STAFF) >= 0 || worn_in(SLOT_CHARM) == EQ_PILGRIMS_SOUL;
+    // The Shepherd's Crook is a plain staff too: its swings still give MP.
+    int staff = worn_in(SLOT_STAFF);
+    int no_mp = (staff >= 0 && staff != EQ_SHEPHERDS_CROOK) || worn_in(SLOT_CHARM) == EQ_PILGRIMS_SOUL;
     if (no_mp && BRIAN_MP > mp_before_staff) {
         BRIAN_MP = mp_before_staff;
     }
