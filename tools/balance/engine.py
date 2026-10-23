@@ -36,9 +36,9 @@ LEVELS_GAINED = [s + b for s, b in zip(SPIRITS_BY_BOSS, BATTLE_LEVELS_BY_BOSS)] 
 TIER_LEVEL = [1, 12, 30, 48, 66]
 LEVEL_CAP = 99   # the game's is 50; raised so one school can max but never two
 BOSS_ORDER = ["Solvaring", "Zelse", "Nepty", "Shilf", "Fargo", "Guilty", "Beigis", "Mammon"]
-BOSS_HP = [220, 680, 840, 1490, 1990, 2030, 3060, 2950]   # fitted for a player with 75% of the spirits
+BOSS_HP = [230, 710, 1000, 1400, 2070, 2240, 3410, 3910]   # fitted for a player with 75% of the spirits
 VANILLA_BOSS_HP = [200, 680, 880, 1000, 1500, 1800, 1900, 2300]
-PACK_HP_SCALE = [0.87, 0.78, 0.75, 1.18, 1.14, 1.32, 1.28, 1.11]   # monster HP x this, fitted with the bosses
+PACK_HP_SCALE = [0.75, 0.78, 0.74, 1.15, 1.13, 1.29, 1.27, 1.11]   # monster HP x this, fitted with the bosses
 BOSS_ATTACK_SCALE = [1.00, 1.05, 1.10, 1.10, 1.15, 1.15, 1.20, 1.20]   # balance.c
 # Brian's own stats when he reaches each boss (estimates; Zelse matches the 2026-10-21 playtest setup).
 BRIAN_HP = [80, 160, 200, 260, 310, 370, 430, 490]
@@ -58,10 +58,11 @@ MONSTER_ACT_CHANCE = 0.75   # a monster spends some turns walking into range
 # roughly double Brian's damage by the end.
 KIT_DMG = [1.00, 1.10, 1.20, 1.35, 1.50, 1.65, 1.80, 2.00]
 KIT_TAKEN = [1.00, 0.95, 0.90, 0.85, 0.80, 0.76, 0.73, 0.70]
-KIT_ITEMS = [2, 3, 3, 4, 4, 5, 5, 6]
+KIT_ITEMS = [4, 5, 5, 5, 5, 6, 6, 6]   # healing items carried (2026-10-22: more early, so builds without Water can heal)
 KIT_MP = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7]
 CONFIG = dict(
     kit=False,            # apply the KIT rows above
+    kit_items=None,       # healing items carried at each boss with the kit (None = KIT_ITEMS)
     same_mult=0.5,        # damage Brian's spells deal to a foe of the same element (game rule: 0.5)
     none_mult=0.75,       # damage Brian's spells deal to no-element foes (spec; the game's rule was 0.5)
     burn_full=False,      # Burn ticks ignore the target's element (a Fire boss still burns at full)
@@ -103,9 +104,9 @@ BALANCE_PASS = dict(
     pack_hit=[1, 1, 1, 1, 1.25, 1.5, 1.75, 2.0],   # late packs keep up with gear
     # Fitted to the original game (2026-10-22): Brian's attacking turns about the original's plus a little, damage
     # taken per fight on its curve (smoothed, slightly harder), every boss won by at least 85% of builds. One boss action
-    # costs about 14, 13, 14, 13, 14, 13, 13 and 12% of Brian's HP with gear; Mammon is the riskiest fight, not the
-    # one with the most damage (his attacks come in bursts, so more than about 12% a hit is unwinnable).
-    boss_hit=[1.17, 1.13, 1.33, 1.3, 1.42, 1.4, 1.49, 1.4],
+    # costs about 10, 13, 13, 14, 13, 13, 12 and 12% of Brian's HP with gear (Solvaring eased: the first boss); Mammon's
+    # attacks come in bursts, so he stays at 12% a hit and is the peak through length and HP.
+    boss_hit=[0.81, 1.17, 1.17, 1.39, 1.38, 1.38, 1.39, 1.4],
 )
 # The progression before 2026-10-22 (element EXP model, cap 50, the game's 3% growth), for comparison.
 EXP_MODEL = dict(levels=[13, 32, 38, 53, 59, 69, 76, 84], level_cap=50, tier_levels=[8, 20, 32, 44], power_growth=1.03,
@@ -299,7 +300,7 @@ class Battle:
         self.items = items
         self.dmg_mult, self.taken_mult = 1.0, 1.0
         if CONFIG["kit"]:
-            self.items = KIT_ITEMS[beat] if items else 0
+            self.items = (CONFIG["kit_items"] or KIT_ITEMS)[beat] if items else 0
             self.mp = self.max_mp = round(self.max_mp * KIT_MP[beat])
             self.dmg_mult, self.taken_mult = KIT_DMG[beat], KIT_TAKEN[beat]
         self.calibrate()
@@ -313,6 +314,8 @@ class Battle:
                        and s["kind"] != "well"]
         if CONFIG["wellspring"] and (self.usable[WATER] or CONFIG["wellspring_all"]):
             self.spells.append(next(s for s in known if s["kind"] == "well"))
+        if not self.usable[WATER]:   # every element starts at level 1, so anyone can cast Mend, weakly
+            self.spells += [s for s in known if s["name"] == "Mend"]
         self.wells = self.staff_turns = self.rests = 0
         self.casts = {}
 
@@ -335,7 +338,7 @@ class Battle:
     def hit_roll(self, atk_agi, def_agi):
         return self.rng.random() < atk_agi / (atk_agi + def_agi / 8)
 
-    def dmg_to(self, foe, base, school):
+    def dmg_to(self, foe, base, school, noise=True):
         A = sum(self.lv)
         d = power(base, school, self.lv) * A / (A + foe.df * (1.4 if foe.freeze else 1.0) * (0.7 if foe.def_down else 1.0))
         d *= element_mult(school, foe.elem)
@@ -344,7 +347,7 @@ class Battle:
         if school == EARTH and self.settled:
             d *= CONFIG["settle_mult"]
         d *= self.dmg_mult * CONFIG["dmg_scale"]
-        return d + self.rng.random() * math.sqrt(max(d, 0))
+        return d + self.rng.random() * math.sqrt(max(d, 0)) if noise else d
 
     def burn_from(self, d, school, foe):
         """A Burn stack from a hit: 20% of it, or of what it would have dealt ignoring element (burn_full)."""
@@ -416,8 +419,12 @@ class Battle:
         # Low HP: heal (Water spells first, then an item if the scenario allows).
         if self.hp < self.max_hp * 0.35:
             heals = [s for s in self.spells if s["kind"] in ("heal", "regen") and self.mp >= s["mp"]]
-            if heals:
-                return ("spell", max(heals, key=lambda s: s.get("heal", 0)))
+            best_heal = max(heals, key=self.heal_amount, default=None)
+            # a heal smaller than a boss hit (about 12%) loses the race; attack instead once items run out
+            if best_heal and self.heal_amount(best_heal) >= 0.15:
+                return ("spell", best_heal)
+            if self.items == 0 and best_heal and self.heal_amount(best_heal) >= 0.12:
+                return ("spell", best_heal)
             if self.items > 0:
                 return ("item", None)
         best, best_v = ("staff", None), self.staff_value()
@@ -458,9 +465,27 @@ class Battle:
         return min(alive, key=lambda f: f.hp)
 
     def threat(self):
-        """What one enemy action is worth avoiding, in damage terms (a stand-in for safety)."""
+        """What avoiding one foe's action is worth, in damage terms: holding every foe off for a turn is worth about
+        half a turn of Brian's best plain damage (a skipped enemy turn only makes the fight longer, unless his HP is
+        what runs out). (The old stand-in, 5% of the foes' HP, made control spells look far
+        better than damage against big bosses, so Water builds froze and walled Mammon for 70 turns.)"""
         alive = self.alive_foes()
-        return sum(f.max_hp for f in alive) * 0.05
+        if not alive:
+            return 0
+        main = self.main_target()
+        best = max([self.dmg_to(main, s["base"], s["school"], noise=False) * s["hits"] for s in self.spells if s["base"]]
+                   + [self.staff_damage(main)])
+        return 0.5 * best / len(alive)
+
+    def mend_scale(self):
+        """Mend heals by Water level: full at level 12 (a main school's level by Solvaring), weaker below, on the
+        spell-power curve. Everyone can cast it, since every element starts at level 1."""
+        g = CONFIG["power_growth"]
+        p = lambda L: 1 + 0.2 * (g ** L - 1) / (g - 1)
+        return min(1.0, p(self.lv[WATER]) / p(12))
+
+    def heal_amount(self, s):
+        return s.get("heal", 0) * (self.mend_scale() if s["name"] == "Mend" else 1)
 
     def value(self, s):
         main = self.main_target()
@@ -507,7 +532,7 @@ class Battle:
         elif kind == "freeze":
             if main.freeze or main.freeze_immune:
                 return 0
-            v = 2.0 * self.threat()
+            v = (1.0 if main.boss else 2.0) * self.threat()   # bosses stay frozen 1 turn
         elif kind == "multi" or kind == "fan":
             n = s["hits"] * (1 + 0.4 * b)
             v = per * n * n_targets * (1.6 if kind == "fan" and main.stacks else 1)
@@ -523,7 +548,7 @@ class Battle:
             v = self.threat() * len(self.alive_foes()) * (1 + b) * 0.8
         elif kind in ("heal", "regen"):
             if s["name"] == "Mend" and CONFIG["mend_mp"]:
-                return self.well_value(CONFIG["mend_mp"])
+                return self.well_value(CONFIG["mend_mp"] * self.mend_scale())
             v = 0
         elif kind == "well":
             return self.well_value(CONFIG["wellspring"])
@@ -595,9 +620,9 @@ class Battle:
             return
         if k == "heal" and s["name"] == "Mend" and CONFIG["mend_mp"]:
             self.wells += 1
-            self.mp = min(self.max_mp, self.mp + self.max_mp * CONFIG["mend_mp"])
+            self.mp = min(self.max_mp, self.mp + self.max_mp * CONFIG["mend_mp"] * self.mend_scale())
         if k == "heal":
-            self.heal(self.max_hp * s["heal"] * (1 + 0.1 * b))
+            self.heal(self.max_hp * self.heal_amount(s) * (1 + 0.1 * b))
             return
         if k == "regen":
             self.regen, self.regen_turns = self.max_hp * s["heal"], 3
