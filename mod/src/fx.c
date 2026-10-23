@@ -12,6 +12,10 @@
 // Broken: the enemy's lights pulse dark, glints drift around its head, and its animation crawls. When it breaks
 // it also flickers dark for a moment.
 
+// Freeze (playtest, 2026-10-23: "a freeze visual that stops their animation and has an ice block on the frozen
+// enemy"): a frozen foe's animation stops dead, and a pale, see-through block of ice is drawn around it, shaded by
+// the scene's lights. Broken foes also carry the restriction bit; they keep the Broken look instead.
+
 // Particles: the game's sparkle particles (the ones spell impacts and enemy deaths spray), from the color table:
 //   Burn damage  small embers rising around the enemy, in reds and orange. The sparkle's own draw commands mix
 //                its color toward white ("texture + (1 - texture) x color"), so embers use a copy that draws
@@ -43,6 +47,8 @@ static const u32 game_light[LIGHT_COUNT] = { 0x80085770, 0x80085780, 0x80085790,
 #define FX_RAM 0x807F1200
 #define TINT_LIGHTS ((u8*)FX_RAM)              // 4 x 16 bytes
 #define FLAME_GFX ((u32*)(FX_RAM + 0x40))      // the sparkle's draw commands, recolored
+#define ICE_VTX ((u8*)(FX_RAM + 0x100))         // the ice block: 24 vertices x 16 bytes
+#define ICE_MTX ((u8*)(FX_RAM + 0x280))         // one 64-byte matrix per enemy
 
 #define PULSE_PERIOD 48           // frames per pulse
 #define BROKEN_DARK 70            // percent the lights drop at the peak of a Broken enemy's dark pulse
@@ -61,6 +67,23 @@ static const u32 game_light[LIGHT_COUNT] = { 0x80085770, 0x80085780, 0x80085790,
 #define GFX_FOG_FACTOR 0xBC000008
 #define FOG_SCAN 4096             // commands searched back for the game's current fog settings
 #define FOG_PEAK 0x00A0           // fog offset at the peak of a status pulse
+
+// The ice block, drawn in F3DEX right after the frozen enemy's model, in the models' own 2-cycle mode: the game's
+// translucent surface mode (it uses it itself), color = primitive x shade (the scene's lights on the block's
+// faces), alpha = primitive. The game's render mode and color mode are put back after it.
+#define GFX_MTX_LOAD 0x01020040   // modelview, load, no push (as model_draw_bone does; the view is in projection)
+#define GFX_VTX_24 0x0400617F     // 24 vertices from index 0
+#define GFX_TRI2 0xB1
+#define GFX_PIPE_SYNC 0xE7
+#define GFX_RENDER_MODE 0xB900031D
+#define ICE_RENDER_MODE 0x0C1849D8     // pass, then translucent surface (z compare, no z update)
+#define ICE_COMBINE_W0 0xFC327FFF      // cycle 1: primitive x shade, alpha primitive; cycle 2: pass
+#define ICE_COMBINE_W1 0xFFFFF638
+#define GFX_PRIM_COLOR 0xFA
+#define ICE_COLOR 0xD2F0FFA8           // pale icy blue, about two-thirds opaque
+#define ICE_WIDTH 1.35f                // the block's half-width, times the body's
+#define ICE_HEIGHT 1.08f               // its height, times the body's
+#define ICE_UNIT 100                   // vertex coordinates are +-100; the matrix scales them
 
 typedef struct { u8 r, g, b; } Rgb;
 static const Rgb burn_color = { 255, 50, 0 };
@@ -120,7 +143,9 @@ static u32 frame = 0;             // counts Brian's draws: one per frame whereve
 static u8 flame_frames[MAX_ENEMIES];
 static u8 was_broken[MAX_ENEMIES];
 static u8 flash_frames[MAX_ENEMIES];
-static u16 held_frame[MAX_ENEMIES];  // a Broken enemy's animation frame
+static u16 held_frame[MAX_ENEMIES];  // a Broken or frozen enemy's animation frame
+static u8 was_frozen[MAX_ENEMIES];
+static int ice_slot = -1;            // the frozen enemy being drawn now
 
 static int enemy_slot_of(u8* object) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -200,12 +225,16 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
         element = color == 0 ? eo_combat_shifting_element(slot) : -1;
         // A Broken enemy's animation is held back: its frame only moves on every BROKEN_ANIM_STEP draws (the
         // game advances it by one after each draw).
+        // A frozen one's doesn't move at all.
+        int frozen = !broken && stats != 0 && (*(u16*)stats & STATUS_RESTRICTION) != 0;
         u16* anim_frame = (u16*)(object + BATTLE_DATA_ANIM_FRAME);
-        if (broken && was_broken[slot] && frame % BROKEN_ANIM_STEP != 0) {
+        if ((broken && was_broken[slot] && frame % BROKEN_ANIM_STEP != 0) || (frozen && was_frozen[slot])) {
             *anim_frame = held_frame[slot];
         }
         held_frame[slot] = *anim_frame;
         was_broken[slot] = (u8)broken;
+        was_frozen[slot] = (u8)frozen;
+        ice_slot = frozen ? slot : -1;
     }
     if (!eo_gfx_fits(0x100)) {
         return;   // no room to tint and restore this model
@@ -244,6 +273,124 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
     }
 }
 
+// Builds the ice block's 24 vertices once: four per face, wound counter-clockwise seen from outside, with the
+// face's normal for the lights. x and z run -100..100, y 0..100 (feet to top).
+static void make_ice_vertices(void) {
+    static int ready = 0;
+    if (ready) {
+        return;
+    }
+    static const s8 quad[4][2] = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } };
+    for (int f = 0; f < 6; f++) {
+        int axis = f / 2;
+        int sign = (f & 1) ? -1 : 1;
+        int u = (axis + 1) % 3;
+        int v = (axis + 2) % 3;
+        for (int k = 0; k < 4; k++) {
+            int c[3];
+            c[axis] = sign;
+            // u x v points along +axis, so walking the square forwards faces +axis; backwards faces -axis.
+            int q = sign > 0 ? k : 3 - k;
+            c[u] = quad[q][0];
+            c[v] = quad[q][1];
+            u8* vtx = ICE_VTX + (f * 4 + k) * 16;
+            for (int i = 0; i < 16; i++) {
+                vtx[i] = 0;
+            }
+            *(s16*)(vtx + 0) = (s16)(c[0] * ICE_UNIT);
+            *(s16*)(vtx + 2) = (s16)(c[1] > 0 ? ICE_UNIT : 0);
+            *(s16*)(vtx + 4) = (s16)(c[2] * ICE_UNIT);
+            vtx[12 + axis] = (u8)(s8)(sign * 120);   // normal
+            vtx[15] = 0xFF;
+        }
+    }
+    ready = 1;
+}
+
+// The game's fixed-point matrix: 16 integer halves, then 16 fraction halves, row by row (row vectors: the
+// bottom row is the translation).
+static void put_matrix(u8* mtx, const f32 m[4][4]) {
+    for (int r = 0; r < 4; r++) {
+        for (int c = 0; c < 4; c++) {
+            s32 fixed = (s32)(m[r][c] * 65536.0f);
+            ((u16*)mtx)[r * 4 + c] = (u16)((u32)fixed >> 16);
+            ((u16*)mtx)[16 + r * 4 + c] = (u16)((u32)fixed & 0xFFFF);
+        }
+    }
+}
+
+// The last command in this frame's display list with this first word (or this opcode, if `whole` is 0).
+static int find_game_command(u32 w0, int whole, u32* out) {
+    u32* g = gMasterGfxPos;
+    for (int i = 1; i <= FOG_SCAN; i++) {
+        u32* c = g - 2 * i;
+        if (whole ? c[0] == w0 : (c[0] >> 24) == w0) {
+            out[0] = c[0];
+            out[1] = c[1];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void draw_ice(int slot) {
+    if (!eo_gfx_fits(0x140)) {
+        return;
+    }
+    make_ice_vertices();
+    u8* bd = ENEMY_BATTLE_DATA(slot);
+    u8* record = *(u8**)(bd + BATTLE_DATA_RECORD);
+    f32 scale = *(f32*)(bd + BATTLE_DATA_SCALE);
+    f32 width = 6.0f;
+    f32 height = 12.0f;
+    f32 base = *(f32*)(bd + 0x4);
+    if (record != 0) {
+        width = *(f32*)(record + RECORD_WIDTH) * scale * 0.5f;
+        height = *(f32*)(record + RECORD_HEIGHT) * scale;
+        if (*(u16*)(record + RECORD_TYPE) == 1) {
+            base = *(f32*)(*(u8**)(bd + 0x68) + 0x94) - height;   // fliers: down from the top of the body
+        }
+    }
+    f32 w = width * ICE_WIDTH / ICE_UNIT;
+    f32 h = height * ICE_HEIGHT / ICE_UNIT;
+    f32 m[4][4] = {
+        { w, 0, 0, 0 },
+        { 0, h, 0, 0 },
+        { 0, 0, w, 0 },
+        { *(f32*)(bd + 0x0), base - height * 0.05f, *(f32*)(bd + 0x8), 1 },
+    };
+    u8* mtx = ICE_MTX + slot * 64;
+    put_matrix(mtx, m);
+
+    u32 game_mode[2];
+    u32 game_combine[2];
+    u32 game_prim[2];
+    int have_mode = find_game_command(GFX_RENDER_MODE, 1, game_mode);
+    int have_combine = find_game_command(GFX_SET_COMBINE, 0, game_combine);
+    int have_prim = find_game_command(GFX_PRIM_COLOR, 0, game_prim);
+
+    eo_gfx(GFX_PIPE_SYNC << 24, 0);
+    eo_gfx(GFX_RENDER_MODE, ICE_RENDER_MODE);
+    eo_gfx(ICE_COMBINE_W0, ICE_COMBINE_W1);
+    eo_gfx(GFX_PRIM_COLOR << 24, ICE_COLOR);
+    eo_gfx(GFX_MTX_LOAD, (u32)mtx);
+    eo_gfx(GFX_VTX_24, (u32)ICE_VTX);
+    for (int f = 0; f < 6; f++) {
+        u32 q = (u32)(f * 4 * 2);   // F3DEX vertex indices are doubled
+        eo_gfx((GFX_TRI2 << 24) | (q << 16) | ((q + 2) << 8) | (q + 4), (q << 16) | ((q + 4) << 8) | (q + 6));
+    }
+    eo_gfx(GFX_PIPE_SYNC << 24, 0);
+    if (have_mode) {
+        eo_gfx(game_mode[0], game_mode[1]);
+    }
+    if (have_combine) {
+        eo_gfx(game_combine[0], game_combine[1]);
+    }
+    if (have_prim) {
+        eo_gfx(game_prim[0], game_prim[1]);
+    }
+}
+
 RECOMP_HOOK_RETURN("model_draw") void eo_fx_after_model(void) {
     if (lighting) {
         for (int i = 0; i < LIGHT_COUNT; i++) {
@@ -255,6 +402,10 @@ RECOMP_HOOK_RETURN("model_draw") void eo_fx_after_model(void) {
         eo_gfx(GFX_FOG_COLOR << 24, game_fog_color);
         eo_gfx(GFX_FOG_FACTOR, game_fog_factor);
         fogging = 0;
+    }
+    if (ice_slot >= 0) {
+        draw_ice(ice_slot);
+        ice_slot = -1;
     }
 }
 
