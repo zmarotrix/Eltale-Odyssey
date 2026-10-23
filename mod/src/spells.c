@@ -550,7 +550,7 @@ void eo_spells_on_cast(int school, int index, int boost) {
             fog_turns = (u8)(2 + boost + eo_talent(TALENT_UPDRAFT));
             break;
         case K_MEND: {
-            // Free: 18% of max HP at Water 12 or more, from 60% of that at Water 1 (progression.c); and 25% of max
+            // Free: 18% of max HP at Water 12 or more, less below (progression.c); and 25% of max
             // MP at any Water level, never under MEND_MIN_MP, so one Mend always pays for a tier-1 spell (playtest,
             // 2026-10-23: "I don't want to have to cast it so many times to cast a spell").
             // Deep Well: 2% more of each a rank; Wellspring: 5% more MP a rank.

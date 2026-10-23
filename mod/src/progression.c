@@ -91,18 +91,13 @@ u32 eo_progression_spell_power_permille(int school) {
     return curve(own + (opp >> 4) + sides, 1015) * 2 * DAMAGE_SCALE_THOUSANDTHS / 100000;
 }
 
-// Mend's healing by Water level (Spell Trees doc): full at level 12; below, from MEND_LOW_PERMILLE at level 1 up
-// to full along the spell-power curve (a third at level 1 healed far too little, playtest 2026-10-23).
+// Mend's healing by Water level (Spell Trees doc): full at level 12, less below, on the spell-power curve.
 #define MEND_FULL_LEVEL 12
-#define MEND_LOW_PERMILLE 600
 
 u32 eo_progression_mend_permille(void) {
     u32 water = ELEMENT_LEVELS[2];
     if (water >= MEND_FULL_LEVEL) {
         return 1000;
     }
-    u32 low = curve(1, 1015);
-    u32 span = curve(MEND_FULL_LEVEL, 1015) - low;
-    u32 here = water > 1 ? curve(water, 1015) - low : 0;
-    return MEND_LOW_PERMILLE + (1000 - MEND_LOW_PERMILLE) * here / span;
+    return curve(water, 1015) * 1000 / curve(MEND_FULL_LEVEL, 1015);
 }
