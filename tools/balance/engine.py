@@ -67,6 +67,9 @@ CONFIG = dict(
     pack_hp=1.0, pack_hit=[1.0] * 8,   # monster pack HP, and each monster action's share of Brian's HP, per beat
     boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
     dmg_scale=1.0,        # all of Brian's damage (spells and staff), to keep numbers small
+    power_growth=1.03,    # spell power grows this much per element level (the game's formula: 1.03)
+    level_cap=LEVEL_CAP,  # highest element level (the game's is 50)
+    tier_levels=None,     # element levels that open tiers 2 to 5 (None = TIER_LEVEL)
     levels=None,          # element levels gained by each boss (None = LEVELS_GAINED)
     tier_cap=None,        # highest spell tier open at each boss whatever the level (story gate); None = level only
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
@@ -213,12 +216,13 @@ spell(WIND, 5, "Hurricane", 90, 6, "multi", "all", any_chance=1.0, mp=16)
 
 
 def tier(level):
-    return sum(1 for t in TIER_LEVEL if level >= t)
+    return 1 + sum(1 for t in (CONFIG["tier_levels"] or TIER_LEVEL[1:]) if level >= t)
 
 
 def power(base, elem, lv):
     L = lv[elem] + (lv[OPP[elem]] >> 4) + (lv[SIDES[elem][0]] >> 3) + (lv[SIDES[elem][1]] >> 3)
-    return base * 0.02 * (1 + 0.2 * (1.03 ** L - 1) / 0.03)
+    g = CONFIG["power_growth"]
+    return base * 0.02 * (1 + 0.2 * (g ** L - 1) / (g - 1))
 
 
 def element_mult(atk_elem, def_elem):
@@ -789,14 +793,15 @@ class Battle:
 def build_levels(build, beat):
     """Brian's four element levels: 1 each, plus the beat's gained levels spread by the build's weights."""
     total = (CONFIG["levels"] or LEVELS_GAINED)[beat]
+    cap = CONFIG["level_cap"]
     weights = [w if w > 0 else 0.15 for w in build]
     lv = [1 + round(total * w / sum(weights)) for w in weights]
     for i in range(4):
-        if lv[i] > LEVEL_CAP:
-            spill, lv[i] = lv[i] - LEVEL_CAP, LEVEL_CAP
+        if lv[i] > cap:
+            spill, lv[i] = lv[i] - cap, cap
             for k in sorted(range(4), key=lambda k: -build[k]):
-                if k != i and lv[k] < LEVEL_CAP:
-                    lv[k] = min(LEVEL_CAP, lv[k] + spill)
+                if k != i and lv[k] < cap:
+                    lv[k] = min(cap, lv[k] + spill)
                     break
     return lv
 
