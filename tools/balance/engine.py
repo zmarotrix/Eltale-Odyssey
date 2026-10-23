@@ -66,6 +66,9 @@ CONFIG = dict(
     boss_shields=None,    # per-boss shield counts; None = 6 + boss number / 2
     pack_hp=1.0, pack_hit=[1.0] * 8,   # monster pack HP, and each monster action's share of Brian's HP, per beat
     boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
+    dmg_scale=1.0,        # all of Brian's damage (spells and staff), to keep numbers small
+    levels=None,          # element levels gained by each boss (None = LEVELS_GAINED)
+    tier_cap=None,        # highest spell tier open at each boss whatever the level (story gate); None = level only
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
     mend_mp=0.2,          # Mend also refills this share of max MP (spec, 2026-10-22: Mend is free)
     earth_hold=1,         # scripted Earth play: press B until this much Charge before an Earth attack (Broken foes: hit now)
@@ -282,7 +285,8 @@ class Battle:
         self.low_hp = self.max_hp   # the lowest Brian's HP got (danger)
         self.items_used = 0
         known = [dict(s, **CONFIG["spells"].get(s["name"], {})) for s in S]
-        self.spells = [s for s in known if self.usable[s["school"]] and tier(self.lv[s["school"]]) >= s["tier"]
+        cap = CONFIG["tier_cap"][beat] if CONFIG["tier_cap"] else 5
+        self.spells = [s for s in known if self.usable[s["school"]] and min(cap, tier(self.lv[s["school"]])) >= s["tier"]
                        and s["kind"] != "well"]
         if CONFIG["wellspring"] and (self.usable[WATER] or CONFIG["wellspring_all"]):
             self.spells.append(next(s for s in known if s["kind"] == "well"))
@@ -316,7 +320,7 @@ class Battle:
             d *= 2
         if school == EARTH and self.settled:
             d *= CONFIG["settle_mult"]
-        d *= self.dmg_mult
+        d *= self.dmg_mult * CONFIG["dmg_scale"]
         return d + self.rng.random() * math.sqrt(max(d, 0))
 
     def burn_from(self, d, school, foe):
@@ -419,7 +423,7 @@ class Battle:
         p = (T / 2 + sum(min(l, T / 4) for l in self.lv))
         A = T
         d = p * A / (A + foe.df) * (2 if foe.broken else 1)
-        return d
+        return d * CONFIG["dmg_scale"]
 
     def staff_value(self):
         alive = self.alive_foes()
@@ -784,7 +788,7 @@ class Battle:
 
 def build_levels(build, beat):
     """Brian's four element levels: 1 each, plus the beat's gained levels spread by the build's weights."""
-    total = LEVELS_GAINED[beat]
+    total = (CONFIG["levels"] or LEVELS_GAINED)[beat]
     weights = [w if w > 0 else 0.15 for w in build]
     lv = [1 + round(total * w / sum(weights)) for w in weights]
     for i in range(4):
