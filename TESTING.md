@@ -57,6 +57,12 @@ steam around you).
 - [ ] **Levels to 99**: element levels go past 50 at the level-up screen; spells open by level (12/30/48/66), not
   by points; the Spirits window's first page shows the levels. Checked by Claude (Fire 50 to 51).
 - [ ] **12 new gear pieces** in chests (table under Equipment). Checked by Claude: all show in the window.
+- [ ] **Enemies (balance engine)**: boss HP Solvaring 270, Zelse 900, Nepty 1,190, Shilf 2,560, Fargo 3,570,
+  Guilty 3,660, Beigis 5,930, Mammon 6,220 (vanilla 200 to 2,300), and boss hits scaled so an average action takes
+  about 10-17% of the HP you should have by then. Monster HP by area: Holy Plains 1.2x, Dondoran 1.42x, Normoon
+  1.25x, Carmagh/Limelin 2.08x, the desert 2x-2.34x by how many bosses are down, Mammon's World 2.07x; monster
+  attack as before (the engine's flat monster hits would make early monsters hit far harder than the original's).
+  Checked by Claude: Zelse has 900 HP and hit a 160 HP Brian for 12-25. How do the boss fights feel?
 
 ## Starting gold (changed)
 

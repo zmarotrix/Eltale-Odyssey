@@ -867,6 +867,15 @@ RECOMP_HOOK_RETURN("player_take_damage") void eo_spells_after_brian_damage(void)
         return;
     }
     u32 lost = hp_before_hit - BRIAN_HP;
+    // Boss hits land as hard as the balance engine fitted them (balance.c).
+    u32 scale = eo_balance_enemy_hit_permille();
+    if (scale != 1000 && hit_attacker != 0 && hit_attacker != BRIAN_BATTLE_DATA) {
+        lost = (lost * scale + 500) / 1000;
+        if (lost < 1) {
+            lost = 1;
+        }
+        BRIAN_HP = (u16)(hp_before_hit > lost ? hp_before_hit - lost : 0);
+    }
     u32 back = 0;
     int evade = 3 * (eo_talent(TALENT_EVASION) + eo_talent(TALENT_ZEPHYR_STEP));
     if (wall_turns > 0 && spell_on_brian) {

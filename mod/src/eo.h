@@ -279,6 +279,7 @@ void eo_fx_lockon_marker(int enemy_slot);   // fx.c: the sparkle over the target
 
 // ---- The 60 spells (spells.c) ----
 void eo_spells_init(void);
+u32 eo_balance_enemy_hit_permille(void);   // balance.c: how hard an enemy hit on Brian lands (bosses)
 const char* eo_spells_name(int school, int index);
 const char* eo_spells_text(int school, int index);
 u32 eo_spells_mp_cost(int school, int index);
