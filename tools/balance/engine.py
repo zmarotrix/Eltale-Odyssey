@@ -36,9 +36,9 @@ LEVELS_GAINED = [s + b for s, b in zip(SPIRITS_BY_BOSS, BATTLE_LEVELS_BY_BOSS)] 
 TIER_LEVEL = [1, 12, 30, 48, 66]
 LEVEL_CAP = 99   # the game's is 50; raised so one school can max but never two
 BOSS_ORDER = ["Solvaring", "Zelse", "Nepty", "Shilf", "Fargo", "Guilty", "Beigis", "Mammon"]
-BOSS_HP = [230, 710, 1000, 1400, 2070, 2240, 3410, 3910]   # fitted for a player with 75% of the spirits
+BOSS_HP = [240, 790, 1040, 2010, 2620, 2880, 4280, 4850]   # fitted for a player with 75% of the spirits
 VANILLA_BOSS_HP = [200, 680, 880, 1000, 1500, 1800, 1900, 2300]
-PACK_HP_SCALE = [0.75, 0.78, 0.74, 1.15, 1.13, 1.29, 1.27, 1.11]   # monster HP x this, fitted with the bosses
+PACK_HP_SCALE = [0.79, 0.91, 0.85, 1.34, 1.21, 1.40, 1.39, 1.22]   # monster HP x this, fitted with the bosses
 BOSS_ATTACK_SCALE = [1.00, 1.05, 1.10, 1.10, 1.15, 1.15, 1.20, 1.20]   # balance.c
 # Brian's own stats when he reaches each boss (estimates; Zelse matches the 2026-10-21 playtest setup).
 BRIAN_HP = [80, 160, 200, 260, 310, 370, 430, 490]
@@ -63,10 +63,11 @@ KIT_MP = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7]
 CONFIG = dict(
     kit=False,            # apply the KIT rows above
     kit_items=None,       # healing items carried at each boss with the kit (None = KIT_ITEMS)
-    same_mult=0.5,        # damage Brian's spells deal to a foe of the same element (game rule: 0.5)
+    same_mult=0.75,       # damage Brian's spells deal to a foe of the same element (the game's rule: 0.5)
     none_mult=0.75,       # damage Brian's spells deal to no-element foes (spec; the game's rule was 0.5)
     burn_full=False,      # Burn ticks ignore the target's element (a Fire boss still burns at full)
     shatter_neutral=False,  # Shatter breaks ice, so it ignores element
+    shatter_mult=2.0,     # Shatter on a frozen foe: this many times a normal hit, ignoring Freeze defense; ends the Freeze
     beigis_shift=True,    # Beigis takes a random element after each Break (the mod's mechanic)
     boss_hp=[1.0] * 8,    # per-boss HP multipliers on BOSS_HP
     wellspring=0.0,       # Wellspring (Water action, 0 MP): a turn that restores this share of max MP; 0 = not in the game
@@ -107,9 +108,9 @@ BALANCE_PASS = dict(
     pack_hit=[1, 1, 1, 1, 1.25, 1.5, 1.75, 2.0],   # late packs keep up with gear
     # Fitted to the original game (2026-10-22): Brian's attacking turns about the original's plus a little, damage
     # taken per fight on its curve (smoothed, slightly harder), every boss won by at least 85% of builds. One boss action
-    # costs about 10, 13, 13, 14, 13, 13, 12 and 12% of Brian's HP with gear (Solvaring eased: the first boss); Mammon's
+    # costs about 10, 13, 14, 14, 13, 12, 12 and 12% of Brian's HP with gear (Solvaring eased: the first boss); Mammon's
     # attacks come in bursts, so he stays at 12% a hit and is the peak through length and HP.
-    boss_hit=[0.81, 1.17, 1.17, 1.39, 1.38, 1.38, 1.39, 1.4],
+    boss_hit=[0.83, 1.18, 1.25, 1.33, 1.34, 1.37, 1.39, 1.4],
 )
 # The progression before 2026-10-22 (element EXP model, cap 50, the game's 3% growth), for comparison.
 EXP_MODEL = dict(levels=[13, 32, 38, 53, 59, 69, 76, 84], level_cap=50, tier_levels=[8, 20, 32, 44], power_growth=1.03,
@@ -491,6 +492,13 @@ class Battle:
                    + [self.staff_damage(main)])
         return 0.5 * best / len(alive)
 
+    def shatter_setup(self, foe):
+        """Freezing a foe is worth part of the Shatter it sets up, if Brian knows Shatter."""
+        sh = next((s for s in self.spells if s["kind"] == "shatter"), None)
+        if not sh or self.mp < sh["mp"] + 4:
+            return 0
+        return 0.6 * self.dmg_to(foe, sh["base"], sh["school"], noise=False) * CONFIG["shatter_mult"]
+
     def mend_scale(self):
         """Mend heals by Water level: full at level 12 (a main school's level by Solvaring), weaker below, on the
         spell-power curve. Everyone can cast it, since every element starts at level 1."""
@@ -538,15 +546,18 @@ class Battle:
             v = per * (1 + 0.2 * b) + (0.3 * self.threat() if b else 0)
         elif kind == "chill":
             v = per * n_targets * (6 if s.get("multi") else 1) / (6 if s.get("multi") else 1) * s["hits"]
-            v += 0.5 * self.threat() * n_targets if not main.freeze_immune and not main.freeze else 0
+            if not main.freeze_immune and not main.freeze:
+                v += 0.5 * self.threat() * n_targets
+                if main.frost + s.get("steps", 1) + b >= 2:
+                    v += self.shatter_setup(main)
         elif kind == "shatter":
             if not main.freeze:
                 return 0
-            v = per / 0.7 * (1 + 0.25 * b)
+            v = per * CONFIG["shatter_mult"] * (1 + 0.25 * b)
         elif kind == "freeze":
             if main.freeze or main.freeze_immune:
                 return 0
-            v = (1.0 if main.boss else 2.0) * self.threat()   # bosses stay frozen 1 turn
+            v = (1.0 if main.boss else 2.0) * self.threat() + self.shatter_setup(main)   # bosses stay frozen 1 turn
         elif kind == "multi" or kind == "fan":
             n = s["hits"] * (1 + 0.4 * b)
             v = per * n * n_targets * (1.6 if kind == "fan" and main.stacks else 1)
@@ -667,7 +678,7 @@ class Battle:
             return
         if k == "freeze":
             if not main.freeze_immune:
-                main.freeze = 1 if main.boss else 2 + b
+                main.freeze = (1 if main.boss else 2 + b) + 1
             return
         targets = self.targets(s, main)
         for f in targets:
@@ -727,10 +738,12 @@ class Battle:
                     self.crack(f, 1)
             elif k == "shatter":
                 if f.freeze:
+                    frozen, f.freeze = f.freeze, 0          # ignores the Freeze defense
                     d = self.dmg_to(f, s["base"], school)
+                    f.freeze = frozen
                     if CONFIG["shatter_neutral"]:
                         d /= element_mult(school, f.elem)
-                    f.hp -= d / 0.7 * (1 + 0.25 * b)
+                    f.hp -= d * CONFIG["shatter_mult"] * (1 + 0.25 * b)
                     f.freeze, f.frost = 0, 0
                     f.freeze_immune = 2 if f.boss else 0
             elif k in ("multi", "fan"):
@@ -772,7 +785,7 @@ class Battle:
             f.stacks, f.burn_left = [], 0   # Water puts Burn out
         level = f.frost + (1 if f.freeze else 0) + steps
         if level >= 2 and not f.freeze_immune:
-            f.freeze = 1 if f.boss else 2
+            f.freeze = (1 if f.boss else 2) + 1
             f.frost = 0
         else:
             f.frost = 1
@@ -789,12 +802,14 @@ class Battle:
             if f.hot:
                 f.hot -= 1
         for f in self.alive_foes():
+            if f.freeze == 1:   # the start of its first turn after the skips: it thaws and acts
+                f.freeze = 0
+                if f.boss:
+                    f.freeze_immune = 2
             if f.skip:
                 f.skip = False
-            elif f.freeze:
-                f.freeze -= 1
-                if f.freeze == 0 and f.boss:
-                    f.freeze_immune = 2
+            elif f.freeze > 1:
+                f.freeze -= 1   # skips this turn and stays frozen through Brian's next turn (Shatter's window)
             elif f.confused:
                 f.confused -= 1
                 others = [o for o in self.alive_foes() if o is not f]
