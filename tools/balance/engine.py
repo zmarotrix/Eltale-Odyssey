@@ -32,13 +32,13 @@ RESEARCH = os.path.join(os.path.dirname(__file__), "..", "..", "research")
 # then all 98) + battle levels for about 20 battles a stretch with the monsters' and bosses' EXP (research/enemies).
 SPIRITS_BY_BOSS = [13, 44, 51, 88, 92, 98, 98, 98]
 BATTLE_LEVELS_BY_BOSS = [14, 19, 26, 30, 37, 41, 44, 47]
-LEVELS_GAINED = [s + b for s, b in zip(SPIRITS_BY_BOSS, BATTLE_LEVELS_BY_BOSS)]
-TIER_LEVEL = [1, 15, 35, 55, 75]
+LEVELS_GAINED = [s + b for s, b in zip(SPIRITS_BY_BOSS, BATTLE_LEVELS_BY_BOSS)]   # a player who finds every spirit
+TIER_LEVEL = [1, 10, 27, 44, 60]
 LEVEL_CAP = 99   # the game's is 50; raised so one school can max but never two
 BOSS_ORDER = ["Solvaring", "Zelse", "Nepty", "Shilf", "Fargo", "Guilty", "Beigis", "Mammon"]
-BOSS_HP = [200, 830, 1020, 1990, 2490, 3270, 3760, 3400]   # fitted to this curve (Spell Progression Model doc)
+BOSS_HP = [190, 570, 670, 1140, 1550, 1900, 2210, 2220]   # fitted for a player with 65% of the spirits
 VANILLA_BOSS_HP = [200, 680, 880, 1000, 1500, 1800, 1900, 2300]
-PACK_HP_SCALE = [1.03, 1.07, 1.01, 1.70, 1.67, 1.91, 1.91, 1.55]   # monster HP x this, fitted with the bosses
+PACK_HP_SCALE = [0.85, 0.75, 0.68, 1.04, 1.0, 1.14, 1.13, 0.93]   # monster HP x this, fitted with the bosses
 BOSS_ATTACK_SCALE = [1.00, 1.05, 1.10, 1.10, 1.15, 1.15, 1.20, 1.20]   # balance.c
 # Brian's own stats when he reaches each boss (estimates; Zelse matches the 2026-10-21 playtest setup).
 BRIAN_HP = [80, 160, 200, 260, 310, 370, 430, 490]
@@ -76,6 +76,7 @@ CONFIG = dict(
     power_growth=1.015,   # spell power grows this much per element level (the game's formula: 1.03)
     level_cap=LEVEL_CAP,  # highest element level (the game's is 50)
     tier_levels=None,     # element levels that open tiers 2 to 5 (None = TIER_LEVEL)
+    spirit_share=0.65,    # share of the spirits Brian has found (fights are tuned for 0.65, a safety net; completionists are ahead)
     levels=None,          # element levels gained by each boss (None = LEVELS_GAINED)
     tier_cap=None,        # highest spell tier open at each boss whatever the level (story gate); None = level only
     spells={},            # per-spell overrides, {"Hurricane": {"base": 90}}
@@ -110,6 +111,8 @@ SCENARIOS = {
     "before+kit": dict(PRE_PASS, kit=True),
     "pass, no kit": dict(BALANCE_PASS),
     "pass+kit": dict(BALANCE_PASS, kit=True),
+    "completionist, pass+kit": dict(BALANCE_PASS, kit=True, spirit_share=1.0),
+    "light explorer, pass+kit": dict(BALANCE_PASS, kit=True, spirit_share=0.45),
     "EXP model, pass+kit": dict(BALANCE_PASS, kit=True, **EXP_MODEL),
 }
 
@@ -803,7 +806,8 @@ class Battle:
 
 def build_levels(build, beat):
     """Brian's four element levels: 1 each, plus the beat's gained levels spread by the build's weights."""
-    total = (CONFIG["levels"] or LEVELS_GAINED)[beat]
+    total = (CONFIG["levels"] or [round(s * CONFIG["spirit_share"]) + b
+                                  for s, b in zip(SPIRITS_BY_BOSS, BATTLE_LEVELS_BY_BOSS)])[beat]
     cap = CONFIG["level_cap"]
     weights = [w if w > 0 else 0.15 for w in build]
     lv = [1 + round(total * w / sum(weights)) for w in weights]
