@@ -133,6 +133,10 @@ extern EoSaveBlock gEo;
 void eo_reset(void);
 u32 eo_now(void);
 
+// ---- Progression (progression.c) ----
+#define DAMAGE_SCALE_THOUSANDTHS 760   // all of Brian's damage, spells and staff
+u32 eo_progression_spell_scale(int school);   // thousandths: the 1.5%-a-level curve over the game's 3%, x0.76
+
 // ---- Native UI pieces (ui.c) ----
 // Small text in the HUD's 6 x 8 font. Palettes on parchment: 0 dark grey (normal), 1 red (warning),
 // 2 light grey (unavailable), 3 green (selected, good news).

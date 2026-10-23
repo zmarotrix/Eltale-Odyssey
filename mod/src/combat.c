@@ -43,6 +43,7 @@
 #define BRIAN_DEFENSE_NOW (*(u16*)0x8007BBC0)   // in-battle defense
 #define PRISM_PERCENT 20
 #define GLASS_PERCENT 25
+#define RESIST_SOFTEN_PERCENT 50   // 0.5x resisted hits become 0.75x
 #define BLOODSTONE_PERCENT 20      // Bloodstone: spells while Brian is under half HP
 #define EXECUTIONER_PERCENT 30     // Executioner's Charm: foes under a quarter of their HP
 #define STORM_GLASS_PERCENT 30     // Storm Glass: Wind spells on frozen foes
@@ -353,7 +354,8 @@ RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u1
     // The game's element rule: the opposite element hits x1.25 (the guard's weakness), the same one x0.5.
     u16 own = ENEMY_RECORD(slot) != 0 ? *(u16*)(ENEMY_RECORD(slot) + RECORD_ELEMENT) : 0xFF;
     hit_was_weak = hit_kind == HIT_SPELL && g->weakness != NO_WEAKNESS && element == g->weakness;
-    hit_was_resisted = hit_kind == HIT_SPELL && element < 4 && element == own;
+    // The game also halves spells on a foe with no element (4); the overhaul softens both to 0.75x below.
+    hit_was_resisted = hit_kind == HIT_SPELL && element < 4 && (element == own || own == 4);
     if (hit_kind != HIT_SPELL || g->broken) {
         return;
     }
@@ -420,6 +422,16 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     if (hit == 0) {
         return;
     }
+    // Staff hits deal 0.76x like spells (progression.c; spells get it through their base): the rest comes back.
+    if (hit_kind == HIT_STAFF) {
+        u32 back = hit * (1000 - DAMAGE_SCALE_THOUSANDTHS) / 1000;
+        if (back > 0 && hp > 0) {
+            u16 max_hp = *(u16*)(ENEMY_RECORD(slot) + RECORD_MAX_HP);
+            hp = (u16)(hp + back > max_hp ? max_hp : hp + back);
+            ENEMY_HP(slot) = hp;
+            hit -= back;
+        }
+    }
     // Extra damage on top of the hit: a Broken foe takes double, the staff adds its flat bonus, and a staff
     // that favours the spell's element adds 10%.
     u32 extra = 0;
@@ -431,6 +443,10 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     }
     if (hit_was_burning) {
         percent += SEARING_PERCENT * (u32)eo_talent(TALENT_SEARING);
+    }
+    // Same element or no element: the game's 0.5x becomes 0.75x (missing the weakness already costs the shield cracks).
+    if (hit_was_resisted) {
+        percent += RESIST_SOFTEN_PERCENT;
     }
     if (hit_kind == HIT_STAFF) {
         extra += (u32)eo_equip_staff_bonus();
@@ -475,7 +491,7 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     // bonus or a stoke on a burning foe buffs it; the foe resisting the element or a stoke on a foe that isn't
     // burning weakens it. Gear bonuses alone leave it white.
     int buffed = hit_was_weak || hit_was_broken || percent > (u32)(hit_element < 4 ? eo_equip_element_percent(hit_element) +
-                 SCHOOL_TALENT_PERCENT * eo_talent(school_talent[hit_element]) : 0);
+                 SCHOOL_TALENT_PERCENT * eo_talent(school_talent[hit_element]) : 0) + (hit_was_resisted ? RESIST_SOFTEN_PERCENT : 0);
     int weakened = hit_was_resisted;
     u32 shown = hit;
     // Stoking Fire spells: weak on a foe that isn't burning (the HP the extra 30% took comes back; if the full hit
@@ -697,7 +713,8 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     int wellspring = school == WATER && type == SPELL_TYPE_HEAL ? eo_talent(TALENT_WELLSPRING) : 0;
     int leviathan = school == WATER && type == SPELL_TYPE_HEAL && eo_equipment_worn(EQ_LEVIATHAN_STAFF);
     int tether = school == WIND && type == SPELL_TYPE_DAMAGE && eo_equipment_worn(EQ_GALE_TETHER);
-    if (boost == 0 && !echo && !wellspring && !leviathan && !tether) {
+    int curve = type == SPELL_TYPE_DAMAGE;   // every damaging spell: the overhaul's power curve (progression.c)
+    if (boost == 0 && !echo && !wellspring && !leviathan && !tether && !curve) {
         return;
     }
     active_spell = stats;
@@ -725,6 +742,10 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
             extra_shots = boost;
         }
         shots = (u16)(shots + extra_shots + (tether ? 1 : 0));
+    }
+    if (curve) {
+        u32 scaled = (u32)base * eo_progression_spell_scale(school) / 1000;
+        base = (u16)(scaled > 0 ? (scaled > 0xFFFF ? 0xFFFF : scaled) : 1);
     }
     *(u16*)(stats + SPELL_BASE) = base;
     *(u16*)(stats + SPELL_SHOTS) = shots;

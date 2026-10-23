@@ -32,8 +32,12 @@
 #define SPIRIT_FLAG_BYTES 16
 #define ELEMENT_LEVELS ((u8*)gPlayerMainData + 0x24)  // Fire, Earth, Water, Wind
 
-static const u8 tier_min_level[TIERS + 1] = { 0, 1, 7, 16, 25, 36 };   // matches tier_for_level
-static const u8 tier_cost[TIERS + 1] = { 0, 0, 3, 6, 10, 15 };
+// Tiers open by element level alone (2026-10-22: "element level is the only attunement"; tuned for a player who
+// finds 75% of the spirits). Spirit Points now buy only talents. Saves that bought tiers get those points back once.
+static const u8 tier_gate[TIERS + 1] = { 0, 1, 12, 30, 48, 66 };
+static const u8 old_tier_cost[TIERS + 1] = { 0, 0, 3, 6, 10, 15 };   // what tiers cost before, for the refund
+#define PROGRESSION_FLAGS (gEo.reserved[0])
+#define FLAG_TIERS_BY_LEVEL 0x01
 static const char* const element_names[SCHOOLS] = { "Fire", "Earth", "Water", "Wind" };
 static const char unknown_name[] = "???";
 
@@ -48,10 +52,20 @@ static u8 tier_for_level(u16 level) {
     return level < 7 ? 1 : level < 16 ? 2 : level < 25 ? 3 : level < 36 ? 4 : 5;
 }
 
+static int open_tier(int school) {
+    int tier = 0;
+    for (int t = 1; t <= TIERS; t++) {
+        if (ELEMENT_LEVELS[school] >= tier_gate[t]) {
+            tier = t;
+        }
+    }
+    return tier;
+}
+
 static int is_discovered(int school, int index) {
     int bit = school * SPELLS + index;
-    if (spell_tier[school][index] == 1 && ELEMENT_LEVELS[school] >= spell_vanilla_level[school][index]) {
-        return 1;   // a tier 1 spell Brian's level allows
+    if (spell_tier[school][index] == 1) {
+        return 1;   // tier 1 spells are open from level 1
     }
     return (gEo.discovered[bit / 8] >> (bit % 8)) & 1;
 }
@@ -97,18 +111,19 @@ static void set_up_save(void) {
     gEo.spirits_counted = (u8)count_spirits();
     gEo.spirit_points = gEo.spirits_counted;
     for (int s = 0; s < SCHOOLS; s++) {
-        gEo.tiers[s] = 1;
+        gEo.tiers[s] = (u8)open_tier(s);
     }
     for (int i = 0; i < 8; i++) {
         gEo.discovered[i] = 0;
     }
     for (int s = 0; s < SCHOOLS; s++) {
         for (int i = 0; i < SPELLS; i++) {
-            if (spell_tier[s][i] == 1 && ELEMENT_LEVELS[s] >= spell_vanilla_level[s][i]) {
+            if (spell_tier[s][i] == 1) {
                 set_discovered(s, i);
             }
         }
     }
+    PROGRESSION_FLAGS |= FLAG_TIERS_BY_LEVEL;
     gEo.spirits_ready = 1;
     dirty = 1;
 }
@@ -118,7 +133,7 @@ static void apply(void) {
     for (int s = 0; s < SCHOOLS; s++) {
         for (int i = 0; i < SPELLS; i++) {
             u8* stats = SPELL_STAT_TABLES[s] + i * SPELL_STAT_SIZE;
-            *(u16*)(stats + SPELL_LEVEL_REQ) = spell_tier[s][i] <= gEo.tiers[s] ? REQ_OPEN : REQ_LOCKED;
+            *(u16*)(stats + SPELL_LEVEL_REQ) = spell_tier[s][i] <= open_tier(s) ? REQ_OPEN : REQ_LOCKED;
             SPELL_NAME_TABLES[s][i] = is_discovered(s, i) ? spell_names[s][i] : unknown_name;
         }
     }
@@ -218,6 +233,19 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
     if (!gEo.spirits_ready) {
         set_up_save();
     }
+    // A save from when tiers were bought: give the points back once, now that levels open tiers.
+    if (!(PROGRESSION_FLAGS & FLAG_TIERS_BY_LEVEL)) {
+        u32 refund = 0;
+        for (int s = 0; s < SCHOOLS; s++) {
+            for (int tier = 2; tier <= gEo.tiers[s] && tier <= TIERS; tier++) {
+                refund += old_tier_cost[tier];
+            }
+        }
+        u32 points = gEo.spirit_points + refund;
+        gEo.spirit_points = (u8)(points > 255 ? 255 : points);
+        PROGRESSION_FLAGS |= FLAG_TIERS_BY_LEVEL;
+        dirty = 1;
+    }
     int spirits = count_spirits();
     if (spirits > gEo.spirits_counted) {
         gEo.spirit_points = (u8)(gEo.spirit_points + (spirits - gEo.spirits_counted));
@@ -229,6 +257,7 @@ RECOMP_HOOK_RETURN("frame_build") void eo_spirits_frame(void) {
     for (int s = 0; s < SCHOOLS; s++) {
         if (ELEMENT_LEVELS[s] != seen_levels[s]) {
             seen_levels[s] = ELEMENT_LEVELS[s];
+            gEo.tiers[s] = (u8)open_tier(s);
             dirty = 1;
         }
     }
@@ -317,18 +346,6 @@ RECOMP_HOOK_RETURN("pad_read") void eo_spirits_read_input(void) {
     gPadStickY = 0;
 }
 
-static void try_attune(int s) {
-    int next = gEo.tiers[s] + 1;
-    if (next > TIERS || ELEMENT_LEVELS[s] < tier_min_level[next] || gEo.spirit_points < tier_cost[next]) {
-        eo_sfx(SFX_CANCEL);
-        return;
-    }
-    gEo.spirit_points = (u8)(gEo.spirit_points - tier_cost[next]);
-    gEo.tiers[s] = (u8)next;
-    dirty = 1;
-    eo_sfx(SFX_CONFIRM);
-}
-
 static void handle_input(void) {
     u16 p = pressed;
     pressed = 0;
@@ -346,7 +363,7 @@ static void handle_input(void) {
         cursor = (cursor + 1) % rows;
     } else if (p & BTN_A) {
         if (page == 0) {
-            try_attune(cursor);
+            eo_sfx(SFX_CANCEL);   // tiers open by level; nothing to buy here
         } else if (eo_talent_learn((page - 1) * TALENTS_PER_SCHOOL + cursor)) {
             eo_sfx(SFX_CONFIRM);
         } else {
@@ -356,7 +373,7 @@ static void handle_input(void) {
 }
 
 // The window's top line: the page names (the open one green) and the unspent points at the right.
-static const char* const page_names[PAGES] = { "ATTUNE", "FIRE", "EARTH", "WATER", "WIND" };
+static const char* const page_names[PAGES] = { "LEVELS", "FIRE", "EARTH", "WATER", "WIND" };
 
 static s32 draw_header(s32 h) {
     char line[12];
@@ -435,19 +452,15 @@ static void draw_window(void) {
         eo_ui_small(LEVEL_X, y, palette, line);
     }
 
-    // The next tier of the selected element: its level gate and point cost, each green once met, red if not.
-    int next = gEo.tiers[cursor] + 1;
-    s32 cost_x = 0;
+    // The next tier of the selected element and the level that opens it.
+    int next = open_tier(cursor) + 1;
     if (next > TIERS) {
-        eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, TEXT_DIM, "FULLY ATTUNED.");
+        eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, TEXT_GOOD, "EVERY TIER OPEN.");
     } else {
-        eo_format_u32(line, "NEXT TIER: LV ", tier_min_level[next], "");
-        int level_ok = ELEMENT_LEVELS[cursor] >= tier_min_level[next];
-        eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, level_ok ? TEXT_GOOD : TEXT_WARN, line);
-        cost_x = WIN_X + SMALL_PAD + (eo_strlen(line) + 1) * SMALL_W;
-        eo_format_u32(line, "", tier_cost[next], "");
-        int points_ok = gEo.spirit_points >= tier_cost[next];
-        eo_ui_small(cost_x + ICON_W, INFO_Y, points_ok ? TEXT_GOOD : TEXT_WARN, line);
+        char tier[24];
+        eo_format_u32(tier, "TIER ", (u32)next, " OPENS AT LV ");
+        eo_format_u32(line, tier, tier_gate[next], ".");
+        eo_ui_small(WIN_X + SMALL_PAD, INFO_Y, TEXT_NORMAL, line);
     }
 
     eo_icons_begin();
@@ -455,12 +468,9 @@ static void draw_window(void) {
     for (int s = 0; s < SCHOOLS; s++) {
         s32 y = row_text_y(s) + ICON_TEXT_DY;
         eo_icon_draw(ICON_FIRE + s, GEM_X, y);
-        for (int t = 1; t <= TIERS; t++) {   // attuned tiers filled
-            eo_icon_draw(t <= gEo.tiers[s] ? ICON_PIP_FULL : ICON_PIP_EMPTY, PIPS_X + (t - 1) * PIP_STEP, y);
+        for (int t = 1; t <= TIERS; t++) {   // open tiers filled
+            eo_icon_draw(t <= open_tier(s) ? ICON_PIP_FULL : ICON_PIP_EMPTY, PIPS_X + (t - 1) * PIP_STEP, y);
         }
-    }
-    if (cost_x != 0) {
-        eo_icon_draw(ICON_PIP_FULL, cost_x, INFO_Y + ICON_TEXT_DY);
     }
     eo_icon_draw(ICON_POINTER, WIN_X + SMALL_PAD - 1, row_text_y(cursor) + ICON_TEXT_DY);
 }
