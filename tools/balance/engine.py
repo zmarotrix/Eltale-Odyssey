@@ -27,12 +27,18 @@ NONE = 4
 RESEARCH = os.path.join(os.path.dirname(__file__), "..", "..", "research")
 
 # ---- Progression (Spell Trees doc, "Progression: element level is attunement") ----
-LEVELS_GAINED = [13, 32, 38, 53, 59, 69, 76, 84]   # element levels gained by each boss (EXP curve fit)
-TIER_LEVEL = [1, 8, 20, 32, 44]
-LEVEL_CAP = 50
+# The game's own leveling (2026-10-22): a spirit is +1 element level, battles pay monster EXP against the game's
+# chart (8, 10, 13, 17, 22, ...). Levels gained by each boss = spirits found by then (pacing plan: 13, 44, 51, 88, 92,
+# then all 98) + battle levels for about 20 battles a stretch with the monsters' and bosses' EXP (research/enemies).
+SPIRITS_BY_BOSS = [13, 44, 51, 88, 92, 98, 98, 98]
+BATTLE_LEVELS_BY_BOSS = [14, 19, 26, 30, 37, 41, 44, 47]
+LEVELS_GAINED = [s + b for s, b in zip(SPIRITS_BY_BOSS, BATTLE_LEVELS_BY_BOSS)]
+TIER_LEVEL = [1, 15, 35, 55, 75]
+LEVEL_CAP = 99   # the game's is 50; raised so one school can max but never two
 BOSS_ORDER = ["Solvaring", "Zelse", "Nepty", "Shilf", "Fargo", "Guilty", "Beigis", "Mammon"]
-BOSS_HP = [140, 480, 530, 850, 1110, 1800, 2060, 2550]   # re-derived for the curve (progression doc)
+BOSS_HP = [200, 830, 1020, 1990, 2490, 3270, 3760, 3400]   # fitted to this curve (Spell Progression Model doc)
 VANILLA_BOSS_HP = [200, 680, 880, 1000, 1500, 1800, 1900, 2300]
+PACK_HP_SCALE = [1.03, 1.07, 1.01, 1.70, 1.67, 1.91, 1.91, 1.55]   # monster HP x this, fitted with the bosses
 BOSS_ATTACK_SCALE = [1.00, 1.05, 1.10, 1.10, 1.15, 1.15, 1.20, 1.20]   # balance.c
 # Brian's own stats when he reaches each boss (estimates; Zelse matches the 2026-10-21 playtest setup).
 BRIAN_HP = [80, 160, 200, 260, 310, 370, 430, 490]
@@ -66,8 +72,8 @@ CONFIG = dict(
     boss_shields=None,    # per-boss shield counts; None = 6 + boss number / 2
     pack_hp=1.0, pack_hit=[1.0] * 8,   # monster pack HP, and each monster action's share of Brian's HP, per beat
     boss_hit=[1.0] * 8,   # each boss action's share of Brian's HP, per boss
-    dmg_scale=1.0,        # all of Brian's damage (spells and staff), to keep numbers small
-    power_growth=1.03,    # spell power grows this much per element level (the game's formula: 1.03)
+    dmg_scale=0.758,      # all of Brian's damage (spells and staff), to keep numbers small
+    power_growth=1.015,   # spell power grows this much per element level (the game's formula: 1.03)
     level_cap=LEVEL_CAP,  # highest element level (the game's is 50)
     tier_levels=None,     # element levels that open tiers 2 to 5 (None = TIER_LEVEL)
     levels=None,          # element levels gained by each boss (None = LEVELS_GAINED)
@@ -95,11 +101,16 @@ BALANCE_PASS = dict(
     pack_hit=[1, 1, 1, 1, 1.25, 1.5, 1.75, 2.0],   # late packs keep up with gear
     boss_hit=[1, 1, 1, 1, 1.1, 1.15, 1.2, 1.25],
 )
+# The progression before 2026-10-22 (element EXP model, cap 50, the game's 3% growth), for comparison.
+EXP_MODEL = dict(levels=[13, 32, 38, 53, 59, 69, 76, 84], level_cap=50, tier_levels=[8, 20, 32, 44], power_growth=1.03,
+                 dmg_scale=1.0, boss_hp=[a / b for a, b in zip([140, 480, 530, 850, 1110, 1800, 2060, 2550], BOSS_HP)],
+                 pack_hp=[a / b for a, b in zip([0.70, 0.706, 0.602, 0.85, 0.74, 1.0, 1.084, 1.109], PACK_HP_SCALE)])
 SCENARIOS = {
     "before": dict(PRE_PASS),
     "before+kit": dict(PRE_PASS, kit=True),
     "pass, no kit": dict(BALANCE_PASS),
     "pass+kit": dict(BALANCE_PASS, kit=True),
+    "EXP model, pass+kit": dict(BALANCE_PASS, kit=True, **EXP_MODEL),
 }
 
 # Which monster set Brian fights while heading to each boss (research/enemies: set by region and beat).
@@ -816,12 +827,13 @@ def boss_fight(build, beat, rng, items):
 
 def pack_fight(build, beat, rng, items):
     pool = MONSTERS[PACK_SET[beat]]
-    scale = BOSS_HP[beat] / VANILLA_BOSS_HP[beat]   # same rescale as the bosses get
+    ph = CONFIG["pack_hp"]
+    scale = PACK_HP_SCALE[beat] * (ph[beat] if isinstance(ph, list) else ph)
     n = rng.choice([2, 3, 3, 4])
     foes = []
     for _ in range(n):
         rec = rng.choice(pool)
-        foes.append(Foe(rec, max(1, round(rec["hp"] * scale * 1.3 * CONFIG["pack_hp"])), rec["atk"]))
+        foes.append(Foe(rec, max(1, round(rec["hp"] * scale * 1.3)), rec["atk"]))
     return Battle(build, beat, foes, rng, items)
 
 
