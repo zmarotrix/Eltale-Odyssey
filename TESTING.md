@@ -8,6 +8,56 @@ Your save is backed up in the dev panel slots (`before-eltale-0-1`, from before 
 
 "Checked by Claude" means I drove the game through the dev panel and looked at screenshots.
 
+## Tonight's build (2026-10-23): spells, Settle, Freeze, finishers, levels
+
+All 60 spells are the Spell Trees doc's now. Each keeps its button combo and tier; names, descriptions and MP are
+new. The description box shows the spell's own **MP** (red when you can't pay) and **FINISHER: 2 CHARGE** for
+tier-5 spells. Checked by Claude (every school, levels set to 70 in RAM only): each spell below did its thing at
+least once.
+
+- **Fire**: Ember, Twin Flame, Blaze kindle (Burn stacks); Burst and Blast also burn foes near the target; Bellows
+  heats a Burn (1.5x for 3 turns); Flare Up grows it by half; Scald (close range, a ring of steam) ticks burning
+  foes at once and burns the rest; Pyre cashes all of a Burn at once; Firestorm hits every foe and heats their
+  Burn; Detonate copies the target's Burn onto foes near it; Banked Fire pauses a Burn 2 turns, then it ticks 2x;
+  Meteor marks the spot and lands next turn on everything near it; Heat Haze burns foes that hit you; Searing
+  Steam deals 3x the Burn at once, thaws everyone and scalds you a little.
+- **Earth**: heavy hits that Settle you (see below). Boulder cracks 2 shields on a weakness hit; Molten Rock burns;
+  Mudshot frosts; Quagmire frosts foes near the target; Sandblast (4 hits) doesn't Settle; Megalith Settles 2 deep;
+  Avalanche hits every foe; Fissure cracks a shield on foes near the target; Landslide hits everything in its line
+  and pushes it back; Erode lowers defense; Stoneskin: 30% less damage for 3 turns; Juggernaut: your next staff
+  swing deals 3x and cracks 2 shields; Eruption hits around the target and burns; Rockstorm drops a boulder on a
+  random foe at the start of each of your next 3 turns.
+- **Water**: **Frost** (light blue, moves half as far) and **Freeze**: a Frosted foe hit colder Freezes; a frozen
+  one hit colder stays frozen longer; Fire thaws, Water puts Burn out. Spout (Boost: Frost), Icicle, Glacier,
+  Hailstorm, Ice Shards, Undertow (drags the foe to you), Deluge (every foe). **Mend is free** for everyone: heals
+  18% HP and 20% MP at Water 12+, less below. Soothe heals a little and cures your status; Renew heals at the start
+  of 3 turns; Ice Wall stops enemy spells for a turn; Whiteout: foes miss 40% of the time for 2 turns; Frost Nova
+  frosts foes near you; **Shatter**: 1.8x a normal hit on a frozen foe (812 in the test), and ends the Freeze;
+  a weak hit otherwise. Absolute Zero freezes outright.
+- **Wind**: Wind Blade, Shear (cuts foes near the target too), Fan the Flames (1.6x on burning foes, sets Burn),
+  Windchill (may Frost), Gust (no damage, blows a foe ~80 away), Tempest (each hit may crack any shield),
+  Whirlwind (every foe, pulls them together), Downburst (cracks 2 shields), Hurricane (every foe, every hit
+  cracks), Confusion (foes lose their turn and hit an ally). Escape, Homeward, Swiftstep, Mirage, Clear Sight
+  work as the old spells did (not re-checked).
+- **Boost**: Earth +25% damage a charge; Wind +40% hits; Fire and Water spend charges on their effect (more
+  stacks, wider blasts, one step colder, longer guards).
+
+Not checked yet: Stoneskin, Ice Wall and Whiteout actually saving HP (the test made Brian dodge everything);
+Clear Sight's reveal; how each spell **looks** (several borrow another spell's visuals; tell me which look wrong).
+Spells that flew at the wrong range are fixed; a few are close-range by design (Scald, Searing Steam: a ring of
+steam around you).
+
+- [ ] **Settle (Earth)**: after an Earth attack, your Earth attacks deal 0.4x until you end a turn with **A**
+  without casting or swinging (moving is fine). Megalith needs two such turns. Checked by Claude.
+- [ ] **Freeze window**: a frozen foe stays frozen through its skipped turn AND your next turn (your chance to
+  Shatter), then thaws. A thawed boss can't be frozen again for 2 of its turns. Checked by Claude.
+- [ ] **Freeze looks**: a frozen foe stops moving inside a see-through block of ice. Checked by Claude.
+- [ ] **Finishers**: tier-5 spells only open with 2 Charge and spend all of it; each Charge past 2 is their Boost.
+  Checked by Claude.
+- [ ] **Levels to 99**: element levels go past 50 at the level-up screen; spells open by level (12/30/48/66), not
+  by points; the Spirits window's first page shows the levels. Checked by Claude (Fire 50 to 51).
+- [ ] **12 new gear pieces** in chests (table under Equipment). Checked by Claude: all show in the window.
+
 ## Starting gold (changed)
 
 A new game starts with **100 gold** (vanilla's table says 500); the early chests make up some of it. Saves you
@@ -62,6 +112,8 @@ Ingram (Melrode), Thom (Dondoran), Jiryo (Larapool), Anette (Normoon), Ring (Lim
 - [ ] Bought items show up in your item panel and work as usual.
 
 ## Combat slice
+
+Spell numbers and kinds below are from before tonight's build; the spells section at the top replaces them.
 
 - [ ] **Enemy spells are separate** from Brian's (checked: monsters cast from their own copies).
 - [ ] **Element rebalance** (Brian only): Fire Ball 200, Rock 247 (Earth now 0.85x vanilla across the board, it was

@@ -347,6 +347,73 @@ static void freeze_enemy(int i, int turns) {
     }
 }
 
+// ---- For spells.c ----
+
+static int frozen_now(int i) {
+    u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
+    return !guards[i].broken && !eo_spells_confused(i) && status != 0 && (*(u16*)status & STATUS_RESTRICTION_BIT);
+}
+
+int eo_combat_frozen(int slot) {
+    return slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0 && frozen_now(slot);
+}
+
+void eo_combat_freeze(int slot, int turns) {
+    if (slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0 && !guards[slot].broken) {
+        freeze_enemy(slot, turns);
+    }
+}
+
+// A frozen foe hit colder stays frozen a turn longer (up to 3; bosses never past 1).
+void eo_combat_freeze_longer(int slot) {
+    if (!eo_combat_frozen(slot) || (gBattleState & BATTLE_BOSS)) {
+        return;
+    }
+    u8* status = *(u8**)(ENEMY_BATTLE_DATA(slot) + 0x68);
+    if (status[STATUS_RESTRICTION_DURATION] < 3) {
+        status[STATUS_RESTRICTION_DURATION]++;
+    }
+}
+
+// Fire, steam and Shatter end a Freeze; a boss then resists freezing for a while.
+void eo_combat_thaw(int slot) {
+    if (!eo_combat_frozen(slot)) {
+        return;
+    }
+    u8* status = *(u8**)(ENEMY_BATTLE_DATA(slot) + 0x68);
+    *(u16*)status &= (u16)~STATUS_RESTRICTION_BIT;
+    status[STATUS_RESTRICTION_DURATION] = 0;
+    ice_window[slot] = 0;
+    frozen_before[slot] = 0;
+    if (gBattleState & BATTLE_BOSS) {
+        freeze_immune[slot] = BOSS_FREEZE_IMMUNE;
+    }
+}
+
+// Confusion: the foe loses its next turns (the Restriction bit, like Break; no ice).
+void eo_combat_skip_turn(int slot, int turns) {
+    if (slot < 0 || slot >= MAX_ENEMIES || ENEMY_HP(slot) == 0) {
+        return;
+    }
+    u8* status = *(u8**)(ENEMY_BATTLE_DATA(slot) + 0x68);
+    *(u16*)status |= STATUS_RESTRICTION_BIT;
+    if (status[STATUS_RESTRICTION_DURATION] < turns) {
+        status[STATUS_RESTRICTION_DURATION] = (u8)turns;
+    }
+}
+
+void eo_combat_crack(int slot, int count) {
+    if (slot >= 0 && slot < MAX_ENEMIES && ENEMY_HP(slot) > 0) {
+        crack_shields(slot, count);
+    }
+}
+
+void eo_combat_reveal(int slot) {
+    if (slot >= 0 && slot < MAX_ENEMIES) {
+        guards[slot].revealed = 1;
+    }
+}
+
 // Hits from Brian: remember the target's HP, count weakness hits. The staff calls enemy_take_damage with
 // flags 0x8004; burn ticks and reflected hits use plain 0x8000 and are ignored here.
 #define STAFF_FLAGS 0x8004
@@ -382,7 +449,8 @@ RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u1
     Guard* g = &guards[slot];
     hit_was_broken = g->broken;
     u8* target_status = *(u8**)(ENEMY_BATTLE_DATA(slot) + 0x68);
-    hit_was_frozen = !g->broken && target_status != 0 && (*(u16*)target_status & STATUS_RESTRICTION_BIT);
+    hit_was_frozen = !g->broken && !eo_spells_confused(slot) && target_status != 0 &&
+                     (*(u16*)target_status & STATUS_RESTRICTION_BIT);
     hit_was_burning = eo_status_burn_stacks(slot) > 0;
     // The game's element rule: the opposite element hits x1.25 (the guard's weakness), the same one x0.5.
     u16 own = ENEMY_RECORD(slot) != 0 ? *(u16*)(ENEMY_RECORD(slot) + RECORD_ELEMENT) : 0xFF;
@@ -407,7 +475,7 @@ RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u1
         weakness_bonus_given++;
     }
     int heavy = element == EARTH && (eo_talent(TALENT_FAULT_LINE) || eo_equipment_worn(EQ_MOUNTAIN_STAFF));
-    crack_shields(slot, heavy ? 2 : 1);
+    crack_shields(slot, (heavy ? 2 : 1) + eo_spells_weak_extra_cracks());
 }
 
 // Damage numbers: 9 slots of 0x1C bytes at 0x800873D0 (+0x00 the fighter's battle data, +0x04 digits, +0x0C timer,
@@ -520,6 +588,12 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     if (eo_equipment_worn(EQ_GLASS_CHARM)) {
         percent += GLASS_PERCENT;
     }
+    // The spell's own bonus (Shatter on ice, Fan the Flames on a burning foe); Juggernaut's swing.
+    if (hit_kind == HIT_SPELL) {
+        percent += (u32)eo_spells_hit_percent(slot, hit_was_frozen, hit_was_burning);
+    } else if (hit_kind == HIT_STAFF) {
+        percent += (u32)eo_spells_staff_percent(slot);
+    }
     // Which way the mechanics pushed this hit, for the number's color: a weakness hit, a Broken, burning or frozen
     // bonus or a stoke on a burning foe buffs it; the foe resisting the element or a stoke on a foe that isn't
     // burning weakens it. Gear bonuses alone leave it white.
@@ -527,23 +601,6 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
                  SCHOOL_TALENT_PERCENT * eo_talent(school_talent[hit_element]) : 0) + (hit_was_resisted ? RESIST_SOFTEN_PERCENT : 0);
     int weakened = hit_was_resisted;
     u32 shown = hit;
-    // Stoking Fire spells: weak on a foe that isn't burning (the HP the extra 30% took comes back; if the full hit
-    // killed it, it stays down), strong on one that is.
-    if (hit_kind == HIT_SPELL && (last_brian_spell >> 8) == FIRE && eo_fire_kind(last_brian_spell & 0xFF) == FIRE_STOKE) {
-        if (hit_was_burning) {
-            percent += STOKE_BURNING_PERCENT - 100;
-            buffed = 1;
-        } else {
-            weakened = 1;
-            if (hp > 0) {
-                u32 back = hit * (100 - STOKE_FRESH_PERCENT) / 100;
-                u16 max_hp = *(u16*)(ENEMY_RECORD(slot) + RECORD_MAX_HP);
-                hp = (u16)(hp + back > max_hp ? max_hp : hp + back);
-                ENEMY_HP(slot) = hp;
-                shown = hit - back;
-            }
-        }
-    }
     // A boss adapted to the element Brian keeps casting gives back part of the hit.
     if (hit_kind == HIT_SPELL && (gBattleState & BATTLE_BOSS) && element_streak > ADAPT_AFTER &&
         hit_element == last_cast_school && hp > 0) {
@@ -600,10 +657,9 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
         u32 healed = stats[2] + (hit + extra) / 4;
         stats[2] = (u16)(healed > stats[3] ? stats[3] : healed);
     }
-    // A boosted damaging Water spell freezes its target, if it has no other status (status.c); Deep Freeze holds it
-    // a turn longer.
-    if (active_boost > 0 && active_school == WATER && ENEMY_HP(slot) > 0 && !eo_status_blocks(ENEMY_BATTLE_DATA(slot), 1, 0)) {
-        freeze_enemy(slot, active_boost + eo_talent(TALENT_DEEP_FREEZE) + eo_talent(TALENT_EYE_OF_THE_STORM));
+    // What the spell does besides damage (spells.c, next frame).
+    if (hit_kind == HIT_SPELL) {
+        eo_spells_on_hit(slot, shown, hit_was_weak, hit_was_frozen);
     }
 }
 
@@ -712,7 +768,7 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
     // Which foes are frozen (not Broken) as this enemy turn ends: one the game thaws now gets its ice window.
     for (int i = 0; i < MAX_ENEMIES; i++) {
         u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
-        frozen_before[i] = ENEMY_HP(i) > 0 && !guards[i].broken && status != 0 &&
+        frozen_before[i] = ENEMY_HP(i) > 0 && !guards[i].broken && !eo_spells_confused(i) && status != 0 &&
                            (*(u16*)status & STATUS_RESTRICTION_BIT) != 0;
         if (freeze_immune[i] > 0) {
             freeze_immune[i]--;
@@ -779,7 +835,8 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
         return;
     }
     // Once per cast (the first shot of the turn): Stone Memory's streak and Prism Sigil's element change.
-    if (cast_turn != turns_taken + 1) {
+    int new_cast = cast_turn != turns_taken + 1;
+    if (new_cast) {
         cast_turn = turns_taken + 1;
         if (first_cast_turn == 0) {
             first_cast_turn = cast_turn;
@@ -791,12 +848,18 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     }
     u8* stats = SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE;
     u16 type = *(u16*)(stats + SPELL_TYPE);
-    // A finisher (tier 5) spends all of Brian's Charge, with no Boost on top.
+    // A finisher (tier 5) spends all of Brian's Charge: 2 to cast it, and each one past 2 is its Boost.
     int finisher = eo_spirits_tier(school, index) == 5;
-    if (finisher) {
+    int used = boost;
+    if (finisher && new_cast) {
+        used = charge > FINISHER_CHARGE ? charge - FINISHER_CHARGE : 0;
+        used = used > MAX_BOOST ? MAX_BOOST : used;
         boost = 0;
         charge = 0;
         spent_this_turn = 1;
+    }
+    if (new_cast) {
+        eo_spells_on_cast(school, index, used);
     }
     if (school == EARTH && type == SPELL_TYPE_DAMAGE && earth_settle[index] > settle_pending) {
         settle_pending = earth_settle[index];
@@ -806,12 +869,13 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     int leviathan = school == WATER && type == SPELL_TYPE_HEAL && eo_equipment_worn(EQ_LEVIATHAN_STAFF);
     int tether = school == WIND && type == SPELL_TYPE_DAMAGE && eo_equipment_worn(EQ_GALE_TETHER);
     int curve = type == SPELL_TYPE_DAMAGE;   // every damaging spell: the overhaul's power curve (progression.c)
-    if (boost == 0 && !echo && !wellspring && !leviathan && !tether && !curve) {
+    if (used == 0 && !echo && !wellspring && !leviathan && !tether && !curve) {
+        boost = 0;
         return;
     }
     active_spell = stats;
     active_school = (u8)school;
-    active_boost = boost;
+    active_boost = (u8)used;
     saved_base = *(u16*)(stats + SPELL_BASE);
     saved_shots = *(u16*)(stats + SPELL_SHOTS);
     u16 base = saved_base;
@@ -821,19 +885,32 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
         shots = (u16)(shots * 2);
         base = (u16)(base * 65 / 100);
     }
-    if (school == EARTH && type == SPELL_TYPE_DAMAGE) {
-        base = (u16)(base * (100 + (40 + AFTERSHOCK_PERCENT * eo_talent(TALENT_AFTERSHOCK)) * boost) / 100);
-    } else if (school == WATER && type == SPELL_TYPE_HEAL) {
-        base = (u16)(base * (100 + 30 * boost + 10 * wellspring + (leviathan ? 25 : 0)) / 100 + boost);
-    } else if (school == WIND && type == SPELL_TYPE_DAMAGE) {
-        // Wind Boost: +40% shots per charge (rounded, at least one), +10 points with each Crosswind rank and the
-        // Skyreed Staff. A flat +2 a charge made a 3-charge Wind Cutter 4x (balance pass, 2026-10-21).
-        u32 pct = 40 + 10 * (u32)eo_talent(TALENT_CROSSWIND) + (eo_equipment_worn(EQ_SKYREED_STAFF) ? 10 : 0);
-        u32 extra_shots = ((u32)saved_shots * pct * boost + 50) / 100;
-        if (boost > 0 && extra_shots < (u32)boost) {
-            extra_shots = boost;
+    // Boost by spell (spells.c): Earth +25% damage a charge, Wind +40% shots (at least one more a charge), and
+    // the spells that boost like another school. Fire and Water spend their charges on their effects instead.
+    int damage_pct;
+    int shots_pct;
+    eo_spells_boost(school, index, &damage_pct, &shots_pct);
+    if (damage_pct > 0) {
+        if (school == EARTH) {
+            damage_pct += AFTERSHOCK_PERCENT * eo_talent(TALENT_AFTERSHOCK);
         }
-        shots = (u16)(shots + extra_shots + (tether ? 1 : 0));
+        base = (u16)(base * (100 + damage_pct * used) / 100);
+    }
+    if (shots_pct > 0) {
+        // +10 points with each Crosswind rank and the Skyreed Staff. A flat +2 a charge made a 3-charge Wind Cutter
+        // 4x (balance pass, 2026-10-21).
+        u32 pct = (u32)shots_pct + 10 * (u32)eo_talent(TALENT_CROSSWIND) + (eo_equipment_worn(EQ_SKYREED_STAFF) ? 10 : 0);
+        u32 extra_shots = ((u32)saved_shots * pct * used + 50) / 100;
+        if (used > 0 && extra_shots < (u32)used) {
+            extra_shots = used;
+        }
+        shots = (u16)(shots + extra_shots);
+    }
+    if (tether) {
+        shots++;
+    }
+    if (school == WATER && type == SPELL_TYPE_HEAL) {
+        base = (u16)(base * (100 + 10 * used + 10 * wellspring + (leviathan ? 25 : 0)) / 100);
     }
     if (curve) {
         u32 scaled = (u32)base * eo_progression_spell_scale(school) / 1000;
@@ -921,10 +998,10 @@ static void draw_spell_description(void) {
         return;
     }
 
-    // MP: one per element press (research/battle, "MP cost"); Pilgrim's Soul halves it, Gambler's Coin
-    // makes it a gamble. Red when Brian can't pay.
-    char mp[8];
-    u32 cost = BRIAN_SPELL_COUNT;
+    // MP: each spell's own cost (spells.c); Pilgrim's Soul halves it, Gambler's Coin makes it a gamble. Red when
+    // Brian can't pay. A finisher also says it needs 2 Charge.
+    char mp[32];
+    u32 cost = valid ? eo_spells_mp_cost(school, index) : 0;
     if (eo_equipment_worn(EQ_PILGRIMS_SOUL)) {
         cost = (cost + 1) / 2;
     }
@@ -933,12 +1010,16 @@ static void draw_spell_description(void) {
     } else {
         eo_format_u32(mp, "MP ", cost, "");
     }
+    if (valid && eo_spirits_tier(school, index) == 5) {
+        eo_append(mp + eo_strlen(mp), "  FINISHER: 2 CHARGE");
+    }
     int mp_short = ((u16*)gPlayerMainData)[4] < cost;
 
     // Line 1: element gem and description. Line 2: the MP cost. (The HUD's text routine stops drawing past the
     // right of the safe area, so nothing goes after the longest descriptions.)
     s32 text_x = DESC_X + SMALL_PAD + ICON_W + 2;
-    s32 w = text_x + eo_strlen(text) * SMALL_W + SMALL_PAD - DESC_X;
+    s32 longest = eo_strlen(text) > eo_strlen(mp) ? eo_strlen(text) : eo_strlen(mp);
+    s32 w = text_x + longest * SMALL_W + SMALL_PAD - DESC_X;
     s32 h = DESC_ROW * (valid ? 2 : 1) + 4;
     eo_ui_window(DESC_X, DESC_Y, w, h);
     s32 y = DESC_Y + 4;

@@ -136,6 +136,8 @@ u32 eo_now(void);
 // ---- Progression (progression.c) ----
 #define DAMAGE_SCALE_THOUSANDTHS 760   // all of Brian's damage, spells and staff
 u32 eo_progression_spell_scale(int school);   // thousandths: the 1.5%-a-level curve over the game's 3%, x0.76
+u32 eo_progression_spell_power_permille(int school);   // spell power per 1000 base, before defense
+u32 eo_progression_mend_permille(void);       // Mend's strength by Water level: 1000 at level 12 or more
 int eo_spirits_tier(int school, int index);   // the spell's tier, 1-5
 int eo_combat_finisher_ready(void);           // tier-5 spells castable now (2 Charge in battle)
 
@@ -250,9 +252,36 @@ int eo_talent_learn(int talent);   // 1 if a rank was learned now (level and poi
 int eo_lockon_target(void);   // enemy slot Brian is locked onto, -1 if none
 void eo_fx_lockon_marker(int enemy_slot);   // fx.c: the sparkle over the target's head
 
-// ---- Fire's kinds of spell (status.c) ----
-enum { FIRE_OTHER, FIRE_KINDLE, FIRE_STOKE };
-int eo_fire_kind(int index);   // Fire spell index 0-14
+// ---- The 60 spells (spells.c) ----
+void eo_spells_init(void);
+const char* eo_spells_name(int school, int index);
+const char* eo_spells_text(int school, int index);
+u32 eo_spells_mp_cost(int school, int index);
+void eo_spells_boost(int school, int index, int* damage_percent, int* shots_percent);
+void eo_spells_on_cast(int school, int index, int boost);
+void eo_spells_on_hit(int slot, u32 amount, int weak, int frozen);
+int eo_spells_hit_percent(int slot, int frozen, int burning);
+int eo_spells_weak_extra_cracks(void);
+int eo_spells_staff_percent(int slot);
+int eo_spells_frosted(int slot);
+int eo_spells_confused(int slot);
+// combat.c, for spells.c
+int eo_combat_frozen(int slot);
+void eo_combat_freeze(int slot, int turns);
+void eo_combat_freeze_longer(int slot);
+void eo_combat_thaw(int slot);
+void eo_combat_skip_turn(int slot, int turns);
+void eo_combat_crack(int slot, int count);
+void eo_combat_reveal(int slot);
+// status.c: Burn
+void eo_status_burn_cash(int slot, u32 percent);
+u32 eo_status_burn_total(int slot);
+void eo_status_burn_tick_now(int slot);
+void eo_status_burn_heat(int slot, int turns, int percent);
+void eo_status_burn_grow(int slot, int percent);
+void eo_status_burn_bank(int slot, int turns, int percent);
+void eo_status_burn_clear(int slot);
+void eo_status_burn_detonate(int slot, f32 radius);
 
 // ---- One status at a time (status.c) ----
 // 1 if `fighter` (battle data) has a status that keeps a new one off. `by_brian`: the new status is Brian's

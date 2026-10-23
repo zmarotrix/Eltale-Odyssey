@@ -6,7 +6,8 @@
 // that hit's damage (up to 3; a 4th replaces the weakest). Stacks tick at the end of each of Brian's turns,
 // from the turn after they were applied, through the game's own enemy damage routine (damage number, hurt
 // animation, death) and ignore defense. They fade after BURN_TURNS ticks without a new Fire hit.
-// Fire Bomb ignites a burning foe: all the Burn damage still to come (stacks x turns left) lands at once.
+// Fire's spells (spells.c) also heat a Burn (ticks deal more for a few turns), bank it (it pauses, then comes back
+// stronger), grow it, set off one tick at once, or cash all of it in.
 //
 // Poison: poison-themed monsters may poison Brian when they hurt him. He loses 5% of max HP at the end of each
 // of his turns for POISON_TURNS turns, never going below 1 HP; outside battle it ticks every few seconds.
@@ -77,6 +78,10 @@ typedef struct {
     u16 stacks[BURN_STACKS];  // damage per tick of each stack, 0 = empty
     u8 turns_left;
     u8 fresh;                 // applied this turn: starts ticking next turn
+    u8 hot_turns;             // Bellows, Firestorm, Meteor: ticks deal hot_percent more
+    u8 hot_percent;
+    u8 banked_turns;          // Banked Fire: ticks skipped, then bank_percent more for the rest
+    u8 bank_percent;
 } Burn;
 
 static Burn burns[MAX_ENEMIES];
@@ -138,9 +143,17 @@ static void burn_tick_all(void) {
             b->fresh = 0;
             continue;
         }
+        if (b->banked_turns > 0) {
+            b->banked_turns--;   // banked: no tick, and the Burn doesn't run down
+            continue;
+        }
         u32 total = 0;
         for (int i = 0; i < BURN_STACKS; i++) {
             total += b->stacks[i];
+        }
+        total = total * (100 + (b->hot_turns > 0 ? b->hot_percent : 0) + b->bank_percent) / 100;
+        if (b->hot_turns > 0) {
+            b->hot_turns--;
         }
         if (total > 0) {
             eo_fx_burn_hit(slot);
@@ -158,39 +171,17 @@ static void burn_tick_all(void) {
     }
 }
 
-#define SPELL_FIRE_BOMB 0x000A   // Fire school, index 10
-
-// Fire's two kinds of damage spell (playtest, 2026-10-21: "Fire spells should be slightly weaker but apply a burn,
-// and then some spells should do less damage and not burn, unless they are already burning and then do more"):
-// kindling spells set foes burning; stoking spells don't, but hit burning foes harder (combat.c). Detonate (Fire
-// Bomb) does neither: it sets off the Burn already there.
-int eo_fire_kind(int index) {
-    switch (index) {
-        case 0: case 1: case 3: case 5: case 9:   // Ember, Twin Flame, Seeker, Blaze, Flame Volley
-            return FIRE_KINDLE;
-        case 4: case 8: case 12: case 14:         // Scald, Pyre, Magma, Searing Steam
-            return FIRE_STOKE;
+// Deals `percent` of all a burning foe's remaining Burn damage (stacks x turns left) at once and puts it out.
+void eo_status_burn_cash(int slot, u32 percent) {
+    if (slot < 0 || slot >= MAX_ENEMIES || burns[slot].turns_left == 0) {
+        return;
     }
-    return FIRE_OTHER;
-}
-
-// The spell Brian launched last (projectile_init runs for every shot, Brian's and enemies').
-static u16 brian_spell = 0xFFFF;
-
-RECOMP_HOOK("projectile_init") void eo_status_on_projectile(void* caster, u16 spell) {
-    if (!is_enemy_battle_data(caster)) {
-        brian_spell = spell & 0x0FFF;
-    }
-}
-
-// Deals all of a burning foe's remaining Burn damage at once and clears it.
-static void burn_ignite(int slot) {
     Burn* b = &burns[slot];
     u32 total = 0;
     for (int i = 0; i < BURN_STACKS; i++) {
         total += b->stacks[i];
     }
-    total *= b->turns_left;
+    total = total * b->turns_left * percent / 100;
     total = total * (100 + CONFLAGRATION_PERCENT * (u32)eo_talent(TALENT_CONFLAGRATION)) / 100;
     *b = (Burn){ 0 };
     if (total > 0 && ENEMY_HP(slot) > 0) {
@@ -199,40 +190,98 @@ static void burn_ignite(int slot) {
     }
 }
 
-// Remember who a Fire spell from Brian is about to hit; the stack is added once the damage is known.
-static int pending_slot = -1;
-static u16 pending_hp;
-
-RECOMP_HOOK("enemy_take_damage") void eo_status_before_enemy_damage(s32 slot, u16 power, u16 element, u16 flags, void* attacker) {
-    pending_slot = -1;
-    if (power == 0 || element != ELEMENT_FIRE || (flags & DAMAGE_NO_ELEMENT) || attacker == burn_attacker ||
-        is_enemy_battle_data(attacker) || slot < 0 || slot >= MAX_ENEMIES) {
-        return;
+// Damage per tick of a foe's Burn right now (0 if it isn't burning).
+u32 eo_status_burn_total(int slot) {
+    if (slot < 0 || slot >= MAX_ENEMIES || burns[slot].turns_left == 0) {
+        return 0;
     }
-    pending_slot = slot;
-    pending_hp = ENEMY_HP(slot);
+    u32 total = 0;
+    for (int i = 0; i < BURN_STACKS; i++) {
+        total += burns[slot].stacks[i];
+    }
+    return total;
 }
 
-RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_enemy_damage(void) {
-    if (pending_slot < 0) {
+// Scald: one tick of the foe's Burn lands now (the Burn itself carries on).
+void eo_status_burn_tick_now(int slot) {
+    u32 total = eo_status_burn_total(slot);
+    if (total > 0 && ENEMY_HP(slot) > 0) {
+        eo_fx_burn_hit(slot);
+        enemy_take_damage(slot, (u16)(total > 0xFFFF ? 0xFFFF : total), ELEMENT_FIRE, DAMAGE_NO_ELEMENT, burn_attacker);
+    }
+}
+
+// Bellows, Firestorm, Meteor: the foe's Burn deals `percent` more for `turns` ticks.
+void eo_status_burn_heat(int slot, int turns, int percent) {
+    if (eo_status_burn_total(slot) == 0) {
         return;
     }
-    int slot = pending_slot;
-    pending_slot = -1;
-    u16 hp = ENEMY_HP(slot);
-    u16 hit = hp < pending_hp ? (u16)(pending_hp - hp) : 0;  // this hit only, before any ignition
-    // Spirit Charge on a Fire spell (combat.c): +1 stack per charge, and at 3 the hit ignites first.
-    int boost = eo_combat_active_school() == ELEMENT_FIRE ? eo_combat_active_boost() : 0;
-    if ((brian_spell == SPELL_FIRE_BOMB || boost >= 3) && burns[slot].turns_left > 0) {
-        burn_ignite(slot);
+    Burn* b = &burns[slot];
+    if (turns > b->hot_turns) {
+        b->hot_turns = (u8)turns;
     }
-    int kindles = (brian_spell >> 8) == 0 && eo_fire_kind(brian_spell & 0xFF) == FIRE_KINDLE;
-    if (kindles && hit > 0 && ENEMY_HP(slot) > 0 && !eo_status_blocks(ENEMY_BATTLE_DATA(slot), 1, 1)) {
-        u32 amount = (u32)hit * (u32)eo_status_burn_percent() / 100;
-        int stacks = boost + 1 + (eo_equipment_worn(EQ_EMBER_HEART) ? 1 : 0);   // Ember Heart: one more
-        for (int i = 0; i < stacks; i++) {
-            burn_add_stack(slot, (u16)(amount < 1 ? 1 : amount));
+    if (percent > b->hot_percent) {
+        b->hot_percent = (u8)(percent > 255 ? 255 : percent);
+    }
+    if (b->turns_left < turns) {
+        b->turns_left = (u8)turns;
+    }
+}
+
+// Flare Up: every stack grows by `percent` and the Burn starts its duration over.
+void eo_status_burn_grow(int slot, int percent) {
+    if (eo_status_burn_total(slot) == 0) {
+        return;
+    }
+    Burn* b = &burns[slot];
+    for (int i = 0; i < BURN_STACKS; i++) {
+        u32 grown = (u32)b->stacks[i] * (100 + (u32)percent) / 100;
+        b->stacks[i] = (u16)(grown > 0xFFFF ? 0xFFFF : grown);
+    }
+    b->turns_left = (u8)(BURN_TURNS + eo_talent(TALENT_SMOULDER));
+}
+
+// Banked Fire: no ticks for `turns`, then every tick deals `percent` more.
+void eo_status_burn_bank(int slot, int turns, int percent) {
+    if (eo_status_burn_total(slot) == 0) {
+        return;
+    }
+    Burn* b = &burns[slot];
+    b->banked_turns = (u8)turns;
+    b->bank_percent = (u8)(percent > 255 ? 255 : percent);
+}
+
+// Water puts Burn out.
+void eo_status_burn_clear(int slot) {
+    if (slot >= 0 && slot < MAX_ENEMIES) {
+        burns[slot] = (Burn){ 0 };
+    }
+}
+
+// Detonate: every live foe within `radius` of the target gets a copy of each of its stacks; it keeps burning.
+void eo_status_burn_detonate(int slot, f32 radius) {
+    if (eo_status_burn_total(slot) == 0) {
+        return;
+    }
+    f32* from = (f32*)(ENEMY_SLOTS + slot * ENEMY_SLOT_SIZE + 0x24);
+    eo_fx_flare(slot);
+    eo_sfx(SFX_DETONATE);
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (i == slot || ENEMY_HP(i) == 0) {
+            continue;
         }
+        f32* to = (f32*)(ENEMY_SLOTS + i * ENEMY_SLOT_SIZE + 0x24);
+        f32 dx = to[0] - from[0];
+        f32 dz = to[2] - from[2];
+        if (dx * dx + dz * dz > radius * radius || eo_status_blocks(to, 1, 1)) {
+            continue;
+        }
+        for (int k = 0; k < BURN_STACKS; k++) {
+            if (burns[slot].stacks[k] > 0) {
+                burn_add_stack(i, burns[slot].stacks[k]);
+            }
+        }
+        eo_fx_burn_hit(i);
     }
 }
 

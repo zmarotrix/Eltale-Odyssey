@@ -97,7 +97,7 @@ static const Rgb status_colors[12] = {
     { 170, 0, 50 },      // 0x002 Vampire's Touch: crimson
     { 255, 150, 30 },    // 0x004 Power Staff: orange
     { 130, 210, 255 },   // 0x008 Restriction (Freeze): ice blue
-    { 70, 230, 100 },    // 0x010 Movement: green
+    { 170, 235, 255 },   // 0x010 Movement: pale ice blue (Frost, spells.c)
     { 40, 220, 200 },    // 0x020 Agility: teal
     { 255, 255, 255 },   // 0x040 Silence: white
     { 255, 210, 90 },    // 0x080 Soul Searcher: gold
@@ -226,7 +226,7 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
         // A Broken enemy's animation is held back: its frame only moves on every BROKEN_ANIM_STEP draws (the
         // game advances it by one after each draw).
         // A frozen one's doesn't move at all.
-        int frozen = !broken && stats != 0 && (*(u16*)stats & STATUS_RESTRICTION) != 0;
+        int frozen = !broken && !eo_spells_confused(slot) && stats != 0 && (*(u16*)stats & STATUS_RESTRICTION) != 0;
         u16* anim_frame = (u16*)(object + BATTLE_DATA_ANIM_FRAME);
         if ((broken && was_broken[slot] && frame % BROKEN_ANIM_STEP != 0) || (frozen && was_frozen[slot])) {
             *anim_frame = held_frame[slot];

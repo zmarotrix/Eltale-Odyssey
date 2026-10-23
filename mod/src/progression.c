@@ -76,3 +76,28 @@ u32 eo_progression_spell_scale(int school) {
     u32 steps = own + (opp >> 4) + sides;
     return curve(steps, 1015) * DAMAGE_SCALE_THOUSANDTHS / curve(steps, 1030);
 }
+
+// Spell power per 1000 base right now: base x 0.02 x the overhaul's curve x 0.76 (what the game's formula gives
+// once the base is scaled above). For effects that deal a spell's worth of damage themselves (spells.c).
+u32 eo_progression_spell_power_permille(int school) {
+    u32 own = ELEMENT_LEVELS[school];
+    u32 opp = ELEMENT_LEVELS[opposite[school]];
+    u32 sides = 0;
+    for (int s = 0; s < 4; s++) {
+        if (s != school && s != opposite[school]) {
+            sides += ELEMENT_LEVELS[s] >> 3;
+        }
+    }
+    return curve(own + (opp >> 4) + sides, 1015) * 2 * DAMAGE_SCALE_THOUSANDTHS / 100000;
+}
+
+// Mend heals by Water level (Spell Trees doc): full at level 12, less below, on the spell-power curve.
+#define MEND_FULL_LEVEL 12
+
+u32 eo_progression_mend_permille(void) {
+    u32 water = ELEMENT_LEVELS[2];
+    if (water >= MEND_FULL_LEVEL) {
+        return 1000;
+    }
+    return curve(water, 1015) * 1000 / curve(MEND_FULL_LEVEL, 1015);
+}
