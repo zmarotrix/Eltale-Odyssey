@@ -368,6 +368,8 @@ static u8 scalded;                  // Searing Steam scalded Brian this cast
 static u8 phoenix_used;             // Phoenix: once a battle
 
 #define FOG_MISS_PERCENT 40
+#define MEND_MP_PERCENT 25
+#define MEND_MIN_MP 3
 #define FROST_TURNS 2
 #define FREEZE_TURNS 2              // a monster skips 2 turns; bosses 1 (combat.c)
 #define CONFUSED_HIT_PERCENT 12     // of the ally's max HP
@@ -548,14 +550,16 @@ void eo_spells_on_cast(int school, int index, int boost) {
             fog_turns = (u8)(2 + boost + eo_talent(TALENT_UPDRAFT));
             break;
         case K_MEND: {
-            // Free: 18% of max HP and 20% of max MP at Water 12 or more, less below (by the spell-power curve).
+            // Free: 18% of max HP at Water 12 or more, from 60% of that at Water 1 (progression.c); and 25% of max
+            // MP at any Water level, never under MEND_MIN_MP, so one Mend always pays for a tier-1 spell (playtest,
+            // 2026-10-23: "I don't want to have to cast it so many times to cast a spell").
             // Deep Well: 2% more of each a rank; Wellspring: 5% more MP a rank.
             u32 scale = eo_progression_mend_permille();
             u32 well = 2 * (u32)eo_talent(TALENT_DEEP_WELL);
             u32 hp = (u32)BRIAN_MAX_HP * (18 + well) * scale / 100000 * (100 + 10 * (u32)boost) / 100;
-            u32 mp = (u32)BRIAN_MAX_MP * (20 + well + 5 * (u32)eo_talent(TALENT_WELLSPRING)) * scale / 100000;
+            u32 mp = (u32)BRIAN_MAX_MP * (MEND_MP_PERCENT + well + 5 * (u32)eo_talent(TALENT_WELLSPRING)) / 100;
             heal_brian(hp < 1 ? 1 : hp);
-            u32 nmp = BRIAN_MP + (mp < 1 ? 1 : mp);
+            u32 nmp = BRIAN_MP + (mp < MEND_MIN_MP ? MEND_MIN_MP : mp);
             BRIAN_MP = (u16)(nmp > BRIAN_MAX_MP ? BRIAN_MAX_MP : nmp);
             break;
         }
