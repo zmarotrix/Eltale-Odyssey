@@ -67,7 +67,7 @@ CONFIG = dict(
     none_mult=0.75,       # damage Brian's spells deal to no-element foes (spec; the game's rule was 0.5)
     burn_full=False,      # Burn ticks ignore the target's element (a Fire boss still burns at full)
     shatter_neutral=False,  # Shatter breaks ice, so it ignores element
-    shatter_mult=2.0,     # Shatter on a frozen foe: this many times a normal hit, ignoring Freeze defense; ends the Freeze
+    shatter_mult=1.8,     # Shatter on a frozen foe: this many times a normal hit, ignoring Freeze defense; ends the Freeze
     beigis_shift=True,    # Beigis takes a random element after each Break (the mod's mechanic)
     boss_hp=[1.0] * 8,    # per-boss HP multipliers on BOSS_HP
     wellspring=0.0,       # Wellspring (Water action, 0 MP): a turn that restores this share of max MP; 0 = not in the game
