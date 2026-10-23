@@ -87,7 +87,10 @@ CONFIG = dict(
     tier_cap=None,        # highest spell tier open at each boss whatever the level (story gate); None = level only
     talents=False,        # spend Spirit Points on the talent trees (talents.py)
     talent_off=(),        # talent effects switched off (for testing what each one is worth)
-    talent_scale=1.0,     # multiplies every percentage talent effect (one-off picks and capstones stay as they are)
+    talent_scale=1.0,
+    talent_cost="deep",   # "deep": rows 1-2 cost 1 a rank, row 3 costs 2, rows 4-5 cost 3; "flat": 2 a rank
+    talent_policy="focus",
+    talent_overrides={},  # {"Blaze": {"dmg0": 0.01}}: test other talent numbers  # "focus": the main tree first; "split": points spread by the build's weights     # multiplies every percentage talent effect (one-off picks and capstones stay as they are)
     kit_scale=1.0,        # share of the KIT's damage, defense and MP bonus that gear gives (1 = gear and talents together)
     gear={},              # per-build items, {"Wind/Earth": {"shards": 3, "same_mult": 0.8, "school_dmg": {2: 1.25}}}:
                           # shards = uses per boss fight of a consumable that makes the next spell strike the boss's
@@ -325,7 +328,8 @@ class Battle:
         self.tal = {}
         if CONFIG["talents"]:
             points = round(SPIRITS_BY_BOSS[beat] * CONFIG["spirit_share"])
-            self.tal = allocate_talents(build, self.lv, points)
+            self.tal = allocate_talents(build, self.lv, points, CONFIG["talent_policy"], CONFIG["talent_cost"],
+                                        CONFIG["talent_overrides"])
             fixed = {"staff_burn", "staff_frost", "brace", "phoenix", "eternal", "avalanche", "glacier", "second_wind",
                      "seismic", "veil", "start_charge", "rest_charge", "immune_less", "finisher_less", "burn_turns",
                      "max_stacks", "freeze_extra"}
