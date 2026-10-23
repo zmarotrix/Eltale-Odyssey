@@ -31,14 +31,14 @@ RESEARCH = os.path.join(os.path.dirname(__file__), "..", "..", "research")
 # chart (8, 10, 13, 17, 22, ...). Levels gained by each boss = spirits found by then (pacing plan: 13, 44, 51, 88, 92,
 # then all 98) + battle levels for about 20 battles a stretch with the monsters' and bosses' EXP (research/enemies).
 SPIRITS_BY_BOSS = [13, 44, 51, 88, 92, 98, 98, 98]
-BATTLE_LEVELS_BY_BOSS = [14, 19, 26, 30, 37, 41, 44, 47]
+BATTLE_LEVELS_BY_BOSS = [13, 16, 25, 28, 36, 40, 43, 47]   # before each boss's own EXP is paid
 LEVELS_GAINED = [s + b for s, b in zip(SPIRITS_BY_BOSS, BATTLE_LEVELS_BY_BOSS)]   # a player who finds every spirit
 TIER_LEVEL = [1, 12, 30, 48, 66]
 LEVEL_CAP = 99   # the game's is 50; raised so one school can max but never two
 BOSS_ORDER = ["Solvaring", "Zelse", "Nepty", "Shilf", "Fargo", "Guilty", "Beigis", "Mammon"]
-BOSS_HP = [180, 630, 760, 1360, 1810, 2270, 2630, 2650]   # fitted for a player with 75% of the spirits
+BOSS_HP = [220, 680, 840, 1490, 1990, 2030, 3060, 2950]   # fitted for a player with 75% of the spirits
 VANILLA_BOSS_HP = [200, 680, 880, 1000, 1500, 1800, 1900, 2300]
-PACK_HP_SCALE = [0.92, 0.82, 0.77, 1.17, 1.18, 1.35, 1.35, 1.09]   # monster HP x this, fitted with the bosses
+PACK_HP_SCALE = [0.87, 0.78, 0.75, 1.18, 1.14, 1.32, 1.28, 1.11]   # monster HP x this, fitted with the bosses
 BOSS_ATTACK_SCALE = [1.00, 1.05, 1.10, 1.10, 1.15, 1.15, 1.20, 1.20]   # balance.c
 # Brian's own stats when he reaches each boss (estimates; Zelse matches the 2026-10-21 playtest setup).
 BRIAN_HP = [80, 160, 200, 260, 310, 370, 430, 490]
@@ -100,7 +100,11 @@ PRE_PASS = dict(
 )
 BALANCE_PASS = dict(
     pack_hit=[1, 1, 1, 1, 1.25, 1.5, 1.75, 2.0],   # late packs keep up with gear
-    boss_hit=[1, 1, 1, 1, 1.1, 1.15, 1.2, 1.25],
+    # Fitted to the original game (2026-10-22): Brian's attacking turns about the original's plus a little, damage
+    # taken per fight on its curve (smoothed, slightly harder), every boss won by at least 85% of builds. One boss action
+    # costs about 14, 13, 14, 13, 14, 13, 13 and 12% of Brian's HP with gear; Mammon is the riskiest fight, not the
+    # one with the most damage (his attacks come in bursts, so more than about 12% a hit is unwinnable).
+    boss_hit=[1.17, 1.13, 1.33, 1.3, 1.42, 1.4, 1.49, 1.4],
 )
 # The progression before 2026-10-22 (element EXP model, cap 50, the game's 3% growth), for comparison.
 EXP_MODEL = dict(levels=[13, 32, 38, 53, 59, 69, 76, 84], level_cap=50, tier_levels=[8, 20, 32, 44], power_growth=1.03,
@@ -848,7 +852,9 @@ def play(battle, max_turns=80):
             break
         battle.enemies_turn()
     won = not battle.alive_foes() and battle.hp > 0
+    heal_turns = battle.items_used + sum(n for name, n in battle.casts.items() if name in ("Mend", "Soothe", "Renew"))
     return dict(won=won, turns=battle.turns, enemy_actions=battle.enemy_actions,
+                attack_turns=battle.turns - heal_turns, pressure=battle.hp_lost / battle.max_hp,
                 hp_lost=min(1.0, battle.hp_lost / battle.max_hp), mp_used=battle.mp_used / battle.max_mp,
                 breaks=battle.breaks, wells=battle.wells, staff=battle.staff_turns,
                 low_hp=max(0.0, battle.low_hp / battle.max_hp), items_used=battle.items_used, casts=battle.casts,
@@ -876,27 +882,44 @@ def summarize(results):
             casts[name] = casts.get(name, 0) + n
     total = sum(casts.values()) or 1
     out["casts"] = {k: round(v / total, 3) for k, v in sorted(casts.items(), key=lambda kv: -kv[1])[:6]}
-    for key in ("turns", "enemy_actions", "hp_lost", "mp_used", "breaks", "wells", "staff", "low_hp", "items_used", "rests"):
+    for key in ("turns", "enemy_actions", "hp_lost", "mp_used", "breaks", "wells", "staff", "low_hp", "items_used", "rests", "attack_turns", "pressure"):
         vals = [r[key] for r in results]
         out[key] = dict(median=pct(vals, 0.5), p10=pct(vals, 0.1), p90=pct(vals, 0.9),
                         mean=sum(vals) / len(vals))
     return out
 
 
-def run(runs=300, items=0, seed=1, config=None, builds=None):
+def _run_cell(job):
+    """One build at one boss: its boss fights and its pack fights (runs in a worker process)."""
+    label, beat, runs, items, seed, config = job
     CONFIG.clear()
-    CONFIG.update(DEFAULT_CONFIG, **(config or {}))
-    rng = random.Random(seed)
-    data = []
-    for label, build in BUILDS.items():
-        if builds and label not in builds:
-            continue
-        for beat in range(8):
-            for kind, maker in (("boss", boss_fight), ("pack", pack_fight)):
-                results = [play(maker(build, beat, rng, items)) for _ in range(runs)]
-                data.append(dict(build=label, beat=beat, boss=BOSS_ORDER[beat], fight=kind, items=items,
-                                 levels=build_levels(build, beat), **summarize(results)))
-    return data
+    CONFIG.update(DEFAULT_CONFIG, **config)
+    rng = random.Random(f"{seed}-{label}-{beat}")
+    build = BUILDS[label]
+    rows = []
+    for kind, maker in (("boss", boss_fight), ("pack", pack_fight)):
+        results = [play(maker(build, beat, rng, items)) for _ in range(runs)]
+        rows.append(dict(build=label, beat=beat, boss=BOSS_ORDER[beat], fight=kind, items=items,
+                         levels=build_levels(build, beat), **summarize(results)))
+    return rows
+
+
+_POOL = None
+
+
+def run(runs=300, items=0, seed=1, config=None, builds=None):
+    """Every build at every boss, spread over all CPU cores. Scripts that call this need an
+    `if __name__ == "__main__":` guard (Windows starts worker processes by re-importing the script)."""
+    global _POOL
+    from concurrent.futures import ProcessPoolExecutor
+    if _POOL is None:
+        _POOL = ProcessPoolExecutor(os.cpu_count())
+    config = config or {}
+    CONFIG.clear()
+    CONFIG.update(DEFAULT_CONFIG, **config)
+    jobs = [(label, beat, runs, items, seed, config) for label in BUILDS if not builds or label in builds
+            for beat in range(8)]
+    return [row for rows in _POOL.map(_run_cell, jobs) for row in rows]
 
 
 if __name__ == "__main__":
