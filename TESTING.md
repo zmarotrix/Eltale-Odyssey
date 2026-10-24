@@ -39,8 +39,9 @@ least once.
   Whirlwind (every foe, pulls them together), Downburst (cracks 2 shields), Hurricane (every foe, every hit
   cracks), Confusion (foes lose their turn and hit an ally). Escape, Homeward, Swiftstep, Mirage, Clear Sight
   work as the old spells did (not re-checked).
-- **Boost**: Earth +25% damage a charge; Wind +40% hits; Fire and Water spend charges on their effect (more
-  stacks, wider blasts, one step colder, longer guards).
+- **Boost**: every damaging spell +30% damage a charge (Earth +50%); many-shot spells (Wind, Twin Flame, Sandblast,
+  Hailstorm, Ice Shards) +40% hits instead. Fire and Water also spend charges on their effect (more stacks, wider
+  blasts, one step colder, longer guards).
 
 Not checked yet: Stoneskin, Ice Wall and Whiteout actually saving HP (the test made Brian dodge everything);
 Clear Sight's reveal; how each spell **looks** (several borrow another spell's visuals; tell me which look wrong).
@@ -151,14 +152,16 @@ them yourself. For now the weakness is always the element opposite the monster's
       ("UNKNOWN - CAST IT TO LEARN IT." for "???" spells). (Checked by Claude: diamonds, gold spend colour,
       markers, description.)
 
-- [ ] Charge starts at 0 every battle and goes up by 1 each of your turns (max 5), but not on the turn after you spend some.
-      Your first weakness hit in a turn gives +1. (Checked by Claude.)
+- [ ] Charge starts at 0 every battle and goes up by 1 each time an enemy hurts you (max 5). Nothing else gives
+      it except talents and gear (playtest 2026-10-23). (Checked by Claude: a 1-damage hit gave 1 charge.)
 - [ ] **D-pad up/down** sets Boost (0-3, no more than your charge) before you cast; it's spent when the spell fires.
-      Earth: +40% damage per charge. Wind: +2 shots per charge. Water: +30% healing, or Freezes the target for
-      1 turn per charge. Fire: +1 Burn stack per charge; at 3 it also sets off the Burn already on the target.
+      Every damaging spell: +30% damage per charge (Earth +50%; many-shot spells +40% hits instead). Water also:
+      +30% healing, or Freezes the target for 1 turn per charge. Fire also: +1 Burn stack per charge; at 3 it also
+      sets off the Burn already on the target. (Checked by Claude: Ember at 3 charge hit 57, at 0 hit 23.)
 - [ ] Each weakness hit removes a shield and reveals the weakness. At 0 the enemy is **Broken**: it skips its next
-      turn and takes double damage until then (was 50% more); then its shields come back (bosses get one more each time).
-      (Checked by Claude: shields, reveal, charge bonus, Break and the skipped-turn status.)
+      turn, then takes double damage for your whole next turn (the Break window); when that turn ends it recovers
+      before it acts and its shields come back (bosses get one more each time). Before 2026-10-23 a Broken foe
+      stayed dark and slowed through the turn it acted in. (Checked by Claude: skip, window hit about 2x, recovery.)
 - [ ] Does Boost feel worth saving charge for? Are shield counts (2-4, bosses 6-10) right?
 
 Note: Holy Plains enemies die before they can be Broken; Break matters from tougher areas on.

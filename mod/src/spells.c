@@ -295,6 +295,10 @@ void eo_spells_init(void) {
 // ---- Boost, per spell (each school's default, and the spells that boost like another school) ----
 
 // Percent more damage and percent more shots per charge (combat.c applies them to the record for the cast).
+// Every damaging spell hits harder right away for its charge (playtest, 2026-10-23: Fire's Burn stacks and Water's
+// Freeze alone didn't feel like anything); Earth, the heavy hitter, most. Many-shot spells get shots instead.
+#define BOOST_DAMAGE_PERCENT 30
+#define BOOST_EARTH_PERCENT 50
 void eo_spells_boost(int school, int index, int* damage_percent, int* shots_percent) {
     *damage_percent = 0;
     *shots_percent = 0;
@@ -302,27 +306,28 @@ void eo_spells_boost(int school, int index, int* damage_percent, int* shots_perc
     if (d == 0 || d->type != TYPE_DAMAGE) {
         return;
     }
+    *damage_percent = BOOST_DAMAGE_PERCENT;
     if (school == EARTH) {
         if (index == 4) {
+            *damage_percent = 0;
             *shots_percent = 40;      // Sandblast, the clash, boosts like Wind
-        } else if (d->kind != K_QUAGMIRE && d->kind != K_FISSURE) {
-            *damage_percent = 25;
+        } else {
+            *damage_percent = BOOST_EARTH_PERCENT;
         }
     } else if (school == WIND) {
         if (d->kind == K_DOWNBURST) {
-            *damage_percent = 25;     // the clash boosts like Earth
+            *damage_percent = BOOST_EARTH_PERCENT;   // the clash boosts like Earth
         } else {
+            *damage_percent = 0;
             *shots_percent = 40;
         }
     } else if (school == WATER) {
-        if (d->kind == K_SPOUT) {
-            *damage_percent = 20;
-        } else if (d->kind == K_SHATTER) {
-            *damage_percent = 25;
-        } else if (d->kind == K_HAIL || index == 7) {
+        if (d->kind == K_HAIL || index == 7) {
+            *damage_percent = 0;
             *shots_percent = 40;      // Hailstorm and Ice Shards, the Wind-pressed ones
         }
     } else if (school == FIRE && index == 1) {
+        *damage_percent = 0;
         *shots_percent = 50;          // Twin Flame: one more fireball a charge
     }
 }
@@ -1261,6 +1266,10 @@ RECOMP_HOOK_RETURN("player_take_damage") void eo_spells_after_brian_damage(void)
     if (back > 0 && BRIAN_HP > 0) {
         u32 hp = BRIAN_HP + back;
         BRIAN_HP = (u16)(hp > hp_before_hit ? hp_before_hit : hp);
+    }
+    // Spirit Charge comes from being hurt (playtest, 2026-10-23): one a hit that got through.
+    if (attacker >= 0 && lost > back) {
+        eo_combat_gain_charge(1);
     }
     // Ember Skin: a foe that hit him up close catches fire.
     if (eo_talent(TALENT_EMBER_SKIN) && !spell_on_brian && attacker >= 0 && lost > back) {

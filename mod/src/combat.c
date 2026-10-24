@@ -2,18 +2,19 @@
 
 // The combat system (game design document, "Combat resource"): Spirit Charge, plus enemy shields and Break.
 //
-// Spirit Charge: Brian starts a battle with 0 charge and gains 1 at the start of each of his turns (max 5),
-// except the turn after he spent some. His first weakness hit in a turn gives +1. Before casting, D-pad up/down
-// picks a Boost of 0-3 (no more than his charge); it's spent when the spell launches:
+// Spirit Charge: Brian starts a battle with 0 charge and gains 1 each time an enemy hurts him (max 5; playtest,
+// 2026-10-23: only when hit). Before casting, D-pad up/down picks a Boost of 0-3 (no more than his charge); it's
+// spent when the spell launches. Every damaging spell hits harder for it (spells.c, eo_spells_boost), on top of:
 //   Fire  +1 Burn stack per charge (status.c); at 3, the hit first ignites the target's existing Burn
-//   Earth +40% damage per charge
+//   Earth more damage than the others
 //   Water +30% healing per charge; a damaging Water spell Freezes its target for 1 turn per charge
-//   Wind  +2 shots per charge
+//   Wind  more shots instead of more damage
 //
 // Shields and Break: each enemy has shields (2-4 by toughness, bosses 6-10) and a weakness, the element
 // opposite its own (the game's own x1.25 rule), hidden until hit. Each weakness hit from Brian removes a
 // shield; at 0 the enemy is Broken: it loses its next turn (the game's own Restriction status) and takes 100%
-// more damage until then. Then its shields come back; a boss's grow by one each Break.
+// more damage until Brian's next turn is over (his Break window). Then its shields come back; a boss's grow by one
+// each Break.
 
 #define MAX_ENEMIES 6
 #define MAX_CHARGE 5
@@ -99,15 +100,14 @@ typedef struct {
     u8 max_shields;
     u8 weakness;
     u8 revealed;
-    u8 broken;
+    u8 broken;     // BROKEN_WAITING until its turn is skipped, then BROKEN_WINDOW for Brian's next turn
 } Guard;
+#define BROKEN_WAITING 1
+#define BROKEN_WINDOW 2
 
 static Guard guards[MAX_ENEMIES];
 static u8 charge = 0;
 static u8 boost = 0;           // chosen for the next cast
-static u8 spent_last_turn = 0;
-static u8 spent_this_turn = 0;
-static u8 weakness_bonus_given = 0;
 static u8 reflected_this_battle = 0;  // Mirror Shard
 static u32 turns_taken = 0;           // Brian's turns this battle (Still Waters)
 static u32 cast_turn = 0;             // turns_taken + 1 when Brian last cast (one cast a turn)
@@ -278,8 +278,6 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
     stone_guard = 0;
     element_streak = 0;
     boost = 0;
-    spent_last_turn = spent_this_turn = 0;
-    weakness_bonus_given = 0;
     active_boost = 0;
     active_spell = 0;
     reflected_this_battle = 0;
@@ -314,7 +312,7 @@ static void play_break_sounds(void) {
 
 static void break_enemy(int i) {
     Guard* g = &guards[i];
-    g->broken = 1;
+    g->broken = BROKEN_WAITING;
     u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
     *(u16*)status |= STATUS_RESTRICTION_BIT;   // its next turn is skipped by the game itself
     status[STATUS_RESTRICTION_DURATION] = 1;
@@ -513,11 +511,6 @@ RECOMP_HOOK("enemy_take_damage") void eo_combat_before_enemy_damage(s32 slot, u1
         return;
     }
     g->revealed = 1;
-    // Weakness hits give charge once a turn.
-    if (weakness_bonus_given < 1) {
-        gain_charge(1);
-        weakness_bonus_given++;
-    }
     // Mountain Staff: Earth weakness hits take 2 shields; Fault Line: a third of the time a rank, 1 more.
     int cracks = 1 + eo_spells_weak_extra_cracks();
     if (element == EARTH && eo_equipment_worn(EQ_MOUNTAIN_STAFF)) {
@@ -820,10 +813,8 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
                 freeze_immune[i] = boss_freeze_immunity();
             }
         }
-        // Brian's turn is over: undo this turn's boost, remember whether he spent.
+        // Brian's turn is over: undo this turn's boost.
         restore_active_spell();
-        spent_last_turn = spent_this_turn;
-        spent_this_turn = 0;
         boost = 0;
         return;
     }
@@ -836,29 +827,28 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
             freeze_immune[i]--;
         }
     }
-    // An enemy's turn is over, so Brian's begins: a Broken enemy that has now lost its turn recovers.
-    for (int i = 0; i < MAX_ENEMIES; i++) {
-        Guard* g = &guards[i];
-        u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
-        if (g->broken && !(*(u16*)status & STATUS_RESTRICTION_BIT)) {
-            g->broken = 0;
-            if (gBattleState & BATTLE_BOSS) {
-                g->max_shields++;
-                if (CURRENT_BOSS == SHIFTING_BOSS) {
-                    shift_element(i);
-                }
-            }
-            g->shields = g->max_shields;
-        }
-    }
-    if (!spent_last_turn) {
-        gain_charge(1);
-    }
-    spent_last_turn = 0;
-    weakness_bonus_given = 0;
     turns_taken++;
     acted_earlier = 0;
     set_jet_stream(0);
+}
+
+// Brian's turn after a Break is over: the foe recovers before it acts (playtest, 2026-10-23: it had stayed dark and
+// slowed through the turn it acted in), and its shields come back.
+static void end_break_windows(void) {
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        Guard* g = &guards[i];
+        if (g->broken != BROKEN_WINDOW) {
+            continue;
+        }
+        g->broken = 0;
+        if (gBattleState & BATTLE_BOSS) {
+            g->max_shields++;
+            if (CURRENT_BOSS == SHIFTING_BOSS) {
+                shift_element(i);
+            }
+        }
+        g->shields = g->max_shields;
+    }
 }
 
 // The game ticks a fighter's statuses inside battle_end_turn: a foe it just thawed keeps its ice until Brian's
@@ -891,6 +881,9 @@ RECOMP_HOOK_RETURN("battle_end_turn") void eo_combat_after_turn_end(void) {
             BRIAN_SILENCE_COUNTDOWN = 1;
             set_jet_stream(1);
         }
+        if (gBattleState & BATTLE_ENEMY_TURN) {
+            end_break_windows();   // the turn really passes to the enemies
+        }
         return;
     }
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -900,6 +893,14 @@ RECOMP_HOOK_RETURN("battle_end_turn") void eo_combat_after_turn_end(void) {
             ice_window[i] = 1;
         }
         frozen_before[i] = 0;
+    }
+    // A Broken enemy that has now lost its turn opens Brian's Break window. Checked after the game ticks statuses
+    // (before it, the skipped turn's Restriction bit is still on).
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
+        if (guards[i].broken == BROKEN_WAITING && status != 0 && !(*(u16*)status & STATUS_RESTRICTION_BIT)) {
+            guards[i].broken = BROKEN_WINDOW;
+        }
     }
 }
 
@@ -941,7 +942,6 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
         used = used > MAX_BOOST ? MAX_BOOST : used;
         boost = 0;
         charge = 0;
-        spent_this_turn = 1;
     }
     if (new_cast) {
         eo_spells_on_cast(school, index, used);
@@ -971,8 +971,8 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
         shots = (u16)(shots * 2);
         base = (u16)(base * 65 / 100);
     }
-    // Boost by spell (spells.c): Earth +25% damage a charge, Wind +40% shots (at least one more a charge), and
-    // the spells that boost like another school. Fire and Water spend their charges on their effects instead.
+    // Boost by spell (spells.c): more damage a charge (Earth most), Wind +40% shots (at least one more a charge),
+    // and the spells that boost like another school.
     int damage_pct;
     int shots_pct;
     eo_spells_boost(school, index, &damage_pct, &shots_pct);
@@ -1015,7 +1015,6 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     *(u16*)(stats + SPELL_SHOTS) = shots;
     if (boost > 0) {
         charge -= boost;
-        spent_this_turn = 1;
     }
     boost = 0;
 }
