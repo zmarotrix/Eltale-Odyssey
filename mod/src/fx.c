@@ -49,6 +49,8 @@ static const u32 game_light[LIGHT_COUNT] = { 0x80085770, 0x80085780, 0x80085790,
 #define FLAME_GFX ((u32*)(FX_RAM + 0x40))      // the sparkle's draw commands, recolored
 #define ICE_VTX ((u8*)(FX_RAM + 0x100))         // the ice block: 24 vertices x 16 bytes
 #define ICE_MTX ((u8*)(FX_RAM + 0x280))         // one 64-byte matrix per enemy
+#define BOX_MTX ((u8*)(FX_RAM + 0x400))         // one per queued box (arena.c's pillars, stones, ice floors)
+#define MAX_BOXES 16
 
 #define PULSE_PERIOD 48           // frames per pulse
 #define BROKEN_DARK 70            // percent the lights drop at the peak of a Broken enemy's dark pulse
@@ -146,6 +148,22 @@ static u8 flash_frames[MAX_ENEMIES];
 static u16 held_frame[MAX_ENEMIES];  // a Broken or frozen enemy's animation frame
 static u8 was_frozen[MAX_ENEMIES];
 static int ice_slot = -1;            // the frozen enemy being drawn now
+static int drawing_brian = 0;
+
+// Boxes other files ask for this frame (arena.c), drawn after Brian's model: a base point, half-width, height,
+// and an RGBA color (alpha is opacity).
+typedef struct {
+    f32 x, y, z, half_w, h;
+    u32 color;
+} Box;
+static Box boxes[MAX_BOXES];
+static int box_count = 0;
+
+void eo_fx_box(f32 x, f32 y, f32 z, f32 half_w, f32 h, u32 rgba) {
+    if (box_count < MAX_BOXES) {
+        boxes[box_count++] = (Box){ x, y, z, half_w, h, rgba };
+    }
+}
 
 static int enemy_slot_of(u8* object) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -210,6 +228,7 @@ RECOMP_HOOK("model_draw") void eo_fx_before_model(s32 flags, u8* object, void* a
     int broken = 0;
     int flicker = 0;   // a dark frame of the Break flicker
     int element = -1;  // a steady element glow instead of a status
+    drawing_brian = object == BRIAN_OBJECT;
     if (object == BRIAN_OBJECT) {
         frame++;
         color = status_color((gBattleState & 0x1) ? BRIAN_STATUS : 0, 0, eo_status_poisoned(), 0);
@@ -333,33 +352,20 @@ static int find_game_command(u32 w0, int whole, u32* out) {
     return 0;
 }
 
-static void draw_ice(int slot) {
+// A lit, see-through box from a base point up: the ice block, and arena.c's pillars, stones and ice floors.
+static void draw_block(f32 x, f32 base, f32 z, f32 half_w, f32 height, u32 color, u8* mtx) {
     if (!eo_gfx_fits(0x140)) {
         return;
     }
     make_ice_vertices();
-    u8* bd = ENEMY_BATTLE_DATA(slot);
-    u8* record = *(u8**)(bd + BATTLE_DATA_RECORD);
-    f32 scale = *(f32*)(bd + BATTLE_DATA_SCALE);
-    f32 width = 6.0f;
-    f32 height = 12.0f;
-    f32 base = *(f32*)(bd + 0x4);
-    if (record != 0) {
-        width = *(f32*)(record + RECORD_WIDTH) * scale * 0.5f;
-        height = *(f32*)(record + RECORD_HEIGHT) * scale;
-        if (*(u16*)(record + RECORD_TYPE) == 1) {
-            base = *(f32*)(*(u8**)(bd + 0x68) + 0x94) - height;   // fliers: down from the top of the body
-        }
-    }
-    f32 w = width * ICE_WIDTH / ICE_UNIT;
-    f32 h = height * ICE_HEIGHT / ICE_UNIT;
+    f32 w = half_w / ICE_UNIT;
+    f32 h = height / ICE_UNIT;
     f32 m[4][4] = {
         { w, 0, 0, 0 },
         { 0, h, 0, 0 },
         { 0, 0, w, 0 },
-        { *(f32*)(bd + 0x0), base - height * 0.05f, *(f32*)(bd + 0x8), 1 },
+        { x, base, z, 1 },
     };
-    u8* mtx = ICE_MTX + slot * 64;
     put_matrix(mtx, m);
 
     u32 game_mode[2];
@@ -372,7 +378,7 @@ static void draw_ice(int slot) {
     eo_gfx(GFX_PIPE_SYNC << 24, 0);
     eo_gfx(GFX_RENDER_MODE, ICE_RENDER_MODE);
     eo_gfx(ICE_COMBINE_W0, ICE_COMBINE_W1);
-    eo_gfx(GFX_PRIM_COLOR << 24, ICE_COLOR);
+    eo_gfx(GFX_PRIM_COLOR << 24, color);
     eo_gfx(GFX_MTX_LOAD, (u32)mtx);
     eo_gfx(GFX_VTX_24, (u32)ICE_VTX);
     for (int f = 0; f < 6; f++) {
@@ -391,6 +397,25 @@ static void draw_ice(int slot) {
     }
 }
 
+
+static void draw_ice(int slot) {
+    u8* bd = ENEMY_BATTLE_DATA(slot);
+    u8* record = *(u8**)(bd + BATTLE_DATA_RECORD);
+    f32 scale = *(f32*)(bd + BATTLE_DATA_SCALE);
+    f32 width = 6.0f;
+    f32 height = 12.0f;
+    f32 base = *(f32*)(bd + 0x4);
+    if (record != 0) {
+        width = *(f32*)(record + RECORD_WIDTH) * scale * 0.5f;
+        height = *(f32*)(record + RECORD_HEIGHT) * scale;
+        if (*(u16*)(record + RECORD_TYPE) == 1) {
+            base = *(f32*)(*(u8**)(bd + 0x68) + 0x94) - height;   // fliers: down from the top of the body
+        }
+    }
+    draw_block(*(f32*)(bd + 0x0), base - height * 0.05f, *(f32*)(bd + 0x8), width * ICE_WIDTH, height * ICE_HEIGHT,
+               ICE_COLOR, ICE_MTX + slot * 64);
+}
+
 RECOMP_HOOK_RETURN("model_draw") void eo_fx_after_model(void) {
     if (lighting) {
         for (int i = 0; i < LIGHT_COUNT; i++) {
@@ -406,6 +431,14 @@ RECOMP_HOOK_RETURN("model_draw") void eo_fx_after_model(void) {
     if (ice_slot >= 0) {
         draw_ice(ice_slot);
         ice_slot = -1;
+    }
+    if (drawing_brian) {
+        drawing_brian = 0;
+        for (int i = 0; i < box_count; i++) {
+            Box* b = &boxes[i];
+            draw_block(b->x, b->y, b->z, b->half_w, b->h, b->color, BOX_MTX + i * 64);
+        }
+        box_count = 0;
     }
 }
 
@@ -490,6 +523,11 @@ static void spawn_ember(int slot) {
     int pick = get_rand(6);
     u8 color = pick < 2 ? COLOR_RED : pick < 4 ? COLOR_SCARLET : pick < 5 ? COLOR_ORANGE : COLOR_YELLOW;
     spawn(pos, vel, FLAME_SCALE, color, (u16)(14 + get_rand(8)), flame_gfx());
+}
+
+// A sparkle anywhere (arena.c): `flame` draws it as an ember (texture x color) rather than a glint.
+void eo_fx_particle(const f32* pos, const f32* vel, f32 scale, int color, int life, int flame) {
+    spawn(pos, vel, scale, (u8)color, (u16)life, flame ? flame_gfx() : 0);
 }
 
 void eo_fx_burn_hit(int slot) {

@@ -223,32 +223,32 @@ void eo_fx_update(void);              // every frame in battle
 // Each school: five rows of three (two of up to 3 ranks, one single pick), then its capstone.
 enum {
     // Fire
-    TALENT_KINDLING, TALENT_EMBER_HEART, TALENT_SEARING_STAFF,
-    TALENT_FAN_THE_COALS, TALENT_LINGERING_FLAME, TALENT_HOT_HANDS,
-    TALENT_WILDFIRE, TALENT_PYRE, TALENT_ASH_VEIL,
-    TALENT_CONFLAGRATION, TALENT_BLAZE, TALENT_PHOENIX,
-    TALENT_INFERNO, TALENT_SMOLDERING_SHIELDS, TALENT_CINDER_SKIN,
-    TALENT_ETERNAL_FLAME,
+    TALENT_KINDLING, TALENT_SMOKE, TALENT_FLASHPOINT,
+    TALENT_FIREWALL, TALENT_REKINDLE, TALENT_STOKED_MIND,
+    TALENT_WILDFIRE, TALENT_KILN, TALENT_EMBER_SKIN,
+    TALENT_LIVING_FLAME, TALENT_BONFIRE, TALENT_PHOENIX,
+    TALENT_OVERLOAD, TALENT_SMOLDERING_SHIELDS, TALENT_ASH_CLOUD,
+    TALENT_SUN_HEART,
     // Earth
-    TALENT_BEDROCK, TALENT_THICK_SKIN, TALENT_HEAVY_STAFF,
+    TALENT_BEDROCK, TALENT_HEAVY_HANDS, TALENT_MONOLITH,
     TALENT_STEADY_FOOTING, TALENT_MOMENTUM, TALENT_BRACE,
-    TALENT_FAULT_LINE, TALENT_STONESKIN_MASTERY, TALENT_QUARRY,
-    TALENT_TREMOR, TALENT_GRANITE_WILL, TALENT_PLANTED_FEET,
-    TALENT_COLOSSUS, TALENT_UNBREAKABLE, TALENT_SEISMIC,
-    TALENT_AVALANCHE,
+    TALENT_FAULT_LINE, TALENT_IMPACT, TALENT_QUARRY,
+    TALENT_TREMOR, TALENT_GRAVITY_WELL, TALENT_PLANTED_FEET,
+    TALENT_RICOCHET_BOULDER, TALENT_GRANITE_BODY, TALENT_SEISMIC,
+    TALENT_MOUNTAINS_PATIENCE,
     // Water
-    TALENT_DEEP_WELL, TALENT_COLD_SNAP, TALENT_TIDE_STAFF,
-    TALENT_FROSTBITE, TALENT_CLEAR_WATERS, TALENT_WINTERS_GRIP,
-    TALENT_GLACIAL_SHATTER, TALENT_HYPOTHERMIA, TALENT_ICE_ARMOR,
-    TALENT_RIME, TALENT_PERMAFROST, TALENT_LIVING_WATER,
-    TALENT_DEEP_FREEZE, TALENT_WELLSPRING, TALENT_TIDAL_HEART,
+    TALENT_DEEP_WELL, TALENT_COLD_SNAP, TALENT_FLASH_FREEZE,
+    TALENT_CHAIN_SHATTER, TALENT_CLEAR_WATERS, TALENT_WINTERS_GRIP,
+    TALENT_GLACIAL_SHATTER, TALENT_ICE_FLOOR, TALENT_MIRROR_ICE,
+    TALENT_HAILCLOUD, TALENT_PERMAFROST, TALENT_LIVING_WATER,
+    TALENT_FROZEN_STATUE, TALENT_WELLSPRING, TALENT_DEEP_TIDE,
     TALENT_GLACIER_HEART,
     // Wind
-    TALENT_GALE_FORCE, TALENT_FLEET, TALENT_WHISTLING_STAFF,
-    TALENT_SQUALL, TALENT_EVASION, TALENT_TAILWIND,
-    TALENT_CYCLONE, TALENT_CROSSWIND, TALENT_UPDRAFT,
-    TALENT_TEMPEST_FURY, TALENT_EYE_OF_THE_STORM, TALENT_SECOND_BREATH,
-    TALENT_SHEAR_FORCE, TALENT_ZEPHYR_STEP, TALENT_STORM_CALLER,
+    TALENT_GALE_FORCE, TALENT_RICOCHET, TALENT_HIT_AND_RUN,
+    TALENT_FLEET, TALENT_EVASION, TALENT_TAILWIND,
+    TALENT_CYCLONE, TALENT_CROSSWIND, TALENT_LOCK_ON,
+    TALENT_VORTEX, TALENT_SQUALL, TALENT_SECOND_BREATH,
+    TALENT_JET_STREAM, TALENT_ZEPHYR_STEP, TALENT_STORM_CALLER,
     TALENT_SECOND_WIND,
     TALENT_COUNT
 };
@@ -267,9 +267,7 @@ int eo_talent(int talent);         // ranks learned, 0 = none
 int eo_talent_learn(int talent);   // 1 if a rank was learned now (level and points checked)
 int eo_talent_blocked(int talent); // a capstone while another tree's capstone is learned
 void eo_talents_refund_old(void);  // a save from the nine-talent trees: points back, ranks cleared
-int eo_talents_spell_percent(int element, int broken, int frozen, int burning);
-int eo_talents_staff_percent(int frozen);
-int eo_talents_taken_percent(void);
+int eo_talents_spell_percent(int element);
 int eo_talents_mp_percent(int school);
 int eo_combat_finisher_ready_for(int school);   // Storm Caller: Wind finishers need 1 less Charge
 
@@ -291,6 +289,35 @@ int eo_spells_weak_extra_cracks(void);
 int eo_spells_staff_percent(int slot);
 int eo_spells_frosted(int slot);
 void eo_spells_frost_foe(int slot);
+// spells.c, for arena.c
+u32 eo_spells_estimate(int school, u32 base);   // about what a spell of this base deals now
+void eo_spells_chill(int slot, int steps);
+void eo_spells_burn(int slot, u32 amount);      // thaws first
+u32 eo_spells_ember_stack(void);                // the Burn stack an Ember would leave
+void eo_spells_heal(int percent);               // percent of max HP (Water: can overflow)
+// arena.c: the battle space (ground fire, ice, hail, vortex, pillars, stones, smoke, knockback)
+void eo_arena_ground_fire(f32 x, f32 y, f32 z, int wide, int turns);
+void eo_arena_ice_floor(f32 x, f32 y, f32 z);
+void eo_arena_hailcloud(f32 x, f32 y, f32 z);
+void eo_arena_vortex(f32 x, f32 y, f32 z);
+int eo_arena_in_fire(f32 x, f32 z);
+int eo_arena_fire_between(f32 ax, f32 az, f32 bx, f32 bz);
+int eo_arena_ice_between(f32 ax, f32 az, f32 bx, f32 bz);
+void eo_arena_pillar(f32 x, f32 y, f32 z);
+int eo_arena_take_pillar_near_brian(void);
+int eo_arena_take_stones(void);
+int eo_arena_blocks_shot(void* attacker);
+int eo_arena_miss_percent(void* attacker);
+void eo_arena_blind(int slot);
+void eo_arena_knock(int slot, f32 fx, f32 fz, f32 dist, u32 hit);
+void eo_arena_pull(f32 x, f32 z, f32 radius, f32 share);
+void eo_arena_settled_pass(void);
+void eo_arena_brian_turn(void);
+void eo_status_burn_rekindle(int slot, int extra);
+int eo_combat_settled(void);
+void eo_combat_gain_charge(int n);
+void eo_fx_box(f32 x, f32 y, f32 z, f32 half_w, f32 h, u32 rgba);
+void eo_fx_particle(const f32* pos, const f32* vel, f32 scale, int color, int life, int flame);
 int eo_spells_confused(int slot);
 // combat.c, for spells.c
 int eo_combat_frozen(int slot);

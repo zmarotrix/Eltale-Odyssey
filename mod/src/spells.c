@@ -366,12 +366,29 @@ static u8 meteor_stacks;
 static u16 rock_damage;
 static u8 scalded;                  // Searing Steam scalded Brian this cast
 static u8 phoenix_used;             // Phoenix: once a battle
+static u8 cast_marks;               // once-a-cast arena effects already placed (MARK_*)
+static u8 quarry_armed;             // Quarry: the pillar Brian stood by flies with this Earth spell
+static u8 stones_armed;             // Mountain's Patience: stones hurled with this Earth spell
+static u8 momentum;                 // Momentum: Earth hits in a row without moving
+static f32 momentum_x, momentum_z;
+static u8 was_frozen[MAX_ENEMIES];  // Glacier Heart: frozen last frame
+static u8 burst_done[MAX_ENEMIES];
+#define MARK_ZONE 0x01
+#define MARK_PILLAR 0x02
+#define MARK_QUARRY 0x04
+#define MARK_STONES 0x08
+#define OVERFLOW_PERCENT 25         // Overflow: Water healing can go this far past max HP (Deep Tide: twice)
+#define OVERFLOW_FADE 4             // a quarter of it fades at the start of each of Brian's turns
 
 #define FOG_MISS_PERCENT 40
 #define MEND_MP_PERCENT 25
+#define MEND_HP_PERCENT 22          // Water heals got bigger with Overflow (take 3)
+#define SOOTHE_HP_PERCENT 25
+#define RENEW_HP_PERCENT 16
 #define MEND_MIN_MP 3
 #define FROST_TURNS 2
 #define FREEZE_TURNS 2              // a monster skips 2 turns; bosses 1 (combat.c)
+#define FROST_ON_FROST_PERCENT 50   // chilling a frosted foe Freezes it this often (Flash Freeze: always)
 #define CONFUSED_HIT_PERCENT 12     // of the ally's max HP
 
 static int in_battle(void) {
@@ -389,16 +406,37 @@ static void reset_battle(void) {
     juggernaut = 0;
     meteor_armed = 0;
     phoenix_used = 0;
-}
-
-// Tidal Heart: all of Brian's healing.
-static u32 healing(u32 amount) {
-    return amount * (100 + (eo_talent(TALENT_TIDAL_HEART) ? 25 : 0)) / 100;
+    momentum = 0;
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        was_frozen[i] = burst_done[i] = 0;
+    }
 }
 
 static void heal_brian(u32 amount) {
-    u32 hp = BRIAN_HP + healing(amount);
+    if (BRIAN_HP >= BRIAN_MAX_HP) {
+        return;   // never trims Overflow
+    }
+    u32 hp = BRIAN_HP + amount;
     BRIAN_HP = (u16)(hp > BRIAN_MAX_HP ? BRIAN_MAX_HP : hp);
+}
+
+// Overflow (take 3 base rule): Water healing goes past max HP, up to OVERFLOW_PERCENT more (Deep Tide: twice that).
+// The extra soaks hits first, fades a quarter a turn (not with Deep Tide) and is gone after the battle.
+static u32 overflow_cap(void) {
+    return (u32)BRIAN_MAX_HP + (u32)BRIAN_MAX_HP * OVERFLOW_PERCENT * (eo_talent(TALENT_DEEP_TIDE) ? 2 : 1) / 100;
+}
+
+static void heal_water(u32 amount) {
+    u32 hp = BRIAN_HP + amount;
+    u32 cap = in_battle() ? overflow_cap() : BRIAN_MAX_HP;
+    if (hp > cap) {
+        hp = cap > BRIAN_HP ? cap : BRIAN_HP;
+    }
+    BRIAN_HP = (u16)hp;
+}
+
+void eo_spells_heal(int percent) {
+    heal_brian((u32)BRIAN_MAX_HP * (u32)percent / 100 + 1);
 }
 
 RECOMP_HOOK("battle_build_turn_order") void eo_spells_on_battle_start(void) {
@@ -430,6 +468,15 @@ static void fixed_hit(int i, u32 amount) {
 static u32 estimate(int school, u32 base) {
     return base * eo_progression_spell_power_permille(school) / 1000 * 8 / 10;
 }
+
+u32 eo_spells_estimate(int school, u32 base) {
+    return estimate(school, base);
+}
+
+static void glacier_burst(int t);
+static void shape_cast(int school, int index);
+static u32 burn_amount(u32 hit);
+#define BRIAN_POS ((f32*)BRIAN_BATTLE_DATA)
 
 // ---- Frost and Freeze ----
 //
@@ -475,19 +522,20 @@ static void chill(int i, int steps) {
         return;
     }
     eo_status_burn_clear(i);
-    if (get_rand(100) < 10 * eo_talent(TALENT_HYPOTHERMIA)) {
-        steps++;   // Hypothermia
-    }
     for (int k = 0; k < steps; k++) {
         if (eo_combat_frozen(i)) {
             eo_combat_freeze_longer(i);
-        } else if (frosted(i)) {
+        } else if (frosted(i) && (eo_talent(TALENT_FLASH_FREEZE) || get_rand(100) < FROST_ON_FROST_PERCENT)) {
             unfrost(i);
             eo_combat_freeze(i, FREEZE_TURNS);
         } else {
             frost(i, FROST_TURNS);
         }
     }
+}
+
+void eo_spells_chill(int slot, int steps) {
+    chill(slot, steps);
 }
 
 // Fire thaws: Frost and Freeze go before a Burn lands.
@@ -500,7 +548,11 @@ static void burn(int i, u32 amount) {
     eo_status_add_burn(i, (u16)(amount < 1 ? 1 : amount > 0xFFFF ? 0xFFFF : amount));
 }
 
-// Tide Staff (talent): a swing Frosts.
+void eo_spells_burn(int slot, u32 amount) {
+    burn(slot, amount);
+}
+
+// Tide Staff: a swing Frosts.
 void eo_spells_frost_foe(int slot) {
     if (alive(slot) && !eo_combat_broken(slot) && !eo_combat_frozen(slot)) {
         eo_status_burn_clear(slot);
@@ -516,6 +568,81 @@ int eo_spells_confused(int slot) {
     return slot >= 0 && slot < MAX_ENEMIES && confused[slot] > 0;
 }
 
+// ---- Shaping a cast: Heavy Hands and Momentum make Earth spells bigger; Sun Heart and Lock-On make spells home ----
+//
+// The cast's record and visuals are changed as it launches and put back when Brian's turn ends.
+
+#define REC_SIZE 0x1C            // f32 hitbox size
+#define REC_HOMING 0x28          // u16: 0 none, 1 slight, 3 good
+#define REC_SPEED 0x2E           // s16 desired, s16 initial
+#define LOOK_STAGES 4
+#define LOOK_STAGE_SIZE 0x10
+#define LOOK_SIZE_X 0x08         // f32 x, then y
+
+static u8* shaped_rec = 0;
+static u8* shaped_look = 0;
+static f32 saved_size;
+static u16 saved_homing;
+static s16 saved_speed[2];
+static f32 saved_look[LOOK_STAGES][2];
+
+static void unshape_cast(void) {
+    if (shaped_rec != 0) {
+        *(f32*)(shaped_rec + REC_SIZE) = saved_size;
+        *(u16*)(shaped_rec + REC_HOMING) = saved_homing;
+        *(s16*)(shaped_rec + REC_SPEED) = saved_speed[0];
+        *(s16*)(shaped_rec + REC_SPEED + 2) = saved_speed[1];
+        for (int s = 0; s < LOOK_STAGES; s++) {
+            *(f32*)(shaped_look + s * LOOK_STAGE_SIZE + LOOK_SIZE_X) = saved_look[s][0];
+            *(f32*)(shaped_look + s * LOOK_STAGE_SIZE + LOOK_SIZE_X + 4) = saved_look[s][1];
+        }
+        shaped_rec = 0;
+    }
+}
+
+static void shape_cast(int school, int index) {
+    unshape_cast();
+    f32 grow = 1.0f;
+    if (school == EARTH) {
+        // Momentum counts Earth attacks in a row from the same spot.
+        f32 dx = BRIAN_POS[0] - momentum_x;
+        f32 dz = BRIAN_POS[2] - momentum_z;
+        int rank = eo_talent(TALENT_MOMENTUM);
+        momentum = (u8)(rank > 0 && dx * dx + dz * dz < 9.0f ? (momentum + 1 > rank ? rank : momentum + 1) : 0);
+        momentum_x = BRIAN_POS[0];
+        momentum_z = BRIAN_POS[2];
+        grow += 0.25f * (f32)eo_talent(TALENT_HEAVY_HANDS) + 0.15f * (f32)momentum;
+    }
+    int home = (school == FIRE && eo_talent(TALENT_SUN_HEART)) || (eo_talent(TALENT_LOCK_ON) && eo_lockon_target() >= 0);
+    if (grow == 1.0f && !home) {
+        return;
+    }
+    u8* rec = SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE;
+    u8* look = SPELL_VISUAL_TABLES[school] + index * SPELL_VISUAL_SIZE;
+    shaped_rec = rec;
+    shaped_look = look;
+    saved_size = *(f32*)(rec + REC_SIZE);
+    saved_homing = *(u16*)(rec + REC_HOMING);
+    saved_speed[0] = *(s16*)(rec + REC_SPEED);
+    saved_speed[1] = *(s16*)(rec + REC_SPEED + 2);
+    for (int s = 0; s < LOOK_STAGES; s++) {
+        saved_look[s][0] = *(f32*)(look + s * LOOK_STAGE_SIZE + LOOK_SIZE_X);
+        saved_look[s][1] = *(f32*)(look + s * LOOK_STAGE_SIZE + LOOK_SIZE_X + 4);
+    }
+    if (grow != 1.0f) {
+        *(f32*)(rec + REC_SIZE) = saved_size * grow;
+        for (int s = 0; s < LOOK_STAGES; s++) {
+            *(f32*)(look + s * LOOK_STAGE_SIZE + LOOK_SIZE_X) = saved_look[s][0] * grow;
+            *(f32*)(look + s * LOOK_STAGE_SIZE + LOOK_SIZE_X + 4) = saved_look[s][1] * grow;
+        }
+    }
+    if (home) {
+        *(u16*)(rec + REC_HOMING) = 3;
+        *(s16*)(rec + REC_SPEED) = (s16)(saved_speed[0] * 3 / 2 + 1);
+        *(s16*)(rec + REC_SPEED + 2) = (s16)(saved_speed[1] * 3 / 2 + 1);
+    }
+}
+
 // ---- Casting ----
 
 // Brian casts (combat.c, once per cast, as the first shot launches); `boost` is the charges spent on it.
@@ -524,9 +651,19 @@ void eo_spells_on_cast(int school, int index, int boost) {
     cast_index = index;
     cast_boost = boost;
     scalded = 0;
+    cast_marks = 0;
+    quarry_armed = 0;
+    stones_armed = 0;
     const SpellDef* d = def_of(school, index);
     if (d == 0) {
         return;
+    }
+    if (d->type == TYPE_DAMAGE) {
+        shape_cast(school, index);
+    }
+    if (school == EARTH && d->type == TYPE_DAMAGE) {
+        quarry_armed = (u8)(eo_talent(TALENT_QUARRY) && eo_arena_take_pillar_near_brian());
+        stones_armed = (u8)eo_arena_take_stones();
     }
     switch (d->kind) {
         case K_HEAT_HAZE:
@@ -534,7 +671,7 @@ void eo_spells_on_cast(int school, int index, int boost) {
             break;
         case K_STONESKIN:
             guard_turns = (u8)(3 + boost);
-            guard_percent = (u8)(30 + 5 * eo_talent(TALENT_STONESKIN_MASTERY));
+            guard_percent = 30;
             break;
         case K_JUGGERNAUT:
             juggernaut = (u8)(200 + 50 * boost > 255 ? 255 : 200 + 50 * boost);   // 3x, half again more a charge
@@ -547,7 +684,7 @@ void eo_spells_on_cast(int school, int index, int boost) {
             wall_turns = (u8)(1 + boost);
             break;
         case K_WHITEOUT:
-            fog_turns = (u8)(2 + boost + eo_talent(TALENT_UPDRAFT));
+            fog_turns = (u8)(2 + boost);
             break;
         case K_MEND: {
             // Free: 18% of max HP at Water 12 or more, less below (progression.c); and 25% of max
@@ -556,15 +693,15 @@ void eo_spells_on_cast(int school, int index, int boost) {
             // Deep Well: 2% more of each a rank; Wellspring: 5% more MP a rank.
             u32 scale = eo_progression_mend_permille();
             u32 well = 2 * (u32)eo_talent(TALENT_DEEP_WELL);
-            u32 hp = (u32)BRIAN_MAX_HP * (18 + well) * scale / 100000 * (100 + 10 * (u32)boost) / 100;
+            u32 hp = (u32)BRIAN_MAX_HP * (MEND_HP_PERCENT + well) * scale / 100000 * (100 + 10 * (u32)boost) / 100;
             u32 mp = (u32)BRIAN_MAX_MP * (MEND_MP_PERCENT + well + 5 * (u32)eo_talent(TALENT_WELLSPRING)) / 100;
-            heal_brian(hp < 1 ? 1 : hp);
+            heal_water(hp < 1 ? 1 : hp);
             u32 nmp = BRIAN_MP + (mp < MEND_MIN_MP ? MEND_MIN_MP : mp);
             BRIAN_MP = (u16)(nmp > BRIAN_MAX_MP ? BRIAN_MAX_MP : nmp);
             break;
         }
         case K_SOOTHE: {
-            heal_brian((u32)BRIAN_MAX_HP * (15 + (u32)boost * 2) / 100);
+            heal_water((u32)BRIAN_MAX_HP * (SOOTHE_HP_PERCENT + (u32)boost * 2) / 100);
             eo_status_cure_poison();
             for (int k = 0; k < 12; k++) {
                 if ((BRIAN_STATUS_BITS & (1 << k)) && BRIAN_STATUS_COUNTDOWNS[k] > 1) {
@@ -575,7 +712,7 @@ void eo_spells_on_cast(int school, int index, int boost) {
         }
         case K_RENEW:
             renew_turns = 3;
-            renew_heal = (u16)((u32)BRIAN_MAX_HP * 12 * (100 + 10 * (u32)boost) / 10000);
+            renew_heal = (u16)((u32)BRIAN_MAX_HP * RENEW_HP_PERCENT * (100 + 10 * (u32)boost) / 10000);
             break;
         case K_FROST_NOVA: {
             f32 reach = NEAR_RADIUS + BOOST_RADIUS * boost;
@@ -654,13 +791,23 @@ int eo_spells_hit_percent(int slot, int frozen, int burning) {
     if (d->kind == K_SHATTER && frozen) {
         // 315 base on a frozen foe lands as 900 x 1.8 (the engine's Shatter), 0.2x more a talent rank; elsewhere
         // it's a weak hit.
-        int tenths = 18 + 2 * (eo_talent(TALENT_GLACIAL_SHATTER) + eo_talent(TALENT_DEEP_FREEZE));
+        int tenths = 18 + 2 * eo_talent(TALENT_GLACIAL_SHATTER);
         return 900 * tenths * 10 / 315 - 100;
     }
+    int more = 0;
     if (d->kind == K_FAN && burning) {
-        return 60;
+        more += 60;
     }
-    return 0;
+    // Kiln rank 2: a Fire spell that flew through ground fire hits a quarter harder.
+    if (cast_school == FIRE && eo_talent(TALENT_KILN) >= 2 && slot >= 0 && slot < MAX_ENEMIES &&
+        eo_arena_fire_between(BRIAN_POS[0], BRIAN_POS[2], pos(slot)[0], pos(slot)[2])) {
+        more += 25;
+    }
+    // Momentum: each Earth attack in a row without moving, 10% more.
+    if (cast_school == EARTH) {
+        more += 10 * momentum;
+    }
+    return more;
 }
 
 // Extra shields a weakness hit cracks (Boulder).
@@ -712,6 +859,24 @@ static u32 burn_amount(u32 hit) {
     return hit * (u32)eo_status_burn_percent() / 100;
 }
 
+u32 eo_spells_ember_stack(void) {
+    return burn_amount(estimate(FIRE, 200)) + 1;
+}
+
+// Glacier Heart: a frozen foe that shatters or dies bursts into shards that freeze everything near it.
+static void glacier_burst(int t) {
+    if (!eo_talent(TALENT_GLACIER_HEART) || burst_done[t]) {
+        return;
+    }
+    burst_done[t] = 1;
+    eo_fx_shield_hit(t, 1);
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (i != t && alive(i) && dist2(pos(i), pos(t)) <= NEAR_RADIUS * NEAR_RADIUS) {
+            chill(i, 2);
+        }
+    }
+}
+
 // What a spell does to one foe it hit (the target, or a foe the hit splashed onto).
 static void effect(const SpellDef* d, const Hit* h, int i, u32 amount, int main_target) {
     int b = h->boost;
@@ -725,7 +890,7 @@ static void effect(const SpellDef* d, const Hit* h, int i, u32 amount, int main_
             break;
         }
         case K_BELLOWS:
-            eo_status_burn_heat(i, 3, 50 + 25 * b + 10 * eo_talent(TALENT_FAN_THE_COALS));
+            eo_status_burn_heat(i, 3, 50 + 25 * b);
             break;
         case K_SCALD:
             if (eo_status_burn_total(i) > 0) {
@@ -739,13 +904,13 @@ static void effect(const SpellDef* d, const Hit* h, int i, u32 amount, int main_
             eo_combat_thaw(i);
             break;
         case K_FLARE_UP:
-            eo_status_burn_grow(i, 50 + 25 * b + 10 * eo_talent(TALENT_FAN_THE_COALS));
+            eo_status_burn_grow(i, 50 + 25 * b);
             break;
         case K_PYRE:
             eo_status_burn_cash(i, 100 + 20 * (u32)b);
             break;
         case K_FIRESTORM:
-            eo_status_burn_heat(i, 3 + b, 50 + 10 * eo_talent(TALENT_FAN_THE_COALS));
+            eo_status_burn_heat(i, 3 + b, 50);
             break;
         case K_DETONATE:
             eo_status_burn_detonate(i, NEAR_RADIUS + BOOST_RADIUS * b);
@@ -762,7 +927,7 @@ static void effect(const SpellDef* d, const Hit* h, int i, u32 amount, int main_
             meteor_stacks = (u8)(2 + b);
             break;
         case K_SEARING: {
-            u32 total = eo_status_burn_total(i) * (300 + 50 * (u32)b) / 100 * (100 + 15 * (u32)eo_talent(TALENT_PYRE)) / 100;
+            u32 total = eo_status_burn_total(i) * (300 + 50 * (u32)b) / 100;
             eo_status_burn_clear(i);
             fixed_hit(i, total);
             for (int k = 0; k < MAX_ENEMIES; k++) {
@@ -855,6 +1020,162 @@ static void effect(const SpellDef* d, const Hit* h, int i, u32 amount, int main_
     }
 }
 
+// The nearest live foes to `from` other than it, up to `n`, into `out` (Ricochet, Chain Shatter, bounces).
+static int nearest_others(int from, int n, int* out) {
+    int found = 0;
+    u8 used[MAX_ENEMIES] = { 0 };
+    used[from] = 1;
+    while (found < n) {
+        int best = -1;
+        f32 bd = 1e9f;
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            if (!used[i] && alive(i) && dist2(pos(i), pos(from)) < bd) {
+                bd = dist2(pos(i), pos(from));
+                best = i;
+            }
+        }
+        if (best < 0) {
+            break;
+        }
+        used[best] = 1;
+        out[found++] = best;
+    }
+    return found;
+}
+
+static int fireball(int index) {   // Fire spells that fly as fireballs (Firewall: they leave ground fire)
+    return index == 0 || index == 1 || index == 5 || index == 6 || index == 8 || index == 9 || index == 11;
+}
+
+// What the talents add to a hit on its main target, once the spell's own effect is done.
+static void talent_effects(const SpellDef* d, const Hit* h, int t) {
+    f32* p = pos(t);
+    u32 amount = h->amount;
+    int targets[MAX_ENEMIES];
+    if (h->school == FIRE) {
+        // Kiln: a Fire spell that flew through ground fire (already there) adds a stack.
+        if (eo_talent(TALENT_KILN) && alive(t) && !(cast_marks & MARK_ZONE) &&
+            eo_arena_fire_between(BRIAN_POS[0], BRIAN_POS[2], p[0], p[2])) {
+            burn(t, burn_amount(amount));
+        }
+        // Ground fire: Burst and Blast leave it; with Firewall, fireballs too.
+        if (!(cast_marks & MARK_ZONE)) {
+            if (h->index == 2 || h->index == 7) {
+                eo_arena_ground_fire(p[0], p[1], p[2], h->index == 7, 1);
+                cast_marks |= MARK_ZONE;
+            } else if (eo_talent(TALENT_FIREWALL) && fireball(h->index)) {
+                eo_arena_ground_fire(p[0], p[1], p[2], 0, 0);
+                cast_marks |= MARK_ZONE;
+            }
+        }
+        // Flashpoint: the hit bursts; every burning foe near it takes one tick at once.
+        if (eo_talent(TALENT_FLASHPOINT)) {
+            for (int i = 0; i < MAX_ENEMIES; i++) {
+                if (alive(i) && eo_status_burn_total(i) > 0 && dist2(pos(i), p) <= NEAR_RADIUS * NEAR_RADIUS) {
+                    eo_status_burn_tick_now(i);
+                }
+            }
+        }
+        // Rekindle: the Burn starts over, longer.
+        if (eo_talent(TALENT_REKINDLE) && alive(t)) {
+            eo_status_burn_rekindle(t, eo_talent(TALENT_REKINDLE));
+        }
+    } else if (h->school == EARTH && d->type == TYPE_DAMAGE) {
+        // Monolith: Rock and Boulder leave a pillar where they land.
+        if ((h->index == 0 || h->index == 1) && eo_talent(TALENT_MONOLITH) && !(cast_marks & MARK_PILLAR)) {
+            f32* b = BRIAN_POS;
+            f32 dx = b[0] - p[0];
+            f32 dz = b[2] - p[2];
+            f32 len = __builtin_sqrtf(dx * dx + dz * dz);
+            f32 k = len > 0.1f ? -18.0f / len : 0.0f;   // just behind the target: Impact slams foes into it
+            eo_arena_pillar(p[0] + dx * k, p[1], p[2] + dz * k);
+            cast_marks |= MARK_PILLAR;
+        }
+        // Quarry and Mountain's Patience: the stones Brian hurls with it.
+        if (quarry_armed && !(cast_marks & MARK_QUARRY)) {
+            cast_marks |= MARK_QUARRY;
+            fixed_hit(t, estimate(EARTH, 495));
+            eo_fx_shield_hit(t, 1);
+        }
+        if (stones_armed > 0 && !(cast_marks & MARK_STONES)) {
+            cast_marks |= MARK_STONES;
+            for (int k = 0; k < stones_armed; k++) {
+                fixed_hit(t, estimate(EARTH, 300));
+            }
+            eo_fx_shield_hit(t, 1);
+        }
+        // Gravity Well: foes near the impact are pulled in.
+        int well = eo_talent(TALENT_GRAVITY_WELL);
+        if (well > 0) {
+            eo_arena_pull(p[0], p[2], 40.0f + 25.0f * well, 0.5f);
+        }
+        // Bouncing Stone: rolling stones bounce on to more foes.
+        int bounce = eo_talent(TALENT_RICOCHET_BOULDER);
+        if (bounce > 0 && (h->index == 3 || h->index == 11)) {
+            int n = nearest_others(t, bounce, targets);
+            for (int k = 0; k < n; k++) {
+                fixed_hit(targets[k], amount * 7 / 10);
+                eo_fx_shield_hit(targets[k], 0);
+            }
+        }
+        // Impact: the hit knocks the foe back; slammed into something, it takes the hit again.
+        int impact = eo_talent(TALENT_IMPACT);
+        if (impact > 0 && alive(t)) {
+            eo_arena_knock(t, BRIAN_POS[0], BRIAN_POS[2], 15.0f * impact, amount);
+        }
+    } else if (h->school == WATER && d->type == TYPE_DAMAGE) {
+        if (!(cast_marks & MARK_ZONE)) {
+            cast_marks |= MARK_ZONE;
+            if (h->index == 6) {
+                eo_arena_hailcloud(p[0], p[1], p[2]);   // Hailcloud
+            } else {
+                eo_arena_ice_floor(p[0], p[1], p[2]);   // Ice Floor
+            }
+        }
+        // Chain Shatter: shards fly from the broken ice to the nearest foes.
+        int chain = eo_talent(TALENT_CHAIN_SHATTER);
+        if (d->kind == K_SHATTER && h->frozen && chain > 0) {
+            int n = nearest_others(t, chain, targets);
+            for (int k = 0; k < n; k++) {
+                fixed_hit(targets[k], amount * 3 / 10);
+                chill(targets[k], 1);
+                eo_fx_shield_hit(targets[k], 0);
+            }
+        }
+        if (d->kind == K_SHATTER && h->frozen) {
+            glacier_burst(t);
+        }
+    } else if (h->school == WIND && d->type == TYPE_DAMAGE) {
+        if (h->index == 10 && !(cast_marks & MARK_ZONE)) {
+            cast_marks |= MARK_ZONE;
+            eo_arena_vortex(p[0], p[1], p[2]);   // Vortex
+        }
+        // Ricochet: each hit bounces on to the nearest foes.
+        int rico = eo_talent(TALENT_RICOCHET);
+        if (rico > 0) {
+            int n = nearest_others(t, rico, targets);
+            for (int k = 0; k < n; k++) {
+                fixed_hit(targets[k], amount * 7 / 10);
+                eo_fx_shield_hit(targets[k], 0);
+            }
+        }
+        // Crosswind: the wind carries flame and frost it passed through.
+        int cross = eo_talent(TALENT_CROSSWIND);
+        if (cross > 0 && alive(t)) {
+            int fire = eo_arena_fire_between(BRIAN_POS[0], BRIAN_POS[2], p[0], p[2]);
+            int ice = eo_arena_ice_between(BRIAN_POS[0], BRIAN_POS[2], p[0], p[2]);
+            if (fire && (cross >= 2 || !ice)) {
+                for (int k = 0; k < cross; k++) {
+                    burn(t, eo_spells_ember_stack());
+                }
+            }
+            if (ice && (cross >= 2 || !fire)) {
+                chill(t, cross);
+            }
+        }
+    }
+}
+
 static void run_hit(const Hit* h) {
     const SpellDef* d = def_of(h->school, h->index);
     int t = h->slot;
@@ -883,6 +1204,7 @@ static void run_hit(const Hit* h) {
     if (alive(t) || d->kind == K_METEOR || d->kind == K_DETONATE) {
         effect(d, h, t, h->amount, 1);
     }
+    talent_effects(d, h, t);
     // Whirlwind: everyone it hit drifts toward the target.
     if (d->kind == K_WHIRLWIND) {
         for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -928,25 +1250,50 @@ RECOMP_HOOK_RETURN("player_take_damage") void eo_spells_after_brian_damage(void)
         BRIAN_HP = (u16)(hp_before_hit > lost ? hp_before_hit - lost : 0);
     }
     u32 back = 0;
-    int evade = 3 * (eo_talent(TALENT_EVASION) + eo_talent(TALENT_ZEPHYR_STEP));
+    int attacker = -1;
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (hit_attacker == ENEMY_BATTLE_DATA(i)) {
+            attacker = i;
+        }
+    }
+    int evade = 3 * eo_talent(TALENT_EVASION) + eo_arena_miss_percent(hit_attacker);
     if (wall_turns > 0 && spell_on_brian) {
         back = lost;   // the wall stops the spell
+        if (eo_talent(TALENT_MIRROR_ICE) && attacker >= 0) {
+            fixed_hit(attacker, lost);   // Mirror Ice: and throws it back
+        }
+    } else if (spell_on_brian && eo_arena_blocks_shot(hit_attacker)) {
+        back = lost;   // a pillar, a frozen statue or an orbiting stone took it
     } else if (fog_turns > 0 && get_rand(100) < FOG_MISS_PERCENT) {
         back = lost;   // lost in the fog
     } else if (get_rand(100) < evade) {
-        back = lost;   // Evasion, Zephyr Step
+        back = lost;   // Evasion, smoke, blinding, Zephyr Step
     } else {
-        u32 soak = (guard_turns > 0 ? guard_percent : 0) + (u32)eo_talents_taken_percent();
+        u32 soak = guard_turns > 0 ? guard_percent : 0;
+        if (spell_on_brian && eo_combat_settled()) {
+            soak += 10 * (u32)eo_talent(TALENT_GRANITE_BODY);   // Granite Body
+        }
         back = lost * (soak > 90 ? 90 : soak) / 100;
     }
     if (back > 0 && BRIAN_HP > 0) {
         u32 hp = BRIAN_HP + back;
-        BRIAN_HP = (u16)(hp > BRIAN_MAX_HP ? BRIAN_MAX_HP : hp);
+        BRIAN_HP = (u16)(hp > hp_before_hit ? hp_before_hit : hp);
+    }
+    // Ember Skin: a foe that hit him up close catches fire.
+    if (eo_talent(TALENT_EMBER_SKIN) && !spell_on_brian && attacker >= 0 && lost > back) {
+        burn(attacker, eo_spells_ember_stack());
     }
     // Phoenix: once a battle, falling under a quarter of his HP heals 30%.
     if (eo_talent(TALENT_PHOENIX) && !phoenix_used && BRIAN_HP > 0 && (u32)BRIAN_HP * 4 < BRIAN_MAX_HP) {
         phoenix_used = 1;
         heal_brian((u32)BRIAN_MAX_HP * 30 / 100);
+        // and bursts into flame: every foe near him catches 2 stacks.
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            if (alive(i) && dist2(pos(i), BRIAN_POS) <= NEAR_RADIUS * NEAR_RADIUS) {
+                burn(i, eo_spells_ember_stack());
+                burn(i, eo_spells_ember_stack());
+            }
+        }
     }
     // Heat Haze: whoever hit him catches a Burn stack.
     if (haze_turns > 0 && lost > back) {
@@ -976,13 +1323,19 @@ static void brian_turn_begins(void) {
             confused[i] = 0;
         }
     }
+    // Overflow fades a quarter a turn (Deep Tide: it keeps).
+    if (BRIAN_HP > BRIAN_MAX_HP && !eo_talent(TALENT_DEEP_TIDE)) {
+        u32 over = BRIAN_HP - BRIAN_MAX_HP;
+        BRIAN_HP = (u16)(BRIAN_HP - (over + OVERFLOW_FADE - 1) / OVERFLOW_FADE);
+    }
     if (renew_turns > 0) {
         renew_turns--;
-        heal_brian(renew_heal);
+        heal_water(renew_heal);
     }
     if (eo_talent(TALENT_LIVING_WATER) && BRIAN_HP > 0) {
-        heal_brian((u32)BRIAN_MAX_HP * 3 / 100 + 1);
+        heal_water((u32)BRIAN_MAX_HP * 3 / 100 + 1);
     }
+    eo_arena_brian_turn();
     // Meteor lands: heavy damage and hot Burn on everything near the mark.
     if (meteor_armed) {
         meteor_armed = 0;
@@ -1036,7 +1389,11 @@ static void confused_turn_over(int i) {
 
 // An enemy's turn ends (battle_end_turn gets the fighter whose turn it was): a confused one lashed out.
 RECOMP_HOOK("battle_end_turn") void eo_spells_on_turn_end(u8* fighter) {
-    if (!in_battle() || !(gBattleState & BATTLE_ENEMY_TURN)) {
+    if (!in_battle()) {
+        return;
+    }
+    if (!(gBattleState & BATTLE_ENEMY_TURN)) {
+        unshape_cast();
         return;
     }
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -1048,10 +1405,26 @@ RECOMP_HOOK("battle_end_turn") void eo_spells_on_turn_end(u8* fighter) {
 
 RECOMP_HOOK_RETURN("frame_build") void eo_spells_frame(void) {
     static int was_enemy_turn = 0;
+    static int was_in_battle = 0;
     if (!in_battle()) {
         queued = 0;
         was_enemy_turn = 0;
+        if (was_in_battle) {
+            was_in_battle = 0;
+            unshape_cast();
+            if (BRIAN_HP > BRIAN_MAX_HP) {
+                BRIAN_HP = BRIAN_MAX_HP;   // Overflow is gone after the battle
+            }
+        }
         return;
+    }
+    was_in_battle = 1;
+    // Glacier Heart: a frozen foe that dies bursts too.
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (was_frozen[i] && !alive(i)) {
+            glacier_burst(i);
+        }
+        was_frozen[i] = (u8)(alive(i) && eo_combat_frozen(i));
     }
     for (int k = 0; k < queued; k++) {
         run_hit(&queue[k]);

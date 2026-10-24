@@ -24,7 +24,8 @@
 #define MAX_ENEMIES 6
 #define BURN_STACKS 5        // room for Wildfire's fourth and Eternal Flame's fifth
 #define BASE_BURN_STACKS 3
-#define TICK_TALENT_PERCENT 10   // Kindling, Inferno: Burn ticks, a rank
+#define TICK_TALENT_PERCENT 10   // Kindling: Burn ticks, a rank
+#define WILDFIRE_RADIUS 110.0f   // Wildfire: how far a dying foe's Burn leaps
 #define SMOLDER_CHANCE 10        // Smoldering Shields: a tick cracks a shield, a rank
 #define BURN_PERCENT 20      // per stack per turn (30 made Fire the best boss damage by far; balance pass)
 #define SFX_DETONATE 0x0F     // the Ember spell's own sound (playtest, 2026-10-21)
@@ -100,16 +101,14 @@ static int is_enemy_battle_data(void* p) {
 // ---- Burn ----
 
 // Wildfire at rank 3 fits a fourth stack; Eternal Flame five.
+// Overload: a foe holds a fourth and a fifth stack.
 static int burn_stack_limit(void) {
-    if (eo_talent(TALENT_ETERNAL_FLAME)) {
-        return 5;
-    }
-    return BASE_BURN_STACKS + (eo_talent(TALENT_WILDFIRE) >= 3 ? 1 : 0);
+    return BASE_BURN_STACKS + eo_talent(TALENT_OVERLOAD);
 }
 
 // Lingering Flame at rank 3: a turn longer.
 static u8 burn_turns(void) {
-    return (u8)(BURN_TURNS + (eo_talent(TALENT_LINGERING_FLAME) >= 3 ? 1 : 0));
+    return BURN_TURNS;
 }
 
 static u16 strongest_stack(int slot) {
@@ -133,8 +132,12 @@ static void burn_add_stack(int slot, u16 amount) {
     if (amount > b->stacks[weakest]) {
         b->stacks[weakest] = amount;
     }
+    // A new Burn starts ticking next turn; a stack added to a burning foe doesn't hold its ticks back (ground fire and
+    // Sun Heart add one nearly every turn).
+    if (b->turns_left == 0) {
+        b->fresh = 1;
+    }
     b->turns_left = burn_turns();
-    b->fresh = 1;
 }
 
 static void burn_tick_all(void) {
@@ -160,7 +163,7 @@ static void burn_tick_all(void) {
             total += b->stacks[i];
         }
         total = total * (100 + (b->hot_turns > 0 ? b->hot_percent : 0) + b->bank_percent +
-                         TICK_TALENT_PERCENT * (u32)(eo_talent(TALENT_KINDLING) + eo_talent(TALENT_INFERNO))) / 100;
+                         TICK_TALENT_PERCENT * (u32)eo_talent(TALENT_KINDLING)) / 100;
         if (b->hot_turns > 0) {
             b->hot_turns--;
         }
@@ -170,15 +173,16 @@ static void burn_tick_all(void) {
             if (get_rand(100) < SMOLDER_CHANCE * eo_talent(TALENT_SMOLDERING_SHIELDS)) {
                 eo_combat_crack(slot, 1);   // Smoldering Shields
             }
+            // Burn feeds Brian (take 3 base rule): each tick gives back MP; Stoked Mind doubles it.
+            u32 mp = BRIAN_MP + (eo_talent(TALENT_STOKED_MIND) ? 2 : 1);
+            BRIAN_MP = (u16)(mp > BRIAN_MAX_MP ? BRIAN_MAX_MP : mp);
         }
         if (b->turns_left == 0) {
             continue;   // the tick killed it (Wildfire's death watch cleared its Burn)
         }
-        if (eo_talent(TALENT_ETERNAL_FLAME)) {
-            continue;   // Eternal Flame: it never runs out
-        }
         if (--b->turns_left == 0) {
             *b = (Burn){ 0 };
+            eo_arena_blind(slot);   // Ash Cloud: a Burn that runs out leaves the foe blind for a turn
         }
     }
 }
@@ -296,7 +300,14 @@ void eo_status_burn_detonate(int slot, f32 radius) {
     }
 }
 
-// Any damage that kills a burning foe puts its Burn out.
+// Rekindle: a Fire hit on a burning foe starts its Burn over, `extra` turns longer.
+void eo_status_burn_rekindle(int slot, int extra) {
+    if (slot >= 0 && slot < MAX_ENEMIES && burns[slot].turns_left > 0) {
+        burns[slot].turns_left = (u8)(burn_turns() + extra);
+    }
+}
+
+// Any damage that kills a burning foe puts its Burn out; with Wildfire it leaps onto every foe within reach first.
 static int death_watch_slot = -1;
 
 RECOMP_HOOK("enemy_take_damage") void eo_status_watch_death(s32 slot, u16 power, u16 element, u16 flags, void* attacker) {
@@ -307,6 +318,29 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_status_after_death_watch(void) {
     int slot = death_watch_slot;
     death_watch_slot = -1;
     if (slot >= 0 && ENEMY_HP(slot) == 0) {
+        if (eo_talent(TALENT_WILDFIRE)) {
+            f32* from = (f32*)(ENEMY_SLOTS + slot * ENEMY_SLOT_SIZE + 0x24);
+            int spread = 0;
+            for (int i = 0; i < MAX_ENEMIES; i++) {
+                f32* to = (f32*)(ENEMY_SLOTS + i * ENEMY_SLOT_SIZE + 0x24);
+                f32 dx = to[0] - from[0];
+                f32 dz = to[2] - from[2];
+                if (i == slot || ENEMY_HP(i) == 0 || dx * dx + dz * dz > WILDFIRE_RADIUS * WILDFIRE_RADIUS) {
+                    continue;
+                }
+                for (int k = 0; k < BURN_STACKS; k++) {
+                    if (burns[slot].stacks[k] > 0) {
+                        burn_add_stack(i, burns[slot].stacks[k]);
+                    }
+                }
+                eo_fx_burn_hit(i);
+                spread = 1;
+            }
+            if (spread) {
+                eo_fx_flare(slot);
+                eo_sfx(SFX_DETONATE);
+            }
+        }
         burns[slot] = (Burn){ 0 };
     }
 }
@@ -555,29 +589,7 @@ RECOMP_HOOK_RETURN("spell_status_roll") void eo_status_after_roll(void) {
     roll_blocked = 0;
 }
 
-// Eye of the Storm: statuses Brian applies last longer. spell_status_set_duration(projectile, target, status) sets the
-// countdown at the target's stats + 2 + status; add to it afterwards.
-#define PROJECTILE_CASTER 0x24
-static u8* storm_countdown = 0;
 
-#define STATUS_EVADE 5
-
-RECOMP_HOOK("spell_status_set_duration") void eo_status_before_duration(u8* projectile, u8* target, s32 status) {
-    storm_countdown = 0;
-    if (status != STATUS_EVADE || target != BRIAN_BATTLE_DATA || *(void**)(projectile + PROJECTILE_CASTER) != BRIAN_BATTLE_DATA ||
-        eo_talent(TALENT_UPDRAFT) == 0) {
-        return;
-    }
-    u8* stats = *(u8**)(target + BATTLE_DATA_STATS);
-    storm_countdown = stats != 0 ? stats + 2 + status : 0;
-}
-
-RECOMP_HOOK_RETURN("spell_status_set_duration") void eo_status_after_duration(void) {
-    if (storm_countdown != 0) {
-        *storm_countdown = (u8)(*storm_countdown + 1);
-        storm_countdown = 0;
-    }
-}
 
 // ---- Display ----
 

@@ -233,42 +233,32 @@ Every spell has its own name, no levels (Rock, Boulder, ...); the list is in mod
       Burn, Freeze, Poison; Brian included, so a buffed Brian can't be poisoned and a poisoned Brian can't buff
       himself). Burn still stacks on a burning foe. Break isn't a status. Not checked in play yet.
 
-## Talents (rebuilt 2026-10-23)
+## Talents (take 3, 2026-10-23)
 
-The Spirits window (D-pad up): **LEVELS**, then one tree per element (D-pad left / right). Each tree has 16 talents:
-five rows that open at element level 1, 12, 30, 48 and 60 (two talents of up to 3 ranks and one single pick each),
-then a capstone at 68. The list shows ten at a time and scrolls with the cursor (a dash at the left says there's
-more). Ranks cost 1 point in rows 1-2, 2 in row 3, 3 in rows 4-5, and 4 for a capstone: a whole tree is 74 points.
-**Only one capstone** in all four trees: the others show TAKEN. Saves with talents from the old 9-talent trees get
-those points back once (the old ranks are cleared).
+The Spirits window (D-pad up): **LEVELS**, then one tree per element. Same frame as before (rows at element level 1,
+12, 30, 48, 60, a capstone at 68, one capstone in all), but the talents now change what happens in the arena. The full
+list and what each does is in the Spell Trees doc ("Talent trees, take 3"). New base rules everyone gets:
 
-| Fire | Earth | Water | Wind |
-|---|---|---|---|
-| Kindling 3: Burn ticks +10% | Bedrock 3: Earth +7% | Deep Well 3: Mend +2% HP and MP | Gale Force 3: Wind +6% |
-| Ember Heart 3: Fire +6% | Thick Skin 3: take 2% less | Cold Snap 3: Water +6% | Fleet 3: agility +5% |
-| Searing Staff: swings add Burn, take 6% less | Heavy Staff: swings +30%, take 6% less | Tide Staff: swings Frost, take 6% less | Whistling Staff: swings +30%, take 6% less |
-| Fan the Coals 3: stoking +10% | Steady Footing 3: Settle loses 7% less | Frostbite 3: frozen foes +8% | Squall 3: many-hit spells 8% more hits |
-| Lingering Flame 3: Burn +1 turn at rank 3 | Momentum 3: Earth Boost +5% a charge | Clear Waters 3: Water MP -9% | Evasion 3: foes miss 3% more |
-| Hot Hands: Fire MP -25% | Brace: passing while Settled halves hits | Winter's Grip: bosses resist freeze 1 turn less | Tailwind: Wind MP -25% |
-| Wildfire 3: a 4th stack at rank 3 | Fault Line 3: Earth weak hits may crack 1 more | Glacial Shatter 3: Shatter +0.2x | Cyclone 3: Wind hits 5% to crack any shield |
-| Pyre 3: Searing Steam +15% | Stone Mastery 3: guards +5% | Hypothermia 3: 10% to chill a step colder | Crosswind 3: Wind +10% on Broken |
-| Ash Veil: take 7% less | Quarry: Earth MP -25% | Ice Armor: take 7% less | Updraft: Mirage, Whiteout +1 turn |
-| Conflagration 3: burning foes +5% | Tremor 3: Earth +10% on Broken | Rime 3: Water +5% | Tempest Fury 3: Wind +5% |
-| Blaze 3: Fire +5% | Granite Will 3: take 3% less | Permafrost 3: Freeze +1 turn at rank 3 | Eye of the Storm 3: take 3% less |
-| Phoenix: once a fight, under 25% HP heal 30% | Planted Feet: passing while Settled +1 Charge | Living Water: heal 3% each turn | Second Breath: start with 1 Charge |
-| Inferno 3: Burn ticks +10% | Colossus 3: Earth +7% | Deep Freeze 3: Shatter +0.2x | Shear Force 3: many-hit spells 8% more hits |
-| Smolder Shields 3: Burn ticks 10% to crack | Unbreakable 3: hits soak 4% | Wellspring 3: Mend +5% MP | Zephyr Step 3: foes miss 3% more |
-| Cinder Skin: take 7% less | Seismic: heavy Earth hits always crack 1 | Tidal Heart: healing +25% | Storm Caller: Wind finishers need 1 Charge |
-| **Eternal Flame**: Burn never ends, 5 stacks | **Avalanche**: every 3rd Earth cast 2x | **Glacier Heart**: bosses refreeze at once | **Second Wind**: every 3rd round you act twice |
+- **Ground fire**: Burst and Blast leave a patch of embers for a turn; foes crossing it or standing in it catch Burn.
+- **Smoke**: burning foes smoke (pale sparkles); their attacks on you can miss.
+- **Burn feeds you**: every Burn tick gives back 1 MP.
+- **Frost on Frost**: chilling a frosted foe Freezes it half the time (Flash Freeze: always).
+- **Overflow**: Water healing (Mend, Soothe, Renew, Living Water) goes past max HP, up to +25% (shows as 56/53). It
+  soaks hits first, fades a quarter each turn and is gone after the battle. Mend, Soothe and Renew heal a bit more.
 
-Differences from the doc: Unbreakable soaks 4% of each hit a rank instead of raising max HP, and Wellspring makes
-Mend restore 5% more MP a rank instead of raising max MP (changing the max would be written into the save). Wildfire
-no longer spreads a dying foe's Burn. Lock-On is no longer a talent: everyone has it (below).
+Checked by Claude (talents set in memory only, levels 70): ground fire and its catches, Burn ticks with MP back,
+Flashpoint, Rekindle, Overload; Monolith pillars, Impact knockback, Tremor, Brace, stones stored by passing and hurled
+by the next Rock (Mountain's Patience), Momentum; Hailstorm freezing a pack, Shatter, Chain Shatter, Overflow and
+Deep Tide; Ricochet hitting the whole pack, Second Wind (two actions a turn), Hit and Run (after the cast Brian is
+silenced and can only move; A ends the turn), Jet Stream.
 
-- [ ] Checked by Claude: the pages, scrolling, costs, TAKEN, learning ranks (points come off), Second Wind (every
-  third round Brian went twice), Hot Hands (Blaze 5 MP), Eternal Flame, Living Water, Brace. The rest: not yet.
+Not checked yet: Smoke's misses, Ember Skin, Ash Cloud, Living Flame, Bonfire, Wildfire, Kiln, Sun Heart, Quarry,
+Gravity Well, Bouncing Stone, Granite Body, Ice Floor sliding, Mirror Ice, Frozen Statue, Glacier Heart, Crosswind,
+Lock-On homing, Vortex, Zephyr Step. Known rough edges: Overflow HP isn't blue yet; during Hit and Run's phase Brian
+glows white (that's the silence it uses); the arena edge for monster fights is a guess (150 around where the fight
+started).
 
-**Lock-On** (everyone now; was a Wind talent): in battle, hold **Z** and Brian locks onto an enemy (the one most straight ahead) and
+**Lock-On** (Wind talent again, row 3, level 30; now also makes your spells fly faster and home in): in battle, hold **Z** and Brian locks onto an enemy (the one most straight ahead) and
 keeps facing it while you move, which aims your spells. Tap Z again to switch to the next enemy. A pale-gold
 sparkle floats over the target. Z doesn't swing or cast while the talent is learned (A and R still do).
 While locked, the stick moves Brian any way it would normally (strafing no longer pulls him toward the target), and

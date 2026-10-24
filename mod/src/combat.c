@@ -160,8 +160,32 @@ static u8 boss_freeze_immunity(void) {
 }
 
 // Avalanche (Earth capstone): every third Earth attack of a battle deals double.
-static u8 earth_casts = 0;
-static u8 avalanche_now = 0;
+// Turns with more than one phase (Second Wind, Hit and Run): what Brian already did this turn, and whether he is
+// in Hit and Run's moving phase (he can't cast or swing; A ends it).
+static u8 acted_earlier = 0;
+static u8 run_phase = 0;
+static f32 move_base = 0.0f;   // Brian's move multiplier from gear and Fleet (0: not read yet this battle)
+
+#define BRIAN_STATUS_BITS (*(u16*)0x8007BB38)
+#define BRIAN_SILENCE 0x040
+#define BRIAN_SILENCE_COUNTDOWN (*(u8*)0x8007BB40)
+#define BRIAN_MOVE_MULTIPLIER (*(f32*)0x8007BBC8)
+
+// Jet Stream: Brian moves farther until he casts. The base is read the first time it's needed in a battle, once
+// gear and Fleet have set it (player_battle_init).
+static void set_jet_stream(int casting_done) {
+    int jet = eo_talent(TALENT_JET_STREAM);
+    if (jet == 0) {
+        return;
+    }
+    if (move_base == 0.0f) {
+        move_base = BRIAN_MOVE_MULTIPLIER;
+    }
+    BRIAN_MOVE_MULTIPLIER = move_base * (casting_done ? 1.0f : 1.0f + 0.25f * (f32)jet);
+}
+
+int eo_combat_settled(void);
+void eo_combat_gain_charge(int n);
 // Brace: a turn ended with A while Settled halves the hits until Brian's next turn.
 static u8 braced = 0;            // defense the Stone Staff has added this fight
 
@@ -237,9 +261,10 @@ RECOMP_HOOK("battle_build_turn_order") void eo_combat_on_battle_start(void) {
     }
     charge = 0;
     gain_charge(START_CHARGE + eo_talent(TALENT_SECOND_BREATH) + (eo_equipment_worn(EQ_HOURGLASS_CHARM) ? 2 : 0));
-    earth_casts = 0;
-    avalanche_now = 0;
     braced = 0;
+    acted_earlier = 0;
+    run_phase = 0;
+    move_base = 0.0f;
     first_cast_turn = 0;
     settled = settle_pending = 0;
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -358,6 +383,16 @@ static void freeze_enemy(int i, int turns) {
 static int frozen_now(int i) {
     u8* status = *(u8**)(ENEMY_BATTLE_DATA(i) + 0x68);
     return !guards[i].broken && !eo_spells_confused(i) && status != 0 && (*(u16*)status & STATUS_RESTRICTION_BIT);
+}
+
+int eo_combat_settled(void) {
+    return settled > 0;
+}
+
+void eo_combat_gain_charge(int n) {
+    if (in_battle()) {
+        gain_charge(n);
+    }
 }
 
 int eo_combat_frozen(int slot) {
@@ -539,6 +574,11 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     if (hit == 0) {
         return;
     }
+    // Hit and Run's moving phase: no swinging (the hit is undone).
+    if (hit_kind == HIT_STAFF && run_phase) {
+        ENEMY_HP(slot) = hit_hp;
+        return;
+    }
     // Staff hits deal 0.76x like spells (progression.c; spells get it through their base): the rest comes back.
     if (hit_kind == HIT_STAFF) {
         u32 back = hit * (1000 - DAMAGE_SCALE_THOUSANDTHS) / 1000;
@@ -564,15 +604,12 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
     u32 plain = 0;
     if (hit_kind == HIT_STAFF) {
         extra += (u32)eo_equip_staff_bonus();
-        plain = (u32)eo_talents_staff_percent(hit_was_frozen);
-        percent += plain;
+        plain = 0;
     } else if (hit_element < 4) {
         plain = (u32)eo_equip_element_percent(hit_element) +
-                (u32)eo_talents_spell_percent(hit_element, hit_was_broken, hit_was_frozen, hit_was_burning);
+                (u32)eo_talents_spell_percent(hit_element);
         percent += plain;
-        if (hit_element == EARTH && avalanche_now) {
-            percent += 100;   // Avalanche
-        }
+
         // Stone Memory: each Earth spell cast in a row hits 15% harder (to 30%).
         if (hit_element == EARTH && eo_equipment_worn(EQ_STONE_MEMORY)) {
             percent += STONE_MEMORY_PERCENT * (u32)(earth_streak > 1 ? (earth_streak - 1 > 2 ? 2 : earth_streak - 1) : 0);
@@ -653,17 +690,13 @@ RECOMP_HOOK_RETURN("enemy_take_damage") void eo_combat_after_enemy_damage(void) 
             if (eo_equipment_worn(EQ_EMBER_STAFF)) {
                 eo_status_flare(slot);
             }
-        } else if (ENEMY_HP(slot) > 0 && (eo_equipment_worn(EQ_PHOENIX_STAFF) || eo_talent(TALENT_SEARING_STAFF))) {
+        } else if (ENEMY_HP(slot) > 0 && eo_equipment_worn(EQ_PHOENIX_STAFF)) {
             eo_status_add_burn(slot, (u16)(hit * (u32)eo_status_burn_percent() / 100 + 1));
         }
         // Stone Staff: every swing hardens Brian, +3 defense for the rest of the fight (up to +12).
         if (eo_equipment_worn(EQ_STONE_STAFF) && stone_guard < STONE_GUARD_MAX) {
             stone_guard = (u8)(stone_guard + STONE_GUARD_STEP);
             BRIAN_DEFENSE_NOW = (u16)(BRIAN_DEFENSE_NOW + STONE_GUARD_STEP);
-        }
-        // Tide Staff (talent): swings Frost the foe.
-        if (eo_talent(TALENT_TIDE_STAFF) && ENEMY_HP(slot) > 0) {
-            eo_spells_frost_foe(slot);
         }
         // Tide Staff: swings heal Brian for half the damage they deal.
         if (eo_equipment_worn(EQ_TIDE_STAFF)) {
@@ -756,12 +789,18 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
     ending_enemy_turn = (gBattleState & BATTLE_ENEMY_TURN) != 0;
     if (!(gBattleState & BATTLE_ENEMY_TURN)) {
         // Settle: a turn ended with A (no spell, no swing) clears a level; this turn's Earth attack Settles him now.
-        int acted = cast_turn == turns_taken + 1 || turn_swing_used == turns_taken + 1;
+        int acted = acted_earlier || cast_turn == turns_taken + 1 || turn_swing_used == turns_taken + 1;
+        acted_earlier = (u8)acted;
         braced = 0;
         if (!acted && settled > 0) {
             braced = (u8)eo_talent(TALENT_BRACE);
             gain_charge(eo_talent(TALENT_PLANTED_FEET));
+            eo_arena_settled_pass();   // Tremor, Mountain's Patience
             settled--;
+        }
+        if (run_phase) {
+            run_phase = 0;
+            BRIAN_STATUS_BITS &= (u16)~BRIAN_SILENCE;   // Hit and Run's phase is over
         }
         if (settle_pending > settled) {
             settled = settle_pending;
@@ -818,6 +857,8 @@ RECOMP_HOOK("battle_end_turn") void eo_combat_on_turn_end(void) {
     spent_last_turn = 0;
     weakness_bonus_given = 0;
     turns_taken++;
+    acted_earlier = 0;
+    set_jet_stream(0);
 }
 
 // The game ticks a fighter's statuses inside battle_end_turn: a foe it just thawed keeps its ice until Brian's
@@ -827,12 +868,28 @@ RECOMP_HOOK_RETURN("battle_end_turn") void eo_combat_after_turn_end(void) {
         return;
     }
     if (!ending_enemy_turn) {
-        // Second Wind: every third round Brian acts twice (the game just handed the turn to an enemy; take it back).
+        // The game just handed the turn to an enemy; Second Wind and Hit and Run take it back once each.
+        // Second Wind: Brian acts twice every turn. Hit and Run: after a cast he may still move, but not cast or
+        // swing (silenced; swings do nothing), until he ends the turn with A.
         static u32 second_wind_turn = 0;
-        if (eo_talent(TALENT_SECOND_WIND) && turns_taken % 3 == 2 && second_wind_turn != turns_taken + 1 &&
-            (gBattleState & BATTLE_ENEMY_TURN)) {
+        static u32 run_turn = 0;
+        int cast_now = cast_turn == turns_taken + 1;
+        if (!(gBattleState & BATTLE_ENEMY_TURN)) {
+            return;
+        }
+        if (eo_talent(TALENT_SECOND_WIND) && second_wind_turn != turns_taken + 1) {
             second_wind_turn = turns_taken + 1;
             gBattleState &= (u16)~BATTLE_ENEMY_TURN;
+            cast_turn = 0;                 // a fresh action: it may cast again
+            turn_swing_used = 0;
+            set_jet_stream(0);
+        } else if (eo_talent(TALENT_HIT_AND_RUN) && cast_now && run_turn != turns_taken + 1) {
+            run_turn = turns_taken + 1;
+            gBattleState &= (u16)~BATTLE_ENEMY_TURN;
+            run_phase = 1;
+            BRIAN_STATUS_BITS |= BRIAN_SILENCE;
+            BRIAN_SILENCE_COUNTDOWN = 1;
+            set_jet_stream(1);
         }
         return;
     }
@@ -888,10 +945,7 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
     }
     if (new_cast) {
         eo_spells_on_cast(school, index, used);
-        if (school == EARTH && type == SPELL_TYPE_DAMAGE) {
-            earth_casts++;
-            avalanche_now = eo_talent(TALENT_AVALANCHE) && earth_casts % 3 == 0;
-        }
+
     }
     if (school == EARTH && type == SPELL_TYPE_DAMAGE && earth_settle[index] > settle_pending) {
         settle_pending = earth_settle[index];
@@ -942,7 +996,7 @@ RECOMP_HOOK("projectile_init") void eo_combat_on_projectile(void* caster, u16 sp
         shots++;
     }
     // Squall and Shear Force: many-hit spells hit more often (the fraction of a hit is a chance at one more).
-    u32 more = MULTI_HIT_PERCENT * (u32)(eo_talent(TALENT_SQUALL) + eo_talent(TALENT_SHEAR_FORCE));
+    u32 more = MULTI_HIT_PERCENT * (u32)eo_talent(TALENT_SQUALL);
     if (type == SPELL_TYPE_DAMAGE && saved_shots >= 2 && more > 0) {
         u32 hundredths = (u32)shots * more;
         shots = (u16)(shots + hundredths / 100 + ((u32)get_rand(100) < hundredths % 100 ? 1 : 0));
