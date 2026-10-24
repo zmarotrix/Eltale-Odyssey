@@ -243,8 +243,15 @@ list and what each does is in the Spell Trees doc ("Talent trees, take 3"). New 
 - **Smoke**: burning foes smoke (pale sparkles); their attacks on you can miss.
 - **Burn feeds you**: every Burn tick gives back 1 MP.
 - **Frost on Frost**: chilling a frosted foe Freezes it half the time (Flash Freeze: always).
-- **Overflow**: Water healing (Mend, Soothe, Renew, Living Water) goes past max HP, up to +25% (shows as 56/53). It
-  soaks hits first, fades a quarter each turn and is gone after the battle. Mend, Soothe and Renew heal a bit more.
+- Mend, Soothe and Renew heal a bit more than before.
+
+**Changed after playtest (2026-10-23):** Overflow is a Water talent again (row 5, "Overflow", was Deep Tide): Water
+healing goes past max HP up to +25%, the current HP number turns blue while it's over (checked: 64/53 with 64 blue,
+the rest of the HUD normal), and it's gone after the battle. Without the talent healing stops at max. Pressing any
+school's button opens its spells even at 0 MP (casting still needs the MP; checked with Fire). Each school starts
+with one spell: tier-1 spells open at the element level vanilla gave them (1, then 4; Wind's third at 6), except
+Mend, which everyone has from the start (checked: Fire+Fire locked at Fire 1). Holy Plains monsters: 1.4x HP (was
+2x; 1.2x fell in two hits).
 
 Checked by Claude (talents set in memory only, levels 70): ground fire and its catches, Burn ticks with MP back,
 Flashpoint, Rekindle, Overload; Monolith pillars, Impact knockback, Tremor, Brace, stones stored by passing and hurled
@@ -254,7 +261,7 @@ silenced and can only move; A ends the turn), Jet Stream.
 
 Not checked yet: Smoke's misses, Ember Skin, Ash Cloud, Living Flame, Bonfire, Wildfire, Kiln, Sun Heart, Quarry,
 Gravity Well, Bouncing Stone, Granite Body, Ice Floor sliding, Mirror Ice, Frozen Statue, Glacier Heart, Crosswind,
-Lock-On homing, Vortex, Zephyr Step. Known rough edges: Overflow HP isn't blue yet; during Hit and Run's phase Brian
+Lock-On homing, Vortex, Zephyr Step. Known rough edges: during Hit and Run's phase Brian
 glows white (that's the silence it uses); the arena edge for monster fights is a guess (150 around where the fight
 started).
 

@@ -216,9 +216,8 @@ static u32 cost_of(int school, int index) {
 }
 
 // While Brian presses elements, each press is checked against the spell the presses so far make, and refused if
-// he can't pay for it. A press should go through when any spell it leads to is affordable (Water, then Water
-// again for the free Mend, at 0 MP), so a press is charged the cheapest spell that starts with those presses
-// (the last two of three in either order, as the game matches them). Casting checks the spell's own cost.
+// he can't pay for it. Pressing should always open a school's spells (playtest, 2026-10-23), so a press costs
+// nothing; casting checks the spell's own cost.
 static int menu_open = 0;
 
 RECOMP_HOOK("spell_menu_input") void eo_spells_menu_begin(void) {
@@ -227,25 +226,6 @@ RECOMP_HOOK("spell_menu_input") void eo_spells_menu_begin(void) {
 
 RECOMP_HOOK_RETURN("spell_menu_input") void eo_spells_menu_end(void) {
     menu_open = 0;
-}
-
-static u32 cheapest_from(int school, int index) {
-    u8* rec = SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE;
-    u16 n = *(u16*)(rec + REC_PRESSES);
-    u32 best = cost_of(school, index);
-    for (int i = 0; i < SPELLS; i++) {
-        u8* other = SPELL_STAT_TABLES[school] + i * SPELL_STAT_SIZE;
-        u16 m = *(u16*)(other + REC_PRESSES);
-        if (m <= n || m > 3) {
-            continue;
-        }
-        int leads = n == 1 || (n == 2 && (other[REC_PRESS_LIST + 1] == rec[REC_PRESS_LIST + 1] ||
-                                          other[REC_PRESS_LIST + 2] == rec[REC_PRESS_LIST + 1]));
-        if (leads && cost_of(school, i) < best) {
-            best = cost_of(school, i);
-        }
-    }
-    return best;
 }
 
 static void set_mp_cost(s32 spell) {
@@ -258,7 +238,7 @@ static void set_mp_cost(s32 spell) {
     u16 presses = *(u16*)(SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE + REC_PRESSES);
     if (presses >= 1 && presses <= 3) {
         int pressing = menu_open && (MENU_PAD & MENU_C_BUTTONS);
-        MP_COSTS[presses] = (u16)(pressing ? cheapest_from(school, index) : cost_of(school, index));
+        MP_COSTS[presses] = (u16)(pressing ? 0 : cost_of(school, index));
     }
 }
 
@@ -377,8 +357,7 @@ static u8 burst_done[MAX_ENEMIES];
 #define MARK_PILLAR 0x02
 #define MARK_QUARRY 0x04
 #define MARK_STONES 0x08
-#define OVERFLOW_PERCENT 25         // Overflow: Water healing can go this far past max HP (Deep Tide: twice)
-#define OVERFLOW_FADE 4             // a quarter of it fades at the start of each of Brian's turns
+#define OVERFLOW_PERCENT 25         // Overflow: Water healing can go this far past max HP
 
 #define FOG_MISS_PERCENT 40
 #define MEND_MP_PERCENT 25
@@ -420,10 +399,14 @@ static void heal_brian(u32 amount) {
     BRIAN_HP = (u16)(hp > BRIAN_MAX_HP ? BRIAN_MAX_HP : hp);
 }
 
-// Overflow (take 3 base rule): Water healing goes past max HP, up to OVERFLOW_PERCENT more (Deep Tide: twice that).
-// The extra soaks hits first, fades a quarter a turn (not with Deep Tide) and is gone after the battle.
+// Overflow (Water talent): Water healing goes past max HP, up to OVERFLOW_PERCENT more, shown as a blue end on the
+// HP bar (eo_spells_overflow). The extra soaks hits first and is gone after the battle. Without the talent, healing
+// stops at max HP.
 static u32 overflow_cap(void) {
-    return (u32)BRIAN_MAX_HP + (u32)BRIAN_MAX_HP * OVERFLOW_PERCENT * (eo_talent(TALENT_DEEP_TIDE) ? 2 : 1) / 100;
+    if (!eo_talent(TALENT_DEEP_TIDE)) {
+        return BRIAN_MAX_HP;
+    }
+    return (u32)BRIAN_MAX_HP + (u32)BRIAN_MAX_HP * OVERFLOW_PERCENT / 100;
 }
 
 static void heal_water(u32 amount) {
@@ -1324,10 +1307,7 @@ static void brian_turn_begins(void) {
         }
     }
     // Overflow fades a quarter a turn (Deep Tide: it keeps).
-    if (BRIAN_HP > BRIAN_MAX_HP && !eo_talent(TALENT_DEEP_TIDE)) {
-        u32 over = BRIAN_HP - BRIAN_MAX_HP;
-        BRIAN_HP = (u16)(BRIAN_HP - (over + OVERFLOW_FADE - 1) / OVERFLOW_FADE);
-    }
+
     if (renew_turns > 0) {
         renew_turns--;
         heal_water(renew_heal);

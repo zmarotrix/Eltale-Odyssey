@@ -623,3 +623,42 @@ void eo_fx_update(void) {
         }
     }
 }
+
+// ---- Overflow HP shows blue (the Overflow talent) ----
+//
+// The HUD draws each of its numbers with func_80020D4C(mode, x, y, value); Brian's current HP is mode 3 at (12, 0),
+// two texture rectangles. The HUD sets up its color mode in a display list it calls first (G_DL); while his HP is
+// over his max (only in battle), the HP number is drawn with color = texture x a blue primitive color, then that
+// setup list is called again so the rest of the HUD draws as before.
+
+#define HUD_HP_MODE 3
+#define HUD_HP_Y 0
+#define GFX_DL 0x06
+#define TINT_COMBINE_W0 0xFC11FE23   // both cycles: color TEXEL0 x PRIMITIVE, alpha TEXEL0
+#define TINT_COMBINE_W1 0xFFFFF3F9
+#define OVERFLOW_BLUE 0x5AA0FFFF
+
+static int hp_tinted = 0;
+static u32 hud_setup[2];
+
+RECOMP_HOOK("func_80020D4C") void eo_fx_before_hud_number(s32 mode, s32 x, s32 y, u32 value) {
+    u16* brian = (u16*)gPlayerMainData;
+    hp_tinted = 0;
+    if (mode != HUD_HP_MODE || y != HUD_HP_Y || !(gBattleState & 0x1) || brian[2] <= brian[3] || !eo_gfx_fits(0x60) ||
+        !find_game_command(GFX_DL, 0, hud_setup)) {
+        return;
+    }
+    eo_gfx(GFX_PIPE_SYNC << 24, 0);
+    eo_gfx(TINT_COMBINE_W0, TINT_COMBINE_W1);
+    eo_gfx(GFX_PRIM_COLOR << 24, OVERFLOW_BLUE);
+    hp_tinted = 1;
+}
+
+RECOMP_HOOK_RETURN("func_80020D4C") void eo_fx_after_hud_number(void) {
+    if (!hp_tinted) {
+        return;
+    }
+    hp_tinted = 0;
+    eo_gfx(GFX_PIPE_SYNC << 24, 0);
+    eo_gfx(hud_setup[0], hud_setup[1]);   // the HUD's own setup again
+}

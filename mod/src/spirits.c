@@ -140,6 +140,11 @@ static void apply(void) {
             u8* stats = SPELL_STAT_TABLES[s] + i * SPELL_STAT_SIZE;
             // Tier-5 spells are finishers: in battle they open only once Brian holds 2 Charge (combat.c).
             int open = spell_tier[s][i] <= open_tier(s) && (spell_tier[s][i] < TIERS || eo_combat_finisher_ready_for(s));
+            // Tier 1 opens a spell at a time, at the level vanilla gave it (playtest, 2026-10-23: one spell to start).
+            // Mend (Water + Water) is the exception: it's the free spell everyone can cast.
+            if (spell_tier[s][i] == 1 && ELEMENT_LEVELS[s] < spell_vanilla_level[s][i] && !(s == 2 && i == 1)) {
+                open = 0;
+            }
             *(u16*)(stats + SPELL_LEVEL_REQ) = open ? REQ_OPEN : REQ_LOCKED;
             SPELL_NAME_TABLES[s][i] = is_discovered(s, i) ? spell_names[s][i] : unknown_name;
         }
