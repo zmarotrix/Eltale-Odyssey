@@ -44,7 +44,7 @@
 #define PRISM_PERCENT 20
 #define GLASS_PERCENT 25
 #define RESIST_SOFTEN_PERCENT 50   // 0.5x resisted hits become 0.75x
-#define SETTLE_PERMILLE 400        // Earth spells while Brian is Settled deal 0.4x
+#define SETTLE_PERMILLE 700        // Earth spells while Brian is Settled deal 0.7x (0.4x felt like random 3s; playtest, 2026-10-24)
 #define FINISHER_CHARGE 2          // tier-5 spells need this much Charge and spend all of it
 #define BOSS_FREEZE_IMMUNE 2       // a thawed boss can't be frozen again for this many of its turns
 #define BLOODSTONE_PERCENT 20      // Bloodstone: spells while Brian is under half HP
@@ -1064,6 +1064,10 @@ static void draw_charge(void) {
         int icon = i < charge - boost ? ICON_CHARGE_FULL : i < charge ? ICON_CHARGE_SPEND : ICON_CHARGE_EMPTY;
         eo_icon_draw(icon, CHARGE_X - HUD_GEM_SLIDE + i * CHARGE_STEP, CHARGE_Y);
     }
+    // Settled: an Earth diamond a level, after a gap (playtest, 2026-10-24: Settle was invisible).
+    for (int i = 0; in_battle() && i < settled; i++) {
+        eo_icon_draw(ICON_EARTH, CHARGE_X - HUD_GEM_SLIDE + (max_charge() + 1 + i) * CHARGE_STEP, CHARGE_Y);
+    }
 }
 
 static void draw_spell_description(void) {
@@ -1100,6 +1104,9 @@ static void draw_spell_description(void) {
     }
     if (valid && eo_spirits_tier(school, index) == 5) {
         eo_append(mp + eo_strlen(mp), "  FINISHER: 2 CHARGE");
+    } else if (valid && school == EARTH && settled && *(u16*)(SPELL_STAT_TABLES[school] + index * SPELL_STAT_SIZE +
+                                                                SPELL_TYPE) == SPELL_TYPE_DAMAGE) {
+        eo_append(mp + eo_strlen(mp), "  SETTLED: 0.7X");
     }
     int mp_short = ((u16*)gPlayerMainData)[4] < cost;
 
