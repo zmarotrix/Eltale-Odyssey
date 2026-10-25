@@ -48,9 +48,9 @@ Clear Sight's reveal; how each spell **looks** (several borrow another spell's v
 Spells that flew at the wrong range are fixed; a few are close-range by design (Scald, Searing Steam: a ring of
 steam around you).
 
-- [ ] **Settle (Earth)**: after an Earth attack, your Earth attacks deal 0.7x (was 0.4x) until you end a turn with
+- [ ] **Settle (Earth)**: after an Earth attack, your Earth attacks deal 0.4x (0.7x was tried and dropped) until you end a turn with
   **A** without casting or swinging (moving is fine). Megalith needs two such turns. While Settled, an amber
-  diamond per level shows after the charge diamonds, and an Earth attack's MP line says "SETTLED: 0.7X".
+  diamond per level shows after the charge diamonds, and an Earth attack's MP line says "SETTLED: 0.4X".
 - [ ] **Freeze window**: a frozen foe stays frozen through its skipped turn AND your next turn (your chance to
   Shatter), then thaws. A thawed boss can't be frozen again for 2 of its turns. Checked by Claude.
 - [ ] **Freeze looks**: a frozen foe stops moving inside a see-through block of ice. Checked by Claude.
